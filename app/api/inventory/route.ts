@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { queryInventory, markUnitAsSold } from '@/lib/repositories/inventory-repository';
 import { UserRole } from '@/lib/types/auth';
 import { queryGoogleSheetsInventory } from '@/lib/repositories/google-sheets-inventory';
+import { auth } from '@/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,7 +24,9 @@ export async function GET(request: NextRequest) {
     const pageSize = searchParams.get('pageSize') ? Number(searchParams.get('pageSize')) : 25;
 
     // Role is injected by authenticated server middleware; never trust a client role parameter.
-    const roleHeader = (request.headers.get('x-bbk-role') || 'VIEWER') as UserRole;
+    const session = await auth();
+    if (!session?.user?.role) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+    const roleHeader = session.user.role as UserRole;
 
     const result = process.env.BBK_INVENTORY_SOURCE === 'google_sheets'
       ? await queryGoogleSheetsInventory(
@@ -76,7 +79,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, sku, dealPrice, notes } = body;
 
-    const roleHeader = (request.headers.get('x-bbk-role') || 'VIEWER') as UserRole;
+    const session = await auth();
+    if (!session?.user?.role) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+    const roleHeader = session.user.role as UserRole;
     if (roleHeader !== 'ADMIN' && roleHeader !== 'OPERATOR') {
       return NextResponse.json(
         { error: 'Unauthorized: Only ADMIN and OPERATOR can mark units as SOLD or edit inventory.' },
