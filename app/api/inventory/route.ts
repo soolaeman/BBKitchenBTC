@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryInventory, markUnitAsSold } from '@/lib/repositories/inventory-repository';
 import { UserRole } from '@/lib/types/auth';
+import { queryGoogleSheetsInventory } from '@/lib/repositories/google-sheets-inventory';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,10 +22,11 @@ export async function GET(request: NextRequest) {
     const page = searchParams.get('page') ? Number(searchParams.get('page')) : 1;
     const pageSize = searchParams.get('pageSize') ? Number(searchParams.get('pageSize')) : 25;
 
-    // RBAC Role Header or Param for server-side masking
-    const roleHeader = (request.headers.get('x-bbk-role') || searchParams.get('role') || 'ADMIN') as UserRole;
+    // Role is injected by authenticated server middleware; never trust a client role parameter.
+    const roleHeader = (request.headers.get('x-bbk-role') || 'VIEWER') as UserRole;
 
-    const result = queryInventory(
+    const result = process.env.BBK_INVENTORY_SOURCE === 'google_sheets'
+      ? await queryGoogleSheetsInventory(
       {
         search,
         category,
@@ -42,7 +44,26 @@ export async function GET(request: NextRequest) {
         pageSize,
       },
       roleHeader
-    );
+      )
+      : queryInventory(
+          {
+            search,
+            category,
+            location,
+            warehouse,
+            statusUnit,
+            statusPipeline,
+            guardrailStatus,
+            isDirty,
+            minPrice,
+            maxPrice,
+            sortBy,
+            sortOrder,
+            page,
+            pageSize,
+          },
+          roleHeader
+        );
 
     return NextResponse.json(result);
   } catch (error: any) {
@@ -55,7 +76,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, sku, dealPrice, notes } = body;
 
-    const roleHeader = (request.headers.get('x-bbk-role') || 'ADMIN') as UserRole;
+    const roleHeader = (request.headers.get('x-bbk-role') || 'VIEWER') as UserRole;
     if (roleHeader !== 'ADMIN' && roleHeader !== 'OPERATOR') {
       return NextResponse.json(
         { error: 'Unauthorized: Only ADMIN and OPERATOR can mark units as SOLD or edit inventory.' },
