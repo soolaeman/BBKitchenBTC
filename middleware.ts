@@ -58,7 +58,8 @@ export default auth((request) => {
   // Server-side role enforcement. The client cannot choose its own role.
   if (isApi) {
     const rule = API_ROLE_RULES.find((entry) => pathname.startsWith(entry.prefix));
-    if (rule && !rule.roles.includes(role)) {
+    const allowedRoles = rule?.roles ?? ["ADMIN"];
+    if (!allowedRoles.includes(role)) {
       return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
     }
 
