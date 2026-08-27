@@ -45,6 +45,7 @@ type AdminTab =
 
 export default function AdminPage() {
   const { user, role, permissions } = useAuth();
+  if (!user || !role || !permissions) return null;
   const [activeTab, setActiveTab] = useState<AdminTab>('OVERVIEW');
 
   const navItems: {
@@ -78,7 +79,7 @@ export default function AdminPage() {
       id: 'INVOICES',
       label: 'Invoices & Billing',
       icon: <Receipt className="w-4 h-4" />,
-      allowed: permissions.canManageInvoices || role === 'OPERATOR',
+      allowed: permissions.canManageInvoices,
     },
     {
       id: 'FINANCE',
@@ -97,13 +98,13 @@ export default function AdminPage() {
       id: 'SEO',
       label: 'SEO Quality & Schema',
       icon: <SearchCheck className="w-4 h-4" />,
-      allowed: permissions.canEditSEO || role === 'ADMIN',
+      allowed: permissions.canEditSEO,
     },
     {
       id: 'SOCIAL',
       label: 'Social Distribution',
       icon: <Share2 className="w-4 h-4" />,
-      allowed: permissions.canManageSocialMedia || role === 'ADMIN',
+      allowed: permissions.canManageSocialMedia,
     },
     {
       id: 'SALES_HELPER',
