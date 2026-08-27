@@ -60,9 +60,10 @@ export interface MasterInventoryItem {
   image_caption: string;
   image_description: string;
   asal_gudang: WarehouseCode;
+  LINK_TELEGRAM?: string;
   
   // Public Display Price (Estimated market/negotiable opening price)
-  HARGA_ESTIMASI_PUBLIK: number;
+  HARGA_ESTIMASI_PUBLIK?: number;
 
   // STRICTLY INTERNAL COMMERCIAL FIELDS (Protected by RBAC server-side)
   HARGA_MODAL?: number;
@@ -72,7 +73,6 @@ export interface MasterInventoryItem {
   MARGIN_FLOOR?: number;
   MARGIN_DEAL?: number;
   STATUS_GUARDRAIL?: GuardrailStatus;
-  LINK_TELEGRAM?: string;
   LINK_UNIT?: string;
   supplier_code?: string;
   internal_notes?: string;

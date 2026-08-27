@@ -1,6 +1,6 @@
 import type {Metadata} from 'next';
 import './globals.css'; // Global styles
-import { AuthProvider } from '@/lib/auth/auth-context';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'Bukan Baru Kitchen | Pusat Peralatan Dapur Komersial Restoran & Cafe',
@@ -16,9 +16,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="id">
       <body suppressHydrationWarning className="bg-slate-950 text-slate-100 antialiased font-sans">
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
