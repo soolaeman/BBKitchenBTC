@@ -75,14 +75,15 @@ function toItem(row: string[]): MasterInventoryItem {
     image_caption: value(row, 22),
     image_description: value(row, 23),
     asal_gudang: value(row, 24) as MasterInventoryItem["asal_gudang"],
+    HARGA_ESTIMASI_PUBLIK: numberOrNull(value(row, 26)) ?? undefined,
     HARGA_MODAL: numberOrNull(value(row, 25)) ?? undefined,
-    HARGA_BUKA_WA: numberOrNull(value(row, 26)) ?? undefined,
-    HARGA_DEAL_WA: numberOrNull(value(row, 27)) ?? undefined,
-    HARGA_FLOOR_WA: numberOrNull(value(row, 28)) ?? undefined,
-    MARGIN_FLOOR: numberOrNull(value(row, 29)) ?? undefined,
-    MARGIN_DEAL: numberOrNull(value(row, 30)) ?? undefined,
-    STATUS_GUARDRAIL: (value(row, 31) || "SAFE") as MasterInventoryItem["STATUS_GUARDRAIL"],
-    LINK_UNIT: value(row, 33),
+    HARGA_BUKA_WA: numberOrNull(value(row, 27)) ?? undefined,
+    HARGA_DEAL_WA: numberOrNull(value(row, 28)) ?? undefined,
+    HARGA_FLOOR_WA: numberOrNull(value(row, 29)) ?? undefined,
+    MARGIN_FLOOR: numberOrNull(value(row, 30)) ?? undefined,
+    MARGIN_DEAL: numberOrNull(value(row, 31)) ?? undefined,
+    STATUS_GUARDRAIL: (value(row, 32) || "SAFE") as MasterInventoryItem["STATUS_GUARDRAIL"],
+    LINK_UNIT: value(row, 34),
   };
 }
 
