@@ -1,0 +1,6 @@
+{
+  "name": "BBKitchen Business Control Tower",
+  "description": "Enterprise operational control tower and public e-commerce platform for Bukan Baru Kitchen (BBK), unifying inventory, sales helper, pipeline health, finance, SEO audit, and role-based business reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
