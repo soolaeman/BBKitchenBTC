@@ -7,8 +7,8 @@ import { ROLE_PERMISSIONS } from "@/lib/types/auth";
 
 interface AuthContextType {
   user: UserSession | null;
-  role: UserRole | null;
-  permissions: RolePermissions | null;
+  role: UserRole;
+  permissions: RolePermissions;
   switchRole: never;
   isLoading: boolean;
   logout: () => Promise<void>;
@@ -18,13 +18,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
-  const role = session?.user?.role ?? null;
+
+  // VIEWER is the safe client-side default while the session is loading.
+  // Authentication/authorization is enforced server-side by auth(), never by this default.
+  const role: UserRole = session?.user?.role ?? "VIEWER";
   const user: UserSession | null = session?.user
     ? {
         id: session.user.email ?? "authenticated-user",
         name: session.user.name ?? "BBK User",
         email: session.user.email ?? "",
-        role: role ?? "VIEWER",
+        role,
         avatarUrl: session.user.image ?? undefined,
       }
     : null;
@@ -32,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     user,
     role,
-    permissions: role ? ROLE_PERMISSIONS[role] : null,
+    permissions: ROLE_PERMISSIONS[role],
     switchRole: undefined as never,
     isLoading: status === "loading",
     logout: () => signOut({ callbackUrl: "/login" }),
