@@ -24,6 +24,7 @@ import {
   SearchCheck,
   Share2,
   Calculator,
+  MessageSquare,
   Shield,
   ChefHat,
   ArrowUpRight,
@@ -42,6 +43,7 @@ type AdminTab =
   | 'WAREHOUSES'
   | 'SEO'
   | 'SOCIAL'
+  | 'SALES_QUOTE'
   | 'SALES_HELPER';
 
 export default function AdminPage() {
@@ -110,9 +112,15 @@ export default function AdminPage() {
       allowed: permissions.canManageSocialMedia,
     },
     {
-      id: 'SALES_HELPER',
-      label: 'Instant Sales Quote',
+      id: 'SALES_QUOTE',
+      label: 'Sales Quote',
       icon: <Calculator className="w-4 h-4" />,
+      allowed: true,
+    },
+    {
+      id: 'SALES_HELPER',
+      label: 'Sales Helper',
+      icon: <MessageSquare className="w-4 h-4" />,
       allowed: true,
     },
   ];
@@ -170,7 +178,7 @@ export default function AdminPage() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => item.id === 'SALES_HELPER' ? router.push('/admin/sales') : setActiveTab(item.id)}
+                    onClick={() => item.id === 'SALES_QUOTE' ? router.push('/admin/sales') : setActiveTab(item.id)}
                     className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium transition-all rounded-sm ${
                       isActive
                         ? 'text-[#3b82f6] font-semibold bg-white/[0.04]'
