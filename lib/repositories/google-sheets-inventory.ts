@@ -75,7 +75,7 @@ function toItem(row: string[]): MasterInventoryItem {
     image_caption: value(row, 22),
     image_description: value(row, 23),
     asal_gudang: value(row, 24) as MasterInventoryItem["asal_gudang"],
-    HARGA_ESTIMASI_PUBLIK: numberOrNull(value(row, 26)) ?? undefined,
+    HARGA_ESTIMASI_PUBLIK: numberOrNull(value(row, 26)),
     HARGA_MODAL: numberOrNull(value(row, 25)) ?? undefined,
     HARGA_BUKA_WA: numberOrNull(value(row, 27)) ?? undefined,
     HARGA_DEAL_WA: numberOrNull(value(row, 28)) ?? undefined,
