@@ -84,7 +84,7 @@ export function InventoryTable() {
       if (isDirtyOnly) params.append('isDirty', 'true');
 
       const res = await fetch(`/api/inventory?${params.toString()}`, {
-        headers: { ...(role ? { 'x-bbk-role': role } : {}) },
+        headers: { ...(role ? { 'x-bbk-role': role ?? '' } : {}) },
       });
       const result = await res.json();
       setData(result);
@@ -117,7 +117,7 @@ export function InventoryTable() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-bbk-role': role,
+          'x-bbk-role': role ?? '',
         },
         body: JSON.stringify({
           action: 'MARK_AS_SOLD',
