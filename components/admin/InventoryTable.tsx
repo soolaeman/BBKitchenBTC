@@ -84,7 +84,7 @@ export function InventoryTable() {
       if (isDirtyOnly) params.append('isDirty', 'true');
 
       const res = await fetch(`/api/inventory?${params.toString()}`, {
-        headers: { 'x-bbk-role': role },
+        headers: { ...(role ? { 'x-bbk-role': role } : {}) },
       });
       const result = await res.json();
       setData(result);
