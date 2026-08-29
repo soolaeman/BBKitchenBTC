@@ -75,15 +75,21 @@ function toItem(row: string[]): MasterInventoryItem {
     image_caption: value(row, 22),
     image_description: value(row, 23),
     asal_gudang: value(row, 24) as MasterInventoryItem["asal_gudang"],
-    HARGA_ESTIMASI_PUBLIK: numberOrNull(value(row, 26)),
+    // Official HubScript / Publish-to-Woo schema:
+    // Z=HARGA_MODAL, AA=HARGA_BUKA_WA, AB=HARGA_DEAL_WA,
+    // AC=HARGA_FLOOR_WA, AD=MARGIN_FLOOR, AE=MARGIN_DEAL,
+    // AF=STATUS_GUARDRAIL, AG=blank spacer, AH=LINK_UNIT.
+    // The public display price is intentionally derived from HARGA_BUKA_WA;
+    // HARGA_ESTIMASI_PUBLIK is a legacy application field, not a Sheets column.
     HARGA_MODAL: numberOrNull(value(row, 25)) ?? undefined,
-    HARGA_BUKA_WA: numberOrNull(value(row, 27)) ?? undefined,
-    HARGA_DEAL_WA: numberOrNull(value(row, 28)) ?? undefined,
-    HARGA_FLOOR_WA: numberOrNull(value(row, 29)) ?? undefined,
-    MARGIN_FLOOR: numberOrNull(value(row, 30)) ?? undefined,
-    MARGIN_DEAL: numberOrNull(value(row, 31)) ?? undefined,
-    STATUS_GUARDRAIL: (value(row, 32) || "SAFE") as MasterInventoryItem["STATUS_GUARDRAIL"],
-    LINK_UNIT: value(row, 34),
+    HARGA_BUKA_WA: numberOrNull(value(row, 26)) ?? undefined,
+    HARGA_ESTIMASI_PUBLIK: numberOrNull(value(row, 26)),
+    HARGA_DEAL_WA: numberOrNull(value(row, 27)) ?? undefined,
+    HARGA_FLOOR_WA: numberOrNull(value(row, 28)) ?? undefined,
+    MARGIN_FLOOR: numberOrNull(value(row, 29)) ?? undefined,
+    MARGIN_DEAL: numberOrNull(value(row, 30)) ?? undefined,
+    STATUS_GUARDRAIL: (value(row, 31) || "SAFE") as MasterInventoryItem["STATUS_GUARDRAIL"],
+    LINK_UNIT: value(row, 33),
   };
 }
 
