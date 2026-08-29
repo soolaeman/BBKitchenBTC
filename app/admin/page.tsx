@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-context';
 import { RoleSwitcher } from '@/components/admin/RoleSwitcher';
@@ -46,6 +47,7 @@ type AdminTab =
 export default function AdminPage() {
   const { user, role, permissions } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('OVERVIEW');
+  const router = useRouter();
 
   if (!user) return null;
 
@@ -168,7 +170,7 @@ export default function AdminPage() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => item.id === 'SALES_HELPER' ? router.push('/admin/sales') : setActiveTab(item.id)}
                     className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium transition-all rounded-sm ${
                       isActive
                         ? 'text-[#3b82f6] font-semibold bg-white/[0.04]'
