@@ -97,7 +97,7 @@ export function ProductCard({ item }: ProductCardProps) {
           <div>
             <div className="text-[10px] text-slate-500 uppercase font-semibold">Harga Penawaran:</div>
             <div className="text-base font-black text-amber-400 font-mono">
-              {formatIDR(item.HARGA_ESTIMASI_PUBLIK)}
+              {item.HARGA_BUKA_WA != null ? formatIDR(item.HARGA_BUKA_WA) : 'Hubungi kami'}
             </div>
           </div>
 
