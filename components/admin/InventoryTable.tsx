@@ -439,7 +439,7 @@ export function InventoryTable() {
 
                     {/* Public Price */}
                     <td className="py-3 px-3 text-right font-mono font-bold text-slate-100 whitespace-nowrap">
-                      {formatIDR(item.HARGA_BUKA_WA || item.HARGA_ESTIMASI_PUBLIK)}
+                      {item.HARGA_BUKA_WA != null ? formatIDR(item.HARGA_BUKA_WA) : item.HARGA_ESTIMASI_PUBLIK != null ? formatIDR(item.HARGA_ESTIMASI_PUBLIK) : 'Hubungi kami'}
                     </td>
 
                     {/* Floor Price (Protected) */}
