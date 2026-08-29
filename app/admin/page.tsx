@@ -45,8 +45,9 @@ type AdminTab =
 
 export default function AdminPage() {
   const { user, role, permissions } = useAuth();
-  if (!user || !role || !permissions) return null;
   const [activeTab, setActiveTab] = useState<AdminTab>('OVERVIEW');
+
+  if (!user) return null;
 
   const navItems: {
     id: AdminTab;
