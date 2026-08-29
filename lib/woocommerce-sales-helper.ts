@@ -14,16 +14,9 @@ export interface SalesHelperProduct {
 }
 
 type WooProduct = {
-  id: number;
-  name: string;
-  slug: string;
-  sku?: string;
-  price?: string;
-  short_description?: string;
-  description?: string;
-  images?: { src?: string }[];
-  categories?: { name?: string }[];
-  stock_status?: string;
+  id: number; name: string; slug: string; sku?: string; price?: string;
+  short_description?: string; description?: string; images?: { src?: string }[];
+  categories?: { name?: string }[]; stock_status?: string;
   meta_data?: { key: string; value: unknown }[];
 };
 
@@ -85,8 +78,7 @@ export async function getSalesHelperProducts(input: { q?: string; sku?: string }
     return {
       id: product.id,
       sku: meta(product, ['kode_unit']) || product.sku || 'BBK-' + product.id,
-      name: stripHtml(product.name || ''),
-      slug: product.slug || '',
+      name: stripHtml(product.name || ''), slug: product.slug || '',
       category: product.categories?.[0]?.name?.trim() || 'Semua',
       status: meta(product, ['status_unit']) || product.stock_status || 'READY',
       condition: meta(product, ['kondisi_unit']) || 'Bekas Original',
