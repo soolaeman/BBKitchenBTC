@@ -66,7 +66,9 @@ export function resolveLocationFromCode(code: string): WarehouseLocation {
   return WAREHOUSE_LOCATION_MAP[normalized] || 'PAMULANG 2, TANGSEL';
 }
 
-export function formatIDR(amount: number): string {
+export function formatIDR(amount: number | null | undefined): string {
+  if (amount == null || !Number.isFinite(amount)) return 'Hubungi kami';
+
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
