@@ -334,17 +334,17 @@ export function InventoryTable() {
                 <th className="py-3.5 px-3 text-right">Harga Estimasi (WA)</th>
 
                 {/* Role-Protected Columns */}
-                {permissions.canViewFloorPrice && (
+                {permissions?.canViewFloorPrice && (
                   <th className="py-3.5 px-3 text-right text-amber-400 bg-amber-950/20">
                     Floor Price
                   </th>
                 )}
-                {permissions.canViewInternalCost && (
+                {permissions?.canViewInternalCost && (
                   <th className="py-3.5 px-3 text-right text-purple-400 bg-purple-950/20">
                     Modal (HPP)
                   </th>
                 )}
-                {permissions.canViewTelegramLink && (
+                {permissions?.canViewTelegramLink && (
                   <th className="py-3.5 px-3 text-center text-blue-400">
                     Telegram
                   </th>
@@ -443,21 +443,21 @@ export function InventoryTable() {
                     </td>
 
                     {/* Floor Price (Protected) */}
-                    {permissions.canViewFloorPrice && (
+                    {permissions?.canViewFloorPrice && (
                       <td className="py-3 px-3 text-right font-mono text-amber-300 bg-amber-950/10 whitespace-nowrap">
                         {item.HARGA_FLOOR_WA ? formatIDR(item.HARGA_FLOOR_WA) : '-'}
                       </td>
                     )}
 
                     {/* Cost COGS (Protected) */}
-                    {permissions.canViewInternalCost && (
+                    {permissions?.canViewInternalCost && (
                       <td className="py-3 px-3 text-right font-mono text-purple-300 bg-purple-950/10 whitespace-nowrap">
                         {item.HARGA_MODAL ? formatIDR(item.HARGA_MODAL) : <Lock className="w-3.5 h-3.5 inline text-slate-600" />}
                       </td>
                     )}
 
                     {/* Telegram Source (Protected) */}
-                    {permissions.canViewTelegramLink && (
+                    {permissions?.canViewTelegramLink && (
                       <td className="py-3 px-3 text-center whitespace-nowrap">
                         {item.LINK_TELEGRAM ? (
                           <a
@@ -492,7 +492,7 @@ export function InventoryTable() {
                           <Eye className="w-3.5 h-3.5" />
                         </button>
 
-                        {permissions.canMarkAsSold && item.STATUS_UNIT !== 'SOLD' && (
+                        {permissions?.canMarkAsSold && item.STATUS_UNIT !== 'SOLD' && (
                           <button
                             type="button"
                             onClick={() => {
@@ -612,7 +612,7 @@ export function InventoryTable() {
                 </div>
               </div>
 
-              {permissions.canViewFloorPrice && (
+              {permissions?.canViewFloorPrice && (
                 <div>
                   <div className="text-[11px] text-amber-400">Harga Floor (Batas Bawah)</div>
                   <div className="text-sm font-bold text-amber-300 font-mono">
@@ -621,7 +621,7 @@ export function InventoryTable() {
                 </div>
               )}
 
-              {permissions.canViewInternalCost && (
+              {permissions?.canViewInternalCost && (
                 <div>
                   <div className="text-[11px] text-purple-400">Modal HPP (Rahasia)</div>
                   <div className="text-sm font-bold text-purple-300 font-mono">
