@@ -5,13 +5,18 @@ import {
   updateInvoiceStatus,
   getFinancialKPIs,
 } from '@/lib/repositories/finance-repository';
-import { UserRole } from '@/lib/types/auth';
+import { auth } from '@/auth';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const view = searchParams.get('view');
-    const roleHeader = (request.headers.get('x-bbk-role') || searchParams.get('role') || 'ADMIN') as UserRole;
+    const session = await auth();
+    if (!session?.user?.role) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+    const role = session.user.role;
+    if (!['ADMIN', 'FINANCE', 'INVESTOR'].includes(role)) {
+      return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    }
 
     if (view === 'kpis') {
       const kpis = getFinancialKPIs();
@@ -27,6 +32,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.role) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+    const role = session.user.role;
+    if (!['ADMIN', 'FINANCE'].includes(role)) {
+      return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { action, invoice, id, status } = body;
 
