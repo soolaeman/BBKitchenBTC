@@ -70,7 +70,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
       '@type': 'Offer',
       url: `https://bukanbarukitchen.com/product/${product.SKU}`,
       priceCurrency: 'IDR',
-      price: product.HARGA_ESTIMASI_PUBLIK,
+      price: product.HARGA_BUKA_WA,
       priceValidUntil: '2026-12-31',
       itemCondition: 'https://schema.org/UsedCondition',
       availability:
@@ -196,7 +196,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 Harga Penawaran Unit
               </div>
               <div className="text-3xl sm:text-4xl font-black text-amber-400 font-mono">
-                {product.HARGA_ESTIMASI_PUBLIK != null ? formatIDR(product.HARGA_ESTIMASI_PUBLIK) : 'Hubungi kami'}
+                {product.HARGA_BUKA_WA != null ? formatIDR(product.HARGA_BUKA_WA) : 'Hubungi kami'}
               </div>
               <div className="text-xs text-slate-400">
                 Nego tipis via WhatsApp • Termasuk uji running kelistrikan di gudang
