@@ -176,8 +176,12 @@ export function getFinancialKPIs(): FinancialKPIs {
   let totalCOGS = 0;
 
   for (const item of soldUnits) {
-    const revenue = item.HARGA_DEAL_WA || item.HARGA_BUKA_WA || item.HARGA_ESTIMASI_PUBLIK;
-    const cogs = item.HARGA_MODAL || revenue * 0.65;
+    // A SOLD unit without any recorded selling price is incomplete financial data.
+    // Do not coerce missing revenue to zero or fabricate a revenue value.
+    const revenue = item.HARGA_DEAL_WA ?? item.HARGA_BUKA_WA ?? item.HARGA_ESTIMASI_PUBLIK;
+    if (revenue == null) continue;
+
+    const cogs = item.HARGA_MODAL ?? revenue * 0.65;
     totalRevenue += revenue;
     totalCOGS += cogs;
   }
