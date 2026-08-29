@@ -299,11 +299,15 @@ export function queryInventory(
   }
 
   if (options.minPrice !== undefined) {
-    filtered = filtered.filter((item) => item.HARGA_ESTIMASI_PUBLIK >= options.minPrice!);
+    filtered = filtered.filter(
+      (item) => item.HARGA_ESTIMASI_PUBLIK != null && item.HARGA_ESTIMASI_PUBLIK >= options.minPrice!
+    );
   }
 
   if (options.maxPrice !== undefined) {
-    filtered = filtered.filter((item) => item.HARGA_ESTIMASI_PUBLIK <= options.maxPrice!);
+    filtered = filtered.filter(
+      (item) => item.HARGA_ESTIMASI_PUBLIK != null && item.HARGA_ESTIMASI_PUBLIK <= options.maxPrice!
+    );
   }
 
   // Calculate high-level stats from the total filtered or all items
