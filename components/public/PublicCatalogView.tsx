@@ -76,9 +76,9 @@ export function PublicCatalogView() {
       let sortedItems: MasterInventoryItem[] = data.items || [];
 
       if (sortBy === 'PRICE_ASC') {
-        sortedItems.sort((a, b) => a.HARGA_ESTIMASI_PUBLIK - b.HARGA_ESTIMASI_PUBLIK);
+        sortedItems.sort((a, b) => (a.HARGA_BUKA_WA ?? Number.POSITIVE_INFINITY) - (b.HARGA_BUKA_WA ?? Number.POSITIVE_INFINITY));
       } else if (sortBy === 'PRICE_DESC') {
-        sortedItems.sort((a, b) => b.HARGA_ESTIMASI_PUBLIK - a.HARGA_ESTIMASI_PUBLIK);
+        sortedItems.sort((a, b) => (b.HARGA_BUKA_WA ?? Number.NEGATIVE_INFINITY) - (a.HARGA_BUKA_WA ?? Number.NEGATIVE_INFINITY));
       }
 
       setItems(sortedItems);
