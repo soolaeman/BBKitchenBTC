@@ -196,7 +196,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 Harga Penawaran Unit
               </div>
               <div className="text-3xl sm:text-4xl font-black text-amber-400 font-mono">
-                {formatIDR(product.HARGA_ESTIMASI_PUBLIK)}
+                {product.HARGA_ESTIMASI_PUBLIK != null ? formatIDR(product.HARGA_ESTIMASI_PUBLIK) : 'Hubungi kami'}
               </div>
               <div className="text-xs text-slate-400">
                 Nego tipis via WhatsApp • Termasuk uji running kelistrikan di gudang
