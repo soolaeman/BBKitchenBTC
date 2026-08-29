@@ -1,23 +1,13 @@
 export interface SalesHelperProduct {
-  id: number;
-  sku: string;
-  name: string;
-  slug: string;
-  category: string;
-  status: string;
-  condition: string;
-  location: string;
-  summary: string;
-  images: string[];
-  telegramUrl: string | null;
+  id: number; sku: string; name: string; slug: string; category: string; status: string;
+  condition: string; location: string; summary: string; images: string[]; telegramUrl: string | null;
   pricing: { modal: number; buka: number; deal: number; floor: number } | null;
 }
 
 type WooProduct = {
-  id: number; name: string; slug: string; sku?: string; price?: string;
-  short_description?: string; description?: string; images?: { src?: string }[];
-  categories?: { name?: string }[]; stock_status?: string;
-  meta_data?: { key: string; value: unknown }[];
+  id: number; name: string; slug: string; sku?: string; price?: string; short_description?: string;
+  description?: string; images?: { src?: string }[]; categories?: { name?: string }[];
+  stock_status?: string; meta_data?: { key: string; value: unknown }[];
 };
 
 const env = (key: string) => process.env[key]?.trim() || '';
@@ -55,8 +45,9 @@ export async function getSalesHelperProducts(input: { q?: string; sku?: string }
   const search = input.q?.trim() || '';
   const explicitSku = input.sku?.trim() || '';
   const normalized = search.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const isUnitCode = normalized.length >= 4 && /^BBK\\d+$/.test(normalized);
-  const baseUrl = (env('WORDPRESS_URL') || 'https://bukanbarukitchen.com').replace(/\\/$/, '');
+  const isUnitCode = normalized.length >= 4 && /^BBK[0-9]+$/.test(normalized);
+  const configuredUrl = env('WORDPRESS_URL') || 'https://bukanbarukitchen.com';
+  const baseUrl = configuredUrl.endsWith('/') ? configuredUrl.slice(0, -1) : configuredUrl;
   const key = env('WOOCOMMERCE_CONSUMER_KEY');
   const secret = env('WOOCOMMERCE_CONSUMER_SECRET');
   const auth = Buffer.from(key + ':' + secret).toString('base64');
