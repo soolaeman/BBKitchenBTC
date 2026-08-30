@@ -260,17 +260,20 @@ export function InventoryTable() {
               }}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
             >
-              <option value="ALL">Semua Kategori (10 Jenis)</option>
-              <option value="combi-oven">Combi Oven & Steamer</option>
-              <option value="refrigeration">Commercial Chiller & Freezer</option>
-              <option value="cooking-range">Gas Range & Wok Burner</option>
-              <option value="bakery-equipment">Mixer & Deck Oven</option>
-              <option value="coffee-beverage">Commercial Espresso Machine</option>
-              <option value="prep-machinery">Meat Slicer & Food Prep</option>
-              <option value="stainless-fabrication">Stainless Worktable & Sink</option>
-              <option value="warewashing">Dishwasher Resto</option>
-              <option value="deep-fryer">Commercial Deep Fryer</option>
-              <option value="ice-machine">Commercial Ice Maker</option>
+              <option value="ALL">Semua Kategori</option>
+              <option value="meja">Meja Stainless & Worktable</option>
+              <option value="sink">Bak Cuci Sink & Wastafel</option>
+              <option value="kompor">Kompor, Kwali & Wok Range</option>
+              <option value="chiller">Commercial Chiller & Showcase</option>
+              <option value="freezer">Freezer Box & Upright</option>
+              <option value="oven">Oven & Steamer</option>
+              <option value="fryer">Deep Fryer & Griddle</option>
+              <option value="rak">Rak, Wallshelf & Troli</option>
+              <option value="hood">Exhaust Hood, Blower & Ducting</option>
+              <option value="kopi">Mesin Kopi & Barista</option>
+              <option value="mixer">Mixer & Bakery Equipment</option>
+              <option value="ice">Ice Maker & Ice Bin</option>
+              <option value="lainnya">Peralatan Resto Lainnya</option>
             </select>
           </div>
 
@@ -285,8 +288,8 @@ export function InventoryTable() {
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
             >
               <option value="ALL">Semua Status Unit</option>
+              <option value="READY">READY (Siap Jual)</option>
               <option value="AVAILABLE">AVAILABLE (Tersedia)</option>
-              <option value="READY">READY</option>
               <option value="SOLD">SOLD (Terjual)</option>
               <option value="AMBIGUOUS">AMBIGUOUS</option>
             </select>
@@ -303,11 +306,11 @@ export function InventoryTable() {
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
             >
               <option value="ALL">Semua Status Pipeline</option>
-              <option value="PUBLISHED">PUBLISHED (Live)</option>
-              <option value="READY_TO_PUBLISH">READY_TO_PUBLISH</option>
-              <option value="PENDING_PHOTOS">PENDING_PHOTOS</option>
-              <option value="NO_PHOTOS_FOUND">NO_PHOTOS_FOUND</option>
-              <option value="ERROR">ERROR</option>
+              <option value="PUBLISHED">PUBLISHED (Live di Web)</option>
+              <option value="READY_TO_PUBLISH">READY_TO_PUBLISH (Siap Tayang)</option>
+              <option value="PENDING_PHOTOS">PENDING_PHOTOS (Menunggu Foto)</option>
+              <option value="NO_PHOTOS_FOUND">NO_PHOTOS_FOUND (Foto Belum Ada)</option>
+              <option value="ERROR">ERROR (Perlu Dicek)</option>
               <option value="AMBIGUOUS">AMBIGUOUS</option>
             </select>
           </div>
@@ -326,7 +329,7 @@ export function InventoryTable() {
                 }}
                 className="px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 text-xs"
               >
-                <option value="ALL">Semua Hub (GK, BB, SM, BL, ML, RB, PY, PE, WT, ON)</option>
+                <option value="ALL">Semua Hub</option>
                 <option value="GK">GK - Pamulang 2</option>
                 <option value="BB">BB - Pamulang 2</option>
                 <option value="SM">SM - Pamulang 2</option>

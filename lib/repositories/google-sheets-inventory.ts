@@ -190,7 +190,13 @@ export async function queryGoogleSheetsInventory(
   }
 
   if (options.category && options.category !== "ALL") {
-    filtered = filtered.filter((item) => item.CATEGORY_SLUG === options.category);
+    const cat = options.category.toLowerCase().trim();
+    filtered = filtered.filter((item) => {
+      const slug = (item.CATEGORY_SLUG || "").toLowerCase();
+      const name = (item.CATEGORY_NAME || "").toLowerCase();
+      const title = (item.PRODUCT_TITLE || "").toLowerCase();
+      return slug.includes(cat) || name.includes(cat) || title.includes(cat);
+    });
   }
   if (options.location && options.location !== "ALL") {
     filtered = filtered.filter((item) => item.LOKASI_UNIT.includes(options.location!));
