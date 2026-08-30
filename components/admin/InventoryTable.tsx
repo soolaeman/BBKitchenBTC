@@ -59,6 +59,7 @@ export function InventoryTable() {
   // Data States
   const [data, setData] = useState<PaginatedInventoryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
   const [selectedItem, setSelectedItem] = useState<MasterInventoryItem | null>(null);
   const [soldModalItem, setSoldModalItem] = useState<MasterInventoryItem | null>(null);
   const [dealPriceInput, setDealPriceInput] = useState('');
@@ -87,9 +88,16 @@ export function InventoryTable() {
         headers: { ...(role ? { 'x-bbk-role': role ?? '' } : {}) },
       });
       const result = await res.json();
-      setData(result);
-    } catch (err) {
+      if (!res.ok || result.error) {
+        setErrorMessage(result.error || 'Failed to load inventory');
+        setData(null);
+      } else {
+        setData(result);
+        setErrorMessage('');
+      }
+    } catch (err: any) {
       console.error('Failed to load inventory', err);
+      setErrorMessage(err.message || 'Network error fetching inventory');
     } finally {
       setIsLoading(false);
     }
@@ -175,6 +183,16 @@ export function InventoryTable() {
         <div className="p-3 bg-emerald-950/90 border border-emerald-800 text-emerald-300 text-xs rounded-xl flex items-center gap-2">
           <CheckCircle className="w-4 h-4 text-emerald-400" />
           <span>{actionSuccessMsg}</span>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="p-4 bg-rose-950/90 border border-rose-800 text-rose-300 text-xs rounded-xl flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-bold text-rose-200">Gagal Memuat Data Google Sheets</div>
+            <div className="mt-0.5 text-rose-300/90 font-mono text-[11px]">{errorMessage}</div>
+          </div>
         </div>
       )}
 

@@ -6,11 +6,16 @@ import { ROLE_PERMISSIONS } from "@/lib/types/auth";
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 function getSheetsClient() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const email = (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "").replace(/['"]/g, "").trim();
+  let privateKey = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "").replace(/['"]/g, "").trim();
+  if (privateKey) {
+    privateKey = privateKey.replace(/\\n/g, "\n");
+  }
 
   if (!email || !privateKey) {
-    throw new Error("GOOGLE_SHEETS_NOT_CONFIGURED");
+    throw new Error(
+      `GOOGLE_SHEETS_NOT_CONFIGURED: Missing ${!email ? "GOOGLE_SERVICE_ACCOUNT_EMAIL " : ""}${!privateKey ? "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY" : ""}`.trim()
+    );
   }
 
   const auth = new google.auth.GoogleAuth({
@@ -94,10 +99,10 @@ function toItem(row: string[]): MasterInventoryItem {
 }
 
 export async function getGoogleSheetsInventory(): Promise<MasterInventoryItem[]> {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
-  const range = process.env.GOOGLE_SHEETS_RANGE || "MASTER_INVENTORY!A:AI";
+  const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || "").replace(/['"]/g, "").trim();
+  const range = (process.env.GOOGLE_SHEETS_RANGE || "MASTER_INVENTORY!A:AI").replace(/['"]/g, "").trim();
 
-  if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_NOT_CONFIGURED");
+  if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_NOT_CONFIGURED: Missing GOOGLE_SHEETS_SPREADSHEET_ID");
 
   const sheets = getSheetsClient();
   const response = await sheets.spreadsheets.values.get({

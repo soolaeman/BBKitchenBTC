@@ -28,26 +28,30 @@ export async function GET(request: NextRequest) {
     if (!session?.user?.role) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
     const roleHeader = session.user.role as UserRole;
 
-    const result = process.env.BBK_INVENTORY_SOURCE === 'google_sheets'
+    const rawSource = (process.env.BBK_INVENTORY_SOURCE || '').replace(/['"]/g, '').trim().toLowerCase();
+    const hasSheetsConfig = Boolean(process.env.GOOGLE_SHEETS_SPREADSHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
+    const isGoogleSheets = rawSource === 'google_sheets' || (rawSource !== 'mock' && hasSheetsConfig);
+
+    const result = isGoogleSheets
       ? await queryGoogleSheetsInventory(
-      {
-        search,
-        category,
-        location,
-        warehouse,
-        statusUnit,
-        statusPipeline,
-        guardrailStatus,
-        isDirty,
-        minPrice,
-        maxPrice,
-        sortBy,
-        sortOrder,
-        page,
-        pageSize,
-      },
-      roleHeader
-      )
+          {
+            search,
+            category,
+            location,
+            warehouse,
+            statusUnit,
+            statusPipeline,
+            guardrailStatus,
+            isDirty,
+            minPrice,
+            maxPrice,
+            sortBy,
+            sortOrder,
+            page,
+            pageSize,
+          },
+          roleHeader
+        )
       : queryInventory(
           {
             search,
@@ -70,7 +74,15 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to query inventory' }, { status: 500 });
+    console.error('Inventory API Query Error:', error);
+    return NextResponse.json(
+      {
+        error: error.message || 'Failed to query inventory',
+        source: process.env.BBK_INVENTORY_SOURCE,
+        hasSheetsId: Boolean(process.env.GOOGLE_SHEETS_SPREADSHEET_ID),
+      },
+      { status: 500 }
+    );
   }
 }
 
