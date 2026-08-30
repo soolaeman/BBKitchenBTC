@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth/auth-context';
 import { MasterInventoryItem, PaginatedInventoryResponse } from '@/lib/types/inventory';
+import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { StatusBadge, PipelineBadge, GuardrailBadge } from '@/components/ui/StatusBadges';
 import { formatIDR } from '@/lib/repositories/warehouse-utils';
 import {
@@ -260,20 +261,17 @@ export function InventoryTable() {
               }}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
             >
-              <option value="ALL">Semua Kategori</option>
-              <option value="meja">Meja Stainless & Worktable</option>
-              <option value="sink">Bak Cuci Sink & Wastafel</option>
-              <option value="kompor">Kompor, Kwali & Wok Range</option>
-              <option value="chiller">Commercial Chiller & Showcase</option>
-              <option value="freezer">Freezer Box & Upright</option>
-              <option value="oven">Oven & Steamer</option>
-              <option value="fryer">Deep Fryer & Griddle</option>
-              <option value="rak">Rak, Wallshelf & Troli</option>
-              <option value="hood">Exhaust Hood, Blower & Ducting</option>
-              <option value="kopi">Mesin Kopi & Barista</option>
-              <option value="mixer">Mixer & Bakery Equipment</option>
-              <option value="ice">Ice Maker & Ice Bin</option>
-              <option value="lainnya">Peralatan Resto Lainnya</option>
+              <option value="ALL">Semua Kategori (Official Woo)</option>
+              {OFFICIAL_CATEGORIES.map((group) => (
+                <optgroup key={group.slug} label={`📁 ${group.name}`}>
+                  <option value={group.slug}>Semua {group.name}</option>
+                  {group.children.map((child) => (
+                    <option key={child.slug} value={child.slug}>
+                      &nbsp;&nbsp;↳ {child.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
             </select>
           </div>
 

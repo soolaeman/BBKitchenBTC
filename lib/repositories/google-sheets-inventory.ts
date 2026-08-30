@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import type { MasterInventoryItem, InventoryFilterOptions, PaginatedInventoryResponse } from "@/lib/types/inventory";
+import { OFFICIAL_CATEGORIES } from "./categories";
 import type { UserRole } from "@/lib/types/auth";
 import { ROLE_PERMISSIONS } from "@/lib/types/auth";
 
@@ -191,11 +192,21 @@ export async function queryGoogleSheetsInventory(
 
   if (options.category && options.category !== "ALL") {
     const cat = options.category.toLowerCase().trim();
+    const parentGroup = OFFICIAL_CATEGORIES.find((g) => g.slug === cat);
+    const validSlugs = parentGroup
+      ? [cat, ...parentGroup.children.map((c) => c.slug)]
+      : [cat];
+
     filtered = filtered.filter((item) => {
-      const slug = (item.CATEGORY_SLUG || "").toLowerCase();
-      const name = (item.CATEGORY_NAME || "").toLowerCase();
+      const slug = (item.CATEGORY_SLUG || "").toLowerCase().trim();
+      const name = (item.CATEGORY_NAME || "").toLowerCase().trim();
       const title = (item.PRODUCT_TITLE || "").toLowerCase();
-      return slug.includes(cat) || name.includes(cat) || title.includes(cat);
+
+      return (
+        validSlugs.some((s) => slug === s || slug.includes(s) || s.includes(slug)) ||
+        name.includes(cat) ||
+        title.includes(cat)
+      );
     });
   }
   if (options.location && options.location !== "ALL") {
