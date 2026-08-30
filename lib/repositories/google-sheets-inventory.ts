@@ -206,11 +206,25 @@ export async function queryGoogleSheetsInventory(
   let filtered = [...allItems];
 
   if (options.search) {
-    const q = options.search.toLowerCase();
-    filtered = filtered.filter((item) =>
-      [item.SKU, item.PRODUCT_TITLE, item.CATEGORY_SLUG, item.LOKASI_UNIT]
-        .some((v) => v.toLowerCase().includes(q))
-    );
+    const q = options.search.toLowerCase().trim();
+    const qAlpha = q.replace(/[^a-z0-9]/g, "");
+    filtered = filtered.filter((item) => {
+      const sku = (item.SKU || "").toLowerCase();
+      const skuAlpha = sku.replace(/[^a-z0-9]/g, "");
+      const title = (item.PRODUCT_TITLE || "").toLowerCase();
+      const cat = (item.CATEGORY_SLUG || "").toLowerCase();
+      const loc = (item.LOKASI_UNIT || "").toLowerCase();
+      const prodId = (item.PRODUCT_ID || "").toLowerCase();
+
+      return (
+        sku.includes(q) ||
+        (qAlpha.length > 0 && skuAlpha.includes(qAlpha)) ||
+        (prodId && (prodId.includes(q) || prodId === q)) ||
+        title.includes(q) ||
+        cat.includes(q) ||
+        loc.includes(q)
+      );
+    });
   }
 
   if (options.category && options.category !== "ALL") {
