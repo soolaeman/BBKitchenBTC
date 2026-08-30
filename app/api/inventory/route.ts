@@ -108,7 +108,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'SKU is required' }, { status: 400 });
     }
 
-    const isGoogleSheets = process.env.BBK_INVENTORY_SOURCE === 'google_sheets';
+    const rawSource = (process.env.BBK_INVENTORY_SOURCE || '').replace(/['"]/g, '').trim().toLowerCase();
+    const hasSheetsConfig = Boolean(process.env.GOOGLE_SHEETS_SPREADSHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
+    const isGoogleSheets = rawSource === 'google_sheets' || (rawSource !== 'mock' && hasSheetsConfig);
 
     if (action === 'MARK_AS_SOLD' || status === 'SOLD') {
       if (isGoogleSheets) {
