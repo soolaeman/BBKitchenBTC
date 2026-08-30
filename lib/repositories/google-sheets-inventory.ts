@@ -249,7 +249,15 @@ export async function queryGoogleSheetsInventory(
     });
   }
   if (options.statusUnit && options.statusUnit !== "ALL") {
-    filtered = filtered.filter((item) => item.STATUS_UNIT === options.statusUnit);
+    if (options.statusUnit === "READY") {
+      filtered = filtered.filter(
+        (item) =>
+          (item.STATUS_UNIT === "READY" || item.STATUS_UNIT === "AVAILABLE") &&
+          item.STATUS_UNIT !== "SOLD"
+      );
+    } else {
+      filtered = filtered.filter((item) => item.STATUS_UNIT === options.statusUnit);
+    }
   }
   if (options.statusPipeline && options.statusPipeline !== "ALL") {
     filtered = filtered.filter((item) => item.STATUS_PIPELINE === options.statusPipeline);

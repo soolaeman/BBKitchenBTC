@@ -80,6 +80,7 @@ export function SalesHelperView() {
     try {
       const params = new URLSearchParams({
         pageSize: '12',
+        statusUnit: 'READY',
         hasProductId: 'true',
         sortBy: 'TANGGAL_MASUK',
         sortOrder: 'desc',
