@@ -274,3 +274,20 @@ export async function getLiveClosingDealLedger(): Promise<{
     };
   }
 }
+
+export async function getFinancialKPIs(): Promise<FinancialKPIs> {
+  const ledgerData = await getLiveClosingDealLedger();
+  return {
+    period: 'Live Financials',
+    totalRevenue: ledgerData.kpis.totalRevenue,
+    totalCOGS: Math.max(0, ledgerData.kpis.totalRevenue - ledgerData.kpis.totalProfit),
+    grossMarginAmount: ledgerData.kpis.totalProfit,
+    grossMarginPercentage: ledgerData.kpis.avgMarginPercent,
+    unitsSold: ledgerData.kpis.totalDeals,
+    averageOrderValue: ledgerData.kpis.totalDeals > 0 ? Math.round(ledgerData.kpis.totalRevenue / ledgerData.kpis.totalDeals) : 0,
+    averageUnitMargin: ledgerData.kpis.totalDeals > 0 ? Math.round(ledgerData.kpis.totalProfit / ledgerData.kpis.totalDeals) : 0,
+    outstandingInvoicesAmount: 0,
+    paidInvoicesAmount: ledgerData.kpis.totalRevenue,
+    inventoryAssetValue: ledgerData.totalAssetValuation,
+  };
+}

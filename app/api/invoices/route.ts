@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (view === 'kpis') {
-      const kpis = getFinancialKPIs();
+      const kpis = await getFinancialKPIs();
       return NextResponse.json(kpis);
     }
 
