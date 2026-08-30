@@ -33,6 +33,7 @@ export function SalesHelperView() {
   const [isLoading, setIsLoading] = useState(false);
   const [quotePrice, setQuotePrice] = useState<number | ''>('');
   const [buyerName, setBuyerName] = useState('');
+  const [buyerPhone, setBuyerPhone] = useState('');
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -390,20 +391,31 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1">Nama Calon Pembeli</label>
+                  <label className="block text-[10px] text-slate-400 mb-1">Nama Pembeli</label>
                   <input
                     type="text"
                     value={buyerName}
                     onChange={(e) => setBuyerName(e.target.value)}
-                    placeholder="Contoh: Chef Hendra"
+                    placeholder="Chef Hendra"
                     className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1">Harga Buka Nego (IDR)</label>
+                  <label className="block text-[10px] text-slate-400 mb-1">No. WA Pembeli (Opsional)</label>
+                  <input
+                    type="tel"
+                    value={buyerPhone}
+                    onChange={(e) => setBuyerPhone(e.target.value)}
+                    placeholder="08123456789"
+                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Harga Buka (IDR)</label>
                   <input
                     type="number"
                     value={quotePrice}
@@ -467,13 +479,23 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                 Kirim teks beserta foto unit ke WhatsApp calon pembeli.
               </span>
               <a
-                href={`https://wa.me/?text=${encodeURIComponent(generateWhatsAppMessage())}`}
+                href={(() => {
+                  const text = encodeURIComponent(generateWhatsAppMessage());
+                  if (buyerPhone.trim()) {
+                    let cleanPhone = buyerPhone.replace(/[^0-9]/g, '');
+                    if (cleanPhone.startsWith('0')) {
+                      cleanPhone = '62' + cleanPhone.slice(1);
+                    }
+                    return `https://wa.me/${cleanPhone}?text=${text}`;
+                  }
+                  return `https://wa.me/?text=${text}`;
+                })()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition-all hover:scale-105"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>Kirim via WhatsApp Web</span>
+                <span>{buyerPhone.trim() ? `Kirim ke ${buyerPhone}` : 'Kirim via WhatsApp (Pilih Kontak)'}</span>
               </a>
             </div>
           </div>
