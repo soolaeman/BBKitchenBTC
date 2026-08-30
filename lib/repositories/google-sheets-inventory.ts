@@ -125,6 +125,7 @@ function toItem(row: string[]): MasterInventoryItem {
     MARGIN_FLOOR: numberOrNull(value(row, 29)) ?? undefined,
     MARGIN_DEAL: numberOrNull(value(row, 30)) ?? undefined,
     STATUS_GUARDRAIL: (value(row, 31) || "SAFE") as MasterInventoryItem["STATUS_GUARDRAIL"],
+    HARGA_CLOSING: numberOrNull(value(row, 32)) ?? undefined,
     LINK_UNIT: value(row, 33),
   };
 }
@@ -385,13 +386,22 @@ export async function updateGoogleSheetsStockStatus(input: {
     requestBody: { values: soldValues },
   });
 
-  // 3. Update Column AB (HARGA_DEAL_WA) if provided
-  if (input.dealPrice !== undefined && input.dealPrice > 0) {
+  // 3. Update Column AG (HARGA_CLOSING) — Preserves formula in Column AB!
+  if (input.status === "SOLD") {
+    const closingPriceVal = input.dealPrice !== undefined && input.dealPrice > 0 ? input.dealPrice : (input.dealPrice === 0 ? 0 : "");
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `MASTER_INVENTORY!AB${rowIndex}`,
+      range: `MASTER_INVENTORY!AG${rowIndex}`,
       valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[input.dealPrice]] },
+      requestBody: { values: [[closingPriceVal]] },
+    });
+  } else if (input.status === "READY" || input.status === "AVAILABLE") {
+    // Clear closing price on reset
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `MASTER_INVENTORY!AG${rowIndex}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[""]] },
     });
   }
 

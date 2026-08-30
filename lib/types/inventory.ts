@@ -73,6 +73,8 @@ export interface MasterInventoryItem {
   MARGIN_FLOOR?: number;
   MARGIN_DEAL?: number;
   STATUS_GUARDRAIL?: GuardrailStatus;
+  HARGA_CLOSING?: number;
+  CATATAN_CLOSING?: string;
   LINK_UNIT?: string;
   supplier_code?: string;
   internal_notes?: string;

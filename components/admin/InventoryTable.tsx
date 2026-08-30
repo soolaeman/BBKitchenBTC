@@ -695,6 +695,15 @@ export function InventoryTable() {
                   </div>
                 </div>
               )}
+
+              {selectedItem.STATUS_UNIT === 'SOLD' && (
+                <div>
+                  <div className="text-[11px] text-emerald-400">Harga Closing Riil</div>
+                  <div className="text-sm font-bold text-emerald-300 font-mono">
+                    {selectedItem.HARGA_CLOSING != null ? formatIDR(selectedItem.HARGA_CLOSING) : (selectedItem.HARGA_DEAL_WA ? formatIDR(selectedItem.HARGA_DEAL_WA) : 'Pihak Ketiga')}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">
