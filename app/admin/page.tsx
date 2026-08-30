@@ -90,16 +90,17 @@ export default function AdminPage() {
     },
     {
       id: 'INVOICES',
-      label: '💰 Invoices & Deal Ledger',
+      label: '📄 Invoices & Dokumen Resmi',
       icon: <Receipt className="w-4 h-4 text-amber-400" />,
-      badge: 'Tab 4',
+      badge: '4 Format',
       allowed: true,
     },
     {
       id: 'FINANCE',
-      label: 'Financials & Margins',
-      icon: <TrendingUp className="w-4 h-4" />,
-      allowed: permissions.canViewFinanceReports,
+      label: '💰 Financials & Deal Ledger',
+      icon: <TrendingUp className="w-4 h-4 text-emerald-400" />,
+      badge: 'Ledger & Margins',
+      allowed: true,
     },
     {
       id: 'WAREHOUSES',
