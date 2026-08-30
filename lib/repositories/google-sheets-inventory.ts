@@ -47,20 +47,51 @@ function numberOrNull(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function extractWarehouseCode(sku: string, lokasi: string, rawAsalGudang: string): MasterInventoryItem["asal_gudang"] {
+  const cleanRaw = (rawAsalGudang || "").trim().toUpperCase();
+  const validCodes = ["GK", "BB", "SM", "BL", "ML", "RB", "PY", "PE", "WT", "ON"];
+  if (validCodes.includes(cleanRaw)) {
+    return cleanRaw as MasterInventoryItem["asal_gudang"];
+  }
+
+  // Extract from SKU prefix: e.g. "GK-1234", "BBK-GK-1234", "GK1234", "BBKGK1234"
+  const upperSku = (sku || "").toUpperCase().trim();
+  const match = upperSku.match(/^(?:BBK[-_]?)?([A-Z]{2,4})[-_0-9]/i);
+  if (match && match[1]) {
+    const extracted = match[1].toUpperCase();
+    if (validCodes.includes(extracted)) {
+      return extracted as MasterInventoryItem["asal_gudang"];
+    }
+  }
+
+  // Fallback by Location text
+  const upperLokasi = (lokasi || "").toUpperCase();
+  if (upperLokasi.includes("SAWANGAN")) return "PE";
+  if (upperLokasi.includes("SETU")) return "PY";
+  if (upperLokasi.includes("KEDAUNG")) return "WT";
+  if (upperLokasi.includes("PAMULANG BARAT")) return "ML";
+  if (upperLokasi.includes("PAMULANG 2") || upperLokasi.includes("PAMULANG")) return "GK";
+
+  return "GK";
+}
+
 function toItem(row: string[]): MasterInventoryItem {
   const photos = splitPhotos(value(row, 13));
   const status = value(row, 4) as MasterInventoryItem["STATUS_UNIT"];
   const pipeline = value(row, 5) as MasterInventoryItem["STATUS_PIPELINE"];
+  const sku = value(row, 0);
+  const lokasi = value(row, 6);
+  const rawGudang = value(row, 24);
 
   return {
-    SKU: value(row, 0),
+    SKU: sku,
     PRODUCT_TITLE: value(row, 1),
     SEO_TITLE: value(row, 2),
     CATEGORY_SLUG: value(row, 3),
     CATEGORY_NAME: value(row, 3),
     STATUS_UNIT: status || "AVAILABLE",
     STATUS_PIPELINE: pipeline || "ERROR",
-    LOKASI_UNIT: value(row, 6),
+    LOKASI_UNIT: lokasi,
     KONDISI_UNIT: value(row, 7),
     SHORT_DESCRIPTION: value(row, 8),
     FULL_DESCRIPTION: value(row, 9),
@@ -79,7 +110,7 @@ function toItem(row: string[]): MasterInventoryItem {
     image_title: value(row, 21),
     image_caption: value(row, 22),
     image_description: value(row, 23),
-    asal_gudang: value(row, 24) as MasterInventoryItem["asal_gudang"],
+    asal_gudang: extractWarehouseCode(sku, lokasi, rawGudang),
     // Official HubScript / Publish-to-Woo schema:
     // Z=HARGA_MODAL, AA=HARGA_BUKA_WA, AB=HARGA_DEAL_WA,
     // AC=HARGA_FLOOR_WA, AD=MARGIN_FLOOR, AE=MARGIN_DEAL,
@@ -164,7 +195,18 @@ export async function queryGoogleSheetsInventory(
     filtered = filtered.filter((item) => item.LOKASI_UNIT.includes(options.location!));
   }
   if (options.warehouse && options.warehouse !== "ALL") {
-    filtered = filtered.filter((item) => item.asal_gudang === options.warehouse);
+    const wh = options.warehouse.toUpperCase().trim();
+    filtered = filtered.filter((item) => {
+      const code = (item.asal_gudang || "").toUpperCase();
+      const sku = (item.SKU || "").toUpperCase();
+      return (
+        code === wh ||
+        sku.startsWith(wh) ||
+        sku.startsWith(`BBK-${wh}`) ||
+        sku.startsWith(`BBK${wh}`) ||
+        sku.includes(`-${wh}-`)
+      );
+    });
   }
   if (options.statusUnit && options.statusUnit !== "ALL") {
     filtered = filtered.filter((item) => item.STATUS_UNIT === options.statusUnit);

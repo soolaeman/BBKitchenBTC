@@ -151,6 +151,34 @@ export function InventoryTable() {
     }
   };
 
+  const handleMarkAsReady = async (sku: string) => {
+    if (!confirm(`Kembalikan unit ${sku} menjadi status READY?`)) return;
+    try {
+      const res = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-bbk-role': role ?? '',
+        },
+        body: JSON.stringify({
+          action: 'MARK_AS_READY',
+          sku,
+        }),
+      });
+
+      const resJson = await res.json();
+      if (res.ok) {
+        setActionSuccessMsg(`Unit ${sku} berhasil dikembalikan ke status READY.`);
+        fetchInventory();
+        setTimeout(() => setActionSuccessMsg(''), 4000);
+      } else {
+        alert(resJson.error || 'Failed to mark unit as ready');
+      }
+    } catch (err) {
+      console.error('Error marking as ready', err);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header & Title */}
@@ -510,18 +538,30 @@ export function InventoryTable() {
                           <Eye className="w-3.5 h-3.5" />
                         </button>
 
-                        {permissions?.canMarkAsSold && item.STATUS_UNIT !== 'SOLD' && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSoldModalItem(item);
-                              setDealPriceInput(String(item.HARGA_DEAL_WA || item.HARGA_BUKA_WA || ''));
-                            }}
-                            className="px-2 py-1 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white text-[11px] font-bold transition-colors"
-                            title="Tandai Sudah Terjual (Deal)"
-                          >
-                            Mark Sold
-                          </button>
+                        {permissions?.canMarkAsSold && (
+                          item.STATUS_UNIT === 'SOLD' ? (
+                            <button
+                              type="button"
+                              onClick={() => handleMarkAsReady(item.SKU)}
+                              className="px-2 py-1 rounded-lg bg-blue-700/80 hover:bg-blue-600 text-white text-[11px] font-bold transition-colors flex items-center gap-1"
+                              title="Kembalikan status unit menjadi READY"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              <span>Set Ready</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSoldModalItem(item);
+                                setDealPriceInput(String(item.HARGA_DEAL_WA || item.HARGA_BUKA_WA || ''));
+                              }}
+                              className="px-2 py-1 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white text-[11px] font-bold transition-colors"
+                              title="Tandai Sudah Terjual (Deal)"
+                            >
+                              Mark Sold
+                            </button>
+                          )
                         )}
                       </div>
                     </td>
