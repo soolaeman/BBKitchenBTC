@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { MasterInventoryItem } from '@/lib/types/inventory';
+import { MasterInventoryItem, PaginatedInventoryResponse } from '@/lib/types/inventory';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { formatIDR } from '@/lib/repositories/warehouse-utils';
 import {
@@ -19,67 +19,69 @@ import {
   MapPin,
   RefreshCw,
   Share2,
-  Filter,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle,
   Layers,
+  ShoppingBag,
 } from 'lucide-react';
 
 export function SalesHelperView() {
   const { role, permissions } = useAuth();
+  
+  // Search & Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('ALL');
   const [warehouse, setWarehouse] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(16);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Item states
   const [searchedItem, setSearchedItem] = useState<MasterInventoryItem | null>(null);
-  const [searchResults, setSearchResults] = useState<MasterInventoryItem[]>([]);
-  const [recentItems, setRecentItems] = useState<MasterInventoryItem[]>([]);
-  const [isLoadingRecent, setIsLoadingRecent] = useState(true);
-  const [isSearching, setIsSearching] = useState(false);
+  const [items, setItems] = useState<MasterInventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Deal Desk states
   const [quotePrice, setQuotePrice] = useState<number | ''>('');
-  const [buyerName, setBuyerName] = useState('');
   const [buyerPhone, setBuyerPhone] = useState('');
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [notFound, setNotFound] = useState(false);
 
-  // Load recent available items that have WooCommerce Product IDs for fast 1-click selection
-  const fetchRecent = useCallback(async () => {
-    setIsLoadingRecent(true);
-    try {
-      const res = await fetch('/api/inventory?pageSize=8&statusUnit=READY&hasProductId=true&sortBy=TANGGAL_MASUK&sortOrder=desc', {
-        headers: { ...(role ? { 'x-bbk-role': role } : {}) },
-      });
-      const data = await res.json();
-      if (data.items) {
-        setRecentItems(data.items);
-        if (!searchedItem && data.items.length > 0) {
-          selectItem(data.items[0]);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load recent items', e);
-    } finally {
-      setIsLoadingRecent(false);
-    }
-  }, [role, searchedItem]);
+  // Mark Sold modal states
+  const [showSoldModal, setShowSoldModal] = useState(false);
+  const [soldByOther, setSoldByOther] = useState(false);
+  const [dealPriceInput, setDealPriceInput] = useState('');
+  const [soldNotesInput, setSoldNotesInput] = useState('');
+  const [soldSuccessMsg, setSoldSuccessMsg] = useState('');
 
+  // Set responsive pageSize on mount
   useEffect(() => {
-    fetchRecent();
-  }, [fetchRecent]);
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setPageSize(8); // Mobile: 8 per page
+      } else {
+        setPageSize(16); // Desktop: 16 per page
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const selectItem = (item: MasterInventoryItem) => {
     setSearchedItem(item);
     setQuotePrice(item.HARGA_BUKA_WA || item.HARGA_ESTIMASI_PUBLIK || '');
-    setNotFound(false);
   };
 
-  // Live Multi-Criteria Search (by Name, Spec, Category, Warehouse, or SKU)
-  const handleSearch = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-
-    setIsSearching(true);
-    setNotFound(false);
+  // Fetch ready items with pagination & filters
+  const fetchItems = useCallback(async () => {
+    setIsLoading(true);
     try {
       const params = new URLSearchParams({
-        pageSize: '12',
+        page: String(page),
+        pageSize: String(pageSize),
         statusUnit: 'READY',
         hasProductId: 'true',
         sortBy: 'TANGGAL_MASUK',
@@ -93,40 +95,91 @@ export function SalesHelperView() {
       const res = await fetch(`/api/inventory?${params.toString()}`, {
         headers: { ...(role ? { 'x-bbk-role': role } : {}) },
       });
-      const data = await res.json();
-      if (data.items && data.items.length > 0) {
-        setSearchResults(data.items);
-        selectItem(data.items[0]);
-      } else {
-        setSearchResults([]);
-        setNotFound(true);
+      const data: PaginatedInventoryResponse = await res.json();
+      if (data.items) {
+        setItems(data.items);
+        setTotalItems(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+
+        // Keep current selected item if still in list, else pick first
+        if (data.items.length > 0) {
+          const found = data.items.find((i) => i.SKU === searchedItem?.SKU);
+          if (found) {
+            selectItem(found);
+          } else {
+            selectItem(data.items[0]);
+          }
+        } else {
+          setSearchedItem(null);
+        }
       }
     } catch (err) {
-      console.error('Failed search', err);
+      console.error('Failed to fetch items in SalesHelper', err);
     } finally {
-      setIsSearching(false);
+      setIsLoading(false);
+    }
+  }, [page, pageSize, searchQuery, category, warehouse, role]);
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    fetchItems();
+  };
+
+  // Mark as Sold Handler
+  const handleMarkAsSoldSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchedItem) return;
+
+    try {
+      const finalNotes = soldByOther
+        ? (soldNotesInput.trim() ? `[Terjual Pihak Ketiga/Gudang] ${soldNotesInput.trim()}` : 'Terjual Pihak Ketiga / Rekanan Gudang (Harga Deal Tidak Diketahui)')
+        : (soldNotesInput.trim() || 'Deal via WhatsApp Sales');
+
+      const finalPrice = soldByOther ? 0 : (dealPriceInput ? Number(dealPriceInput) : (searchedItem.HARGA_DEAL_WA || searchedItem.HARGA_BUKA_WA || 0));
+
+      const res = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(role ? { 'x-bbk-role': role } : {}),
+        },
+        body: JSON.stringify({
+          action: 'MARK_AS_SOLD',
+          sku: searchedItem.SKU,
+          dealPrice: finalPrice,
+          notes: finalNotes,
+        }),
+      });
+
+      const resJson = await res.json();
+      if (res.ok) {
+        setSoldSuccessMsg(`Unit ${searchedItem.SKU} berhasil ditandai TERJUAL (SOLD).`);
+        setShowSoldModal(false);
+        setDealPriceInput('');
+        setSoldNotesInput('');
+        setSoldByOther(false);
+        fetchItems();
+        setTimeout(() => setSoldSuccessMsg(''), 4000);
+      } else {
+        alert(resJson.error || 'Gagal menandai unit sebagai terjual');
+      }
+    } catch (err) {
+      console.error('Error marking as sold in SalesHelper', err);
     }
   };
 
-  // Trigger search when category or warehouse changes
-  useEffect(() => {
-    if (category !== 'ALL' || warehouse !== 'ALL' || searchQuery.trim()) {
-      handleSearch();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, warehouse]);
-
-  // Generate clean WhatsApp pitch template
+  // Generate clean WhatsApp pitch template (Without buyer name)
   const generateWhatsAppMessage = () => {
     if (!searchedItem) return '';
 
     const priceText = quotePrice
       ? formatIDR(Number(quotePrice))
       : formatIDR(searchedItem.HARGA_BUKA_WA || searchedItem.HARGA_ESTIMASI_PUBLIK);
-
-    const greeting = buyerName
-      ? `Halo Kak ${buyerName}, terima kasih sudah menghubungi Bukan Baru Kitchen! 🙏`
-      : 'Halo Kak, terima kasih sudah menghubungi Bukan Baru Kitchen! 🙏';
 
     const cleanTitle = searchedItem.PRODUCT_TITLE
       .replace(/%%title%%|%%sep%%|%%sitename%%/gi, '')
@@ -147,7 +200,7 @@ export function SalesHelperView() {
       .map(([k, v]) => `• *${k}:* ${v}`)
       .join('\n');
 
-    return `${greeting}
+    return `Halo Kak! Terima kasih sudah menghubungi Bukan Baru Kitchen! 🙏
 
 Berikut informasi detail unit yang sedang *READY* hari ini di gudang:
 
@@ -203,7 +256,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             </span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-400">
-            Alat tempur harian sales: Cari unit berdasarkan nama/kategori/gudang, cek Telegram, dan buat penawaran WA 1-klik.
+            Katalog stok live siap jual (Ready & Terhubung Woo): Pilih unit, cek grup Telegram, tandai terjual, dan buat penawaran WA instan.
           </p>
         </div>
 
@@ -213,28 +266,35 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             setSearchQuery('');
             setCategory('ALL');
             setWarehouse('ALL');
-            setSearchResults([]);
-            fetchRecent();
+            setPage(1);
           }}
           className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-colors self-start sm:self-auto flex items-center gap-1.5 text-xs font-semibold"
-          title="Reset dan Muat Ulang"
+          title="Reset Filter"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoadingRecent ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           <span>Reset Filter</span>
         </button>
       </div>
 
-      {/* Advanced Search & Filtering Bar */}
+      {/* Success Notification Alert */}
+      {soldSuccessMsg && (
+        <div className="p-3 bg-emerald-950/90 border border-emerald-700 rounded-xl text-xs text-emerald-200 flex items-center gap-2 shadow-lg">
+          <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{soldSuccessMsg}</span>
+        </div>
+      )}
+
+      {/* Search & Filter Bar */}
       <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-xl space-y-3">
-        <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-3">
-          {/* Keyword Search Input */}
+        <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          {/* Keyword Search */}
           <div className="md:col-span-6 relative">
             <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-500" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama mesin (contoh: kwali range, deep fryer, meja, chiller, SKU)..."
+              placeholder="Cari nama alat dapur (contoh: kwali range, deep fryer, meja, chiller, SKU)..."
               className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
@@ -243,7 +303,10 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
           <div className="md:col-span-3">
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => {
+                setCategory(e.target.value);
+                setPage(1);
+              }}
               className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             >
               <option value="ALL">Semua Kategori (Official)</option>
@@ -264,7 +327,10 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
           <div className="md:col-span-2">
             <select
               value={warehouse}
-              onChange={(e) => setWarehouse(e.target.value)}
+              onChange={(e) => {
+                setWarehouse(e.target.value);
+                setPage(1);
+              }}
               className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             >
               <option value="ALL">Semua Hub</option>
@@ -281,87 +347,112 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             </select>
           </div>
 
-          {/* Search Action Button */}
+          {/* Submit Search */}
           <div className="md:col-span-1">
             <button
               type="submit"
-              disabled={isSearching}
+              disabled={isLoading}
               className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-600/20 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
             >
               <Search className="w-3.5 h-3.5" />
-              <span>{isSearching ? '...' : 'Cari'}</span>
+              <span>{isLoading ? '...' : 'Cari'}</span>
             </button>
           </div>
         </form>
-
-        {notFound && (
-          <div className="text-xs text-rose-400 flex items-center gap-1.5 pt-1">
-            <AlertCircle className="w-4 h-4" />
-            <span>Tidak ditemukan unit dengan kata kunci / filter tersebut. Coba ganti kata kunci atau pilih &quot;Semua Kategori&quot;.</span>
-          </div>
-        )}
       </div>
 
-      {/* Search Results / Recent Items Carousel */}
-      <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
-            {searchResults.length > 0 ? (
-              <>
-                <Layers className="w-4 h-4 text-emerald-400" />
-                <span>Hasil Pencarian ({searchResults.length} Unit) - Klik untuk Load ke Deal Desk</span>
-              </>
-            ) : (
-              <>
-                <Flame className="w-4 h-4 text-amber-400" />
-                <span>Pilih Cepat Unit Ready Terbaru (Klik untuk Load)</span>
-              </>
-            )}
-          </span>
-          <span className="text-[11px] text-slate-500 font-mono">
-            {searchResults.length > 0 ? searchResults.length : recentItems.length} Unit
-          </span>
+      {/* Grid of Ready Units with Responsive Pagination */}
+      <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-2">
+            <Flame className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+              Katalog Unit Siap Jual ({totalItems} Unit Ready)
+            </span>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-slate-400 font-mono text-[11px]">
+              Hal {page} dari {totalPages || 1}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={page <= 1 || isLoading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Halaman Sebelumnya"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages || isLoading}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Halaman Selanjutnya"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-          {(searchResults.length > 0 ? searchResults : recentItems).map((item) => (
-            <button
-              key={item.SKU}
-              type="button"
-              onClick={() => selectItem(item)}
-              className={`p-2 rounded-xl border text-left transition-all ${
-                searchedItem?.SKU === item.SKU
-                  ? 'bg-emerald-950/80 border-emerald-500 ring-1 ring-emerald-500/40 shadow-lg'
-                  : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-              }`}
-            >
-              <div className="relative aspect-square w-full rounded-lg bg-slate-900 overflow-hidden mb-1.5">
-                {item.FEATURED_IMAGE ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={item.FEATURED_IMAGE}
-                    alt={item.PRODUCT_TITLE}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-600">
-                    No Pic
-                  </div>
-                )}
-              </div>
-              <div className="text-[11px] font-mono font-bold text-amber-400 truncate">{item.SKU}</div>
-              <div className="text-[10px] text-slate-300 truncate">{item.PRODUCT_TITLE}</div>
-            </button>
-          ))}
-        </div>
+        {/* Item Cards Grid (Mobile 2 cols, Tablet 4 cols, Desktop 8 cols) */}
+        {isLoading ? (
+          <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-500">
+            <RefreshCw className="w-6 h-6 animate-spin text-emerald-500" />
+            <span className="text-xs">Memuat katalog unit...</span>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="py-12 text-center text-slate-500 text-xs">
+            Tidak ada unit ready yang sesuai dengan filter pencarian.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+            {items.map((item) => (
+              <button
+                key={item.SKU}
+                type="button"
+                onClick={() => selectItem(item)}
+                className={`p-2 rounded-xl border text-left transition-all relative group ${
+                  searchedItem?.SKU === item.SKU
+                    ? 'bg-emerald-950/90 border-emerald-500 ring-2 ring-emerald-500/40 shadow-xl'
+                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="relative aspect-square w-full rounded-lg bg-slate-900 overflow-hidden mb-1.5">
+                  {item.FEATURED_IMAGE ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={item.FEATURED_IMAGE}
+                      alt={item.PRODUCT_TITLE}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-600">
+                      No Pic
+                    </div>
+                  )}
+                </div>
+                <div className="text-[11px] font-mono font-bold text-amber-400 truncate">{item.SKU}</div>
+                <div className="text-[10px] text-slate-300 truncate leading-tight mt-0.5">{item.PRODUCT_TITLE}</div>
+                <div className="text-[10px] text-emerald-400 font-mono mt-1">
+                  {item.HARGA_BUKA_WA ? formatIDR(item.HARGA_BUKA_WA) : 'Tanya Harga'}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Deal Helper Canvas */}
       {searchedItem && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column: Product Spec & Telegram Verification (5 Cols) */}
+          {/* Left Column: Product Spec, Photos & Mark Sold Button (5 Cols) */}
           <div className="lg:col-span-5 bg-slate-900/80 border border-slate-800/80 rounded-2xl p-5 space-y-4">
             {/* Header info */}
             <div className="flex items-start gap-3">
@@ -389,11 +480,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                     <span className="text-[10px] px-2 py-0.5 rounded bg-blue-950 text-blue-300 font-mono border border-blue-800">
                       Woo #{searchedItem.PRODUCT_ID}
                     </span>
-                  ) : (
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 font-mono border border-rose-800">
-                      Belum Ada ID Woo
-                    </span>
-                  )}
+                  ) : null}
                 </div>
                 <h2 className="text-sm font-bold text-white mt-1 line-clamp-2">
                   {searchedItem.PRODUCT_TITLE}
@@ -405,38 +492,54 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
               </div>
             </div>
 
-            {/* Verification Links Bar */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            {/* Verification & Action Bar */}
+            <div className="grid grid-cols-3 gap-2 pt-1">
               {searchedItem.LINK_TELEGRAM ? (
                 <a
                   href={searchedItem.LINK_TELEGRAM}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-950/80 hover:bg-blue-900 text-blue-300 border border-blue-800 text-xs font-bold transition-colors"
-                  title="Verifikasi keaslian dan status langsung di grup Telegram gudang"
+                  className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-blue-950/80 hover:bg-blue-900 text-blue-300 border border-blue-800 text-xs font-bold transition-colors text-center"
+                  title="Verifikasi langsung di grup Telegram gudang"
                 >
                   <Send className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Cek Telegram</span>
+                  <span>Telegram</span>
                 </a>
               ) : (
                 <button
                   type="button"
                   disabled
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-950 text-slate-600 border border-slate-800 text-xs font-bold cursor-not-allowed"
+                  className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-slate-950 text-slate-600 border border-slate-800 text-xs font-bold cursor-not-allowed"
                 >
-                  <span>No Telegram Link</span>
+                  <span>No TG</span>
                 </button>
               )}
 
               <button
                 type="button"
                 onClick={copyPublicLink}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold transition-colors"
+                className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold transition-colors text-center"
                 title="Salin Link Web Publik"
               >
                 {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-                <span>{copiedLink ? 'Link Tersalin!' : 'Salin Link Web'}</span>
+                <span>{copiedLink ? 'Tersalin' : 'Link Web'}</span>
               </button>
+
+              {/* Mark As Sold Action */}
+              {permissions?.canMarkAsSold && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDealPriceInput(String(searchedItem.HARGA_DEAL_WA || searchedItem.HARGA_BUKA_WA || ''));
+                    setShowSoldModal(true);
+                  }}
+                  className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-bold transition-colors text-center"
+                  title="Tandai unit sudah laku terjual"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Mark Sold</span>
+                </button>
+              )}
             </div>
 
             {/* Photo Gallery with Direct Download / Preview */}
@@ -477,7 +580,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
               </div>
             </div>
 
-            {/* Price Quote Config */}
+            {/* Price Quote Config (Without Nama Pembeli) */}
             <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
               <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
                 <span>Kalkulator Penawaran (Deal Desk)</span>
@@ -488,18 +591,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1">Nama Pembeli</label>
-                  <input
-                    type="text"
-                    value={buyerName}
-                    onChange={(e) => setBuyerName(e.target.value)}
-                    placeholder="Chef Hendra"
-                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-[10px] text-slate-400 mb-1">No. WA Pembeli (Opsional)</label>
                   <input
@@ -512,7 +604,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                 </div>
 
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-1">Harga Buka (IDR)</label>
+                  <label className="block text-[10px] text-slate-400 mb-1">Harga Buka Nego (IDR)</label>
                   <input
                     type="number"
                     value={quotePrice}
@@ -566,7 +658,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                 </button>
               </div>
 
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-emerald-300/90 whitespace-pre-wrap leading-relaxed max-h-[440px] overflow-y-auto selection:bg-emerald-800">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-emerald-300/90 whitespace-pre-wrap leading-relaxed max-h-[460px] overflow-y-auto selection:bg-emerald-800">
                 {generateWhatsAppMessage()}
               </div>
             </div>
@@ -595,6 +687,103 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                 <span>{buyerPhone.trim() ? `Kirim ke ${buyerPhone}` : 'Kirim via WhatsApp (Pilih Kontak)'}</span>
               </a>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark As Sold Modal */}
+      {showSoldModal && searchedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white">Tandai Unit Terjual (Sold)</h3>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">{searchedItem.SKU} • {searchedItem.PRODUCT_TITLE}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSoldModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleMarkAsSoldSubmit} className="space-y-4">
+              {/* Dual Channel Choice */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+                <div className="text-xs font-bold text-slate-300">Siapa yang menjual unit ini?</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSoldByOther(false)}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold border transition-colors ${
+                      !soldByOther
+                        ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Saya / Tim Sales BBK
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSoldByOther(true)}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold border transition-colors ${
+                      soldByOther
+                        ? 'bg-amber-950/80 border-amber-500 text-amber-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Pihak Ketiga / Gudang
+                  </button>
+                </div>
+              </div>
+
+              {!soldByOther && (
+                <div>
+                  <label className="block text-xs text-slate-300 font-medium mb-1">
+                    Harga Deal Kesepakatan (IDR)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={dealPriceInput}
+                    onChange={(e) => setDealPriceInput(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    placeholder="Contoh: 4500000"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs text-slate-300 font-medium mb-1">
+                  Catatan Penjualan / Keterangan
+                </label>
+                <textarea
+                  rows={2}
+                  value={soldNotesInput}
+                  onChange={(e) => setSoldNotesInput(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  placeholder={soldByOther ? "Contoh: Terjual oleh pemilik gudang Sawangan" : "Contoh: Deal via WA Sales, dikirim ke Resto BSD"}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSoldModal(false)}
+                  className="px-3 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/20"
+                >
+                  Simpan Status Terjual
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
