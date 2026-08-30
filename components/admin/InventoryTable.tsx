@@ -63,6 +63,8 @@ export function InventoryTable() {
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedItem, setSelectedItem] = useState<MasterInventoryItem | null>(null);
   const [soldModalItem, setSoldModalItem] = useState<MasterInventoryItem | null>(null);
+  const [waModalItem, setWaModalItem] = useState<MasterInventoryItem | null>(null);
+  const [waCopied, setWaCopied] = useState(false);
   const [dealPriceInput, setDealPriceInput] = useState('');
   const [soldNotesInput, setSoldNotesInput] = useState('');
   const [soldByOther, setSoldByOther] = useState(false);
@@ -565,6 +567,15 @@ export function InventoryTable() {
                           <Eye className="w-3.5 h-3.5" />
                         </button>
 
+                        <button
+                          type="button"
+                          onClick={() => setWaModalItem(item)}
+                          className="p-1.5 rounded-lg bg-emerald-950/80 border border-emerald-800/80 text-emerald-300 hover:bg-emerald-800 hover:text-white transition-colors"
+                          title="1-Klik Format Penawaran WhatsApp"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                        </button>
+
                         {permissions?.canMarkAsSold && (
                           item.STATUS_UNIT === 'SOLD' ? (
                             <button
@@ -844,6 +855,123 @@ export function InventoryTable() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick WhatsApp Pitch Modal */}
+      {waModalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-950 border border-emerald-800 text-emerald-400">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white">Format Penawaran WhatsApp</h2>
+                  <div className="text-xs font-mono text-amber-400">{waModalItem.SKU} • {waModalItem.LOKASI_UNIT}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWaModalItem(null)}
+                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quick Action Bar */}
+            <div className="flex items-center gap-2">
+              {waModalItem.LINK_TELEGRAM && (
+                <a
+                  href={waModalItem.LINK_TELEGRAM}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-950/80 hover:bg-blue-900 text-blue-300 border border-blue-800 text-[11px] font-bold"
+                >
+                  <Send className="w-3 h-3 text-blue-400" />
+                  <span>Cek Telegram</span>
+                </a>
+              )}
+              {waModalItem.FEATURED_IMAGE && (
+                <a
+                  href={waModalItem.FEATURED_IMAGE}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Buka Foto HD</span>
+                </a>
+              )}
+            </div>
+
+            {/* Formatted Text Box */}
+            <div className="flex-1 overflow-y-auto bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-emerald-300/90 whitespace-pre-wrap leading-relaxed">
+              {(() => {
+                const cleanTitle = waModalItem.PRODUCT_TITLE.replace(/[-|–]\s*BBKitchen.*/gi, '').trim();
+                const slug = cleanTitle.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/[\s_]+/g, '-').replace(/-+/g, '-');
+                const publicUrl = waModalItem.LINK_UNIT || `https://www.bukanbarukitchen.com/shop/${slug}/`;
+                const price = waModalItem.HARGA_BUKA_WA ? formatIDR(waModalItem.HARGA_BUKA_WA) : (waModalItem.HARGA_ESTIMASI_PUBLIK ? formatIDR(waModalItem.HARGA_ESTIMASI_PUBLIK) : 'Hubungi kami');
+
+                return `Halo Kak! Terima kasih sudah menghubungi Bukan Baru Kitchen 🙏
+
+Berikut informasi detail unit yang sedang *READY* di gudang:
+
+📌 *${cleanTitle}*
+• *Kode SKU:* ${waModalItem.SKU}
+• *Kondisi:* ${waModalItem.KONDISI_UNIT || 'Bekas Siap Pakai'}
+• *Lokasi Gudang:* ${waModalItem.LOKASI_UNIT}
+• *Hasil Uji QC:* 100% Normal Siap Pakai
+
+💰 *Penawaran Khusus:* ${price} *(Nego Halus)*
+🔗 *Foto & Katalog Web:* ${publicUrl}
+
+💡 *Kunjungan Fisik / Video Call:*
+Kakak bisa datang langsung cek fisik & test running mesin di gudang (${waModalItem.LOKASI_UNIT.split(',')[0]}), atau mau kami kirimkan video uji fungsi unitnya Kak?
+
+_Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
+              })()}
+            </div>
+
+            {/* Modal Bottom Actions */}
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const cleanTitle = waModalItem.PRODUCT_TITLE.replace(/[-|–]\s*BBKitchen.*/gi, '').trim();
+                  const slug = cleanTitle.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/[\s_]+/g, '-').replace(/-+/g, '-');
+                  const publicUrl = waModalItem.LINK_UNIT || `https://www.bukanbarukitchen.com/shop/${slug}/`;
+                  const price = waModalItem.HARGA_BUKA_WA ? formatIDR(waModalItem.HARGA_BUKA_WA) : (waModalItem.HARGA_ESTIMASI_PUBLIK ? formatIDR(waModalItem.HARGA_ESTIMASI_PUBLIK) : 'Hubungi kami');
+                  const text = `Halo Kak! Terima kasih sudah menghubungi Bukan Baru Kitchen 🙏\n\nBerikut informasi detail unit yang sedang *READY* di gudang:\n\n📌 *${cleanTitle}*\n• *Kode SKU:* ${waModalItem.SKU}\n• *Kondisi:* ${waModalItem.KONDISI_UNIT || 'Bekas Siap Pakai'}\n• *Lokasi Gudang:* ${waModalItem.LOKASI_UNIT}\n• *Hasil Uji QC:* 100% Normal Siap Pakai\n\n💰 *Penawaran Khusus:* ${price} *(Nego Halus)*\n🔗 *Foto & Katalog Web:* ${publicUrl}\n\n💡 *Kunjungan Fisik / Video Call:*\nKakak bisa datang langsung cek fisik & test running mesin di gudang (${waModalItem.LOKASI_UNIT.split(',')[0]}), atau mau kami kirimkan video uji fungsi unitnya Kak?\n\n_Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
+                  navigator.clipboard.writeText(text);
+                  setWaCopied(true);
+                  setTimeout(() => setWaCopied(false), 3000);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors"
+              >
+                {waCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{waCopied ? 'Teks Tersalin!' : 'Salin Pesan'}</span>
+              </button>
+
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent((() => {
+                  const cleanTitle = waModalItem.PRODUCT_TITLE.replace(/[-|–]\s*BBKitchen.*/gi, '').trim();
+                  const slug = cleanTitle.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/[\s_]+/g, '-').replace(/-+/g, '-');
+                  const publicUrl = waModalItem.LINK_UNIT || `https://www.bukanbarukitchen.com/shop/${slug}/`;
+                  const price = waModalItem.HARGA_BUKA_WA ? formatIDR(waModalItem.HARGA_BUKA_WA) : (waModalItem.HARGA_ESTIMASI_PUBLIK ? formatIDR(waModalItem.HARGA_ESTIMASI_PUBLIK) : 'Hubungi kami');
+                  return `Halo Kak! Terima kasih sudah menghubungi Bukan Baru Kitchen 🙏\n\nBerikut informasi detail unit yang sedang *READY* di gudang:\n\n📌 *${cleanTitle}*\n• *Kode SKU:* ${waModalItem.SKU}\n• *Kondisi:* ${waModalItem.KONDISI_UNIT || 'Bekas Siap Pakai'}\n• *Lokasi Gudang:* ${waModalItem.LOKASI_UNIT}\n• *Hasil Uji QC:* 100% Normal Siap Pakai\n\n💰 *Penawaran Khusus:* ${price} *(Nego Halus)*\n🔗 *Foto & Katalog Web:* ${publicUrl}\n\n💡 *Kunjungan Fisik / Video Call:*\nKakak bisa datang langsung cek fisik & test running mesin di gudang (${waModalItem.LOKASI_UNIT.split(',')[0]}), atau mau kami kirimkan video uji fungsi unitnya Kak?\n\n_Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
+                })())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all hover:scale-105"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Buka di WhatsApp</span>
+              </a>
+            </div>
           </div>
         </div>
       )}
