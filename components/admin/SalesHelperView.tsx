@@ -38,11 +38,11 @@ export function SalesHelperView() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
-  // Load recent available items for fast 1-click selection
+  // Load recent available items that have WooCommerce Product IDs for fast 1-click selection
   const fetchRecent = useCallback(async () => {
     setIsLoadingRecent(true);
     try {
-      const res = await fetch('/api/inventory?pageSize=8&statusUnit=READY&sortBy=TANGGAL_MASUK&sortOrder=desc', {
+      const res = await fetch('/api/inventory?pageSize=8&statusUnit=READY&hasProductId=true&sortBy=TANGGAL_MASUK&sortOrder=desc', {
         headers: { ...(role ? { 'x-bbk-role': role } : {}) },
       });
       const data = await res.json();
@@ -218,12 +218,12 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             >
               <div className="relative aspect-square w-full rounded-lg bg-slate-900 overflow-hidden mb-1.5">
                 {item.FEATURED_IMAGE ? (
-                  <Image
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
                     src={item.FEATURED_IMAGE}
                     alt={item.PRODUCT_TITLE}
-                    fill
-                    className="object-cover"
-                    sizes="80px"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
@@ -279,24 +279,33 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             <div className="flex items-start gap-3">
               <div className="relative w-16 h-16 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden shrink-0">
                 {searchedItem.FEATURED_IMAGE ? (
-                  <Image
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
                     src={searchedItem.FEATURED_IMAGE}
                     alt={searchedItem.PRODUCT_TITLE}
-                    fill
-                    className="object-cover"
-                    sizes="64px"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
                     referrerPolicy="no-referrer"
                   />
                 ) : null}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] font-mono font-bold text-amber-400 px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800/80">
                     {searchedItem.SKU}
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
                     {searchedItem.asal_gudang}
                   </span>
+                  {searchedItem.PRODUCT_ID && searchedItem.PRODUCT_ID !== '0' && searchedItem.PRODUCT_ID !== '' ? (
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-blue-950 text-blue-300 font-mono border border-blue-800">
+                      Woo #{searchedItem.PRODUCT_ID}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 font-mono border border-rose-800">
+                      Belum Ada ID Woo
+                    </span>
+                  )}
                 </div>
                 <h2 className="text-sm font-bold text-white mt-1 line-clamp-2">
                   {searchedItem.PRODUCT_TITLE}
@@ -359,12 +368,12 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                     className="relative aspect-square rounded-lg bg-slate-950 border border-slate-800 overflow-hidden hover:border-amber-500 transition-colors group"
                   >
                     {url ? (
-                      <Image
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
                         src={url}
                         alt={`Photo ${idx + 1}`}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform"
-                        sizes="100px"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        loading="lazy"
                         referrerPolicy="no-referrer"
                       />
                     ) : (

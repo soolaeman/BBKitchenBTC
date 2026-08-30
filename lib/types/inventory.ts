@@ -94,6 +94,7 @@ export interface InventoryFilterOptions {
   statusPipeline?: string;
   guardrailStatus?: string;
   isDirty?: boolean;
+  hasProductId?: boolean;
   minPrice?: number;
   maxPrice?: number;
   sortBy?: 'TANGGAL_MASUK' | 'SKU' | 'PRODUCT_TITLE' | 'HARGA_BUKA_WA' | 'DURASI_TERJUAL';

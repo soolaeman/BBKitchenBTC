@@ -34,10 +34,32 @@ function value(row: string[], index: number): string {
   return String(row[index] ?? "").trim();
 }
 
+function normalizeImageUrl(rawUrl: string): string {
+  if (!rawUrl) return "";
+  const trimmed = rawUrl.trim();
+
+  // Convert Google Drive view/open links to direct high-speed thumbnail images
+  const driveIdMatch =
+    trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+    trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+    trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+
+  if (driveIdMatch && driveIdMatch[1]) {
+    const fileId = driveIdMatch[1];
+    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+  }
+
+  if (trimmed.startsWith("//")) {
+    return "https:" + trimmed;
+  }
+
+  return trimmed;
+}
+
 function splitPhotos(raw: string): string[] {
   return raw
-    .split(/\r?\n|,/)
-    .map((v) => v.trim())
+    .split(/\r?\n|,|\|/)
+    .map((v) => normalizeImageUrl(v))
     .filter(Boolean);
 }
 
@@ -99,7 +121,7 @@ function toItem(row: string[]): MasterInventoryItem {
     SPESIFIKASI: {},
     YOAST_KEYWORD: value(row, 10),
     YOAST_DESCRIPTION: value(row, 11),
-    FEATURED_IMAGE: value(row, 12) || photos[0] || "",
+    FEATURED_IMAGE: normalizeImageUrl(value(row, 12)) || photos[0] || "",
     PHOTO_URLS: photos,
     TANGGAL_MASUK: value(row, 14),
     TANGGAL_TERJUAL: value(row, 15) || null,
@@ -237,6 +259,12 @@ export async function queryGoogleSheetsInventory(
   }
   if (options.isDirty !== undefined) {
     filtered = filtered.filter((item) => item.IS_DIRTY === options.isDirty);
+  }
+  if (options.hasProductId) {
+    filtered = filtered.filter((item) => {
+      const pid = String(item.PRODUCT_ID || "").trim();
+      return pid !== "" && pid !== "0" && pid !== "null" && pid !== "undefined";
+    });
   }
 
   const stats = {

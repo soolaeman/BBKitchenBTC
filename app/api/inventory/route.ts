@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
     const guardrailStatus = searchParams.get('guardrailStatus') || undefined;
     const isDirtyParam = searchParams.get('isDirty');
     const isDirty = isDirtyParam !== null ? isDirtyParam === 'true' : undefined;
+    const hasProductIdParam = searchParams.get('hasProductId');
+    const hasProductId = hasProductIdParam !== null ? hasProductIdParam === 'true' : undefined;
     const minPrice = searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined;
     const maxPrice = searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined;
     const sortBy = (searchParams.get('sortBy') as any) || 'TANGGAL_MASUK';
@@ -43,6 +45,7 @@ export async function GET(request: NextRequest) {
             statusPipeline,
             guardrailStatus,
             isDirty,
+            hasProductId,
             minPrice,
             maxPrice,
             sortBy,
