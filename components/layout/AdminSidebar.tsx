@@ -32,7 +32,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { name: 'Overview', href: '/admin', icon: LayoutDashboard },
-  { name: 'Inventory', href: '/admin/inventory', icon: Boxes, badge: '2.7k' },
+  { name: 'Inventory', href: '/admin/inventory', icon: Boxes, badge: 'Live' },
   { name: 'Pipeline Monitor', href: '/admin/pipeline', icon: Workflow, badge: 'Exception', badgeColor: 'bg-rose-900 text-rose-200' },
   { name: 'Warehouse Intelligence', href: '/admin/warehouse', icon: Warehouse },
   { name: 'Sales & Deal Desk', href: '/admin/sales', icon: MessageSquareShare },

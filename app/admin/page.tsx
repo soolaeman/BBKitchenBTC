@@ -68,7 +68,7 @@ export default function AdminPage() {
     },
     {
       id: 'INVENTORY',
-      label: 'Master Inventory (2,700+)',
+      label: 'Master Inventory',
       icon: <Boxes className="w-4 h-4" />,
       badge: 'Live',
       allowed: true,

@@ -151,7 +151,7 @@ export function InventoryTable() {
           <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             <span>Inventory Control Tower</span>
             <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
-              {data?.total || 2750} SKUs
+              {data?.total !== undefined ? `${data.total} SKUs` : (isLoading ? 'Syncing...' : '0 SKUs')}
             </span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-400">
