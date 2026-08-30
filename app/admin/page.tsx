@@ -74,6 +74,13 @@ export default function AdminPage() {
       allowed: true,
     },
     {
+      id: 'SALES_HELPER',
+      label: '⚡ Sales & WA Pitch',
+      icon: <MessageSquare className="w-4 h-4 text-emerald-400" />,
+      badge: 'Sprint 2A',
+      allowed: true,
+    },
+    {
       id: 'PIPELINE',
       label: 'Pipeline & QC Funnel',
       icon: <Workflow className="w-4 h-4" />,
@@ -115,12 +122,6 @@ export default function AdminPage() {
       id: 'SALES_QUOTE',
       label: 'Sales Quote',
       icon: <Calculator className="w-4 h-4" />,
-      allowed: true,
-    },
-    {
-      id: 'SALES_HELPER',
-      label: 'Sales Helper',
-      icon: <MessageSquare className="w-4 h-4" />,
       allowed: true,
     },
   ];
