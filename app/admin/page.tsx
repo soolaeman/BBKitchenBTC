@@ -90,9 +90,10 @@ export default function AdminPage() {
     },
     {
       id: 'INVOICES',
-      label: 'Invoices & Billing',
-      icon: <Receipt className="w-4 h-4" />,
-      allowed: permissions.canManageInvoices,
+      label: '💰 Invoices & Deal Ledger',
+      icon: <Receipt className="w-4 h-4 text-amber-400" />,
+      badge: 'Tab 4',
+      allowed: true,
     },
     {
       id: 'FINANCE',

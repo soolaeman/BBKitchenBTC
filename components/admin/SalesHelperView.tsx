@@ -24,7 +24,10 @@ import {
   CheckCircle,
   Layers,
   ShoppingBag,
+  FileText,
 } from 'lucide-react';
+import { OfficialDocumentModal } from './OfficialDocumentModal';
+import { Invoice } from '@/lib/types/finance';
 
 export function SalesHelperView() {
   const { role, permissions } = useAuth();
@@ -55,6 +58,10 @@ export function SalesHelperView() {
   const [dealPriceInput, setDealPriceInput] = useState('');
   const [soldNotesInput, setSoldNotesInput] = useState('');
   const [soldSuccessMsg, setSoldSuccessMsg] = useState('');
+
+  // Official Document Modal state
+  const [docModalInvoice, setDocModalInvoice] = useState<Invoice | null>(null);
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
 
   // Set responsive pageSize on mount
   useEffect(() => {
@@ -516,6 +523,55 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                 <span>{copiedLink ? 'Tersalin' : 'Link Web'}</span>
               </button>
 
+              {/* Quick Official Document Generator */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!searchedItem) return;
+                  const now = new Date();
+                  const price = searchedItem.HARGA_DEAL_WA || searchedItem.HARGA_BUKA_WA || searchedItem.HARGA_ESTIMASI_PUBLIK || 0;
+                  setDocModalInvoice({
+                    id: `deal_${searchedItem.SKU}_${Date.now()}`,
+                    invoiceNumber: `INV-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${searchedItem.SKU.replace(/\D/g, '').slice(-4) || '1024'}`,
+                    kuitansiNumber: `KWT-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${searchedItem.SKU.replace(/\D/g, '').slice(-4) || '1024'}`,
+                    quotationNumber: `QUO-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${searchedItem.SKU.replace(/\D/g, '').slice(-4) || '1024'}`,
+                    suratJalanNumber: `SJ-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${searchedItem.SKU.replace(/\D/g, '').slice(-4) || '1024'}`,
+                    customerName: buyerPhone.trim() ? `Pelanggan (${buyerPhone})` : 'Bpk/Ibu Pembeli',
+                    customerPhone: buyerPhone.trim() || '0851 2200 1051',
+                    customerAddress: searchedItem.LOKASI_UNIT || 'Jabodetabek',
+                    orderReference: `ORD-WA-${searchedItem.SKU}`,
+                    items: [
+                      {
+                        id: `item_${searchedItem.SKU}`,
+                        sku: searchedItem.SKU,
+                        description: searchedItem.PRODUCT_TITLE,
+                        quantity: 1,
+                        unitPrice: price,
+                        total: price,
+                        warehouseLocation: searchedItem.LOKASI_UNIT,
+                        condition: searchedItem.KONDISI_UNIT || 'Bekas Terkurasi (Lolos QC)',
+                      },
+                    ],
+                    subtotal: price,
+                    discount: 0,
+                    tax: 0,
+                    totalAmount: price,
+                    dpAmount: price,
+                    remainingAmount: 0,
+                    issueDate: now.toISOString().split('T')[0],
+                    dueDate: now.toISOString().split('T')[0],
+                    status: 'PAID',
+                    createdBy: 'Sales Desk BBKitchen',
+                  });
+                  setIsDocModalOpen(true);
+                }}
+                className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-amber-300 border border-slate-800 text-xs font-bold transition-colors text-center"
+                title="Terbitkan Invoice, Kuitansi, Quotation atau Surat Jalan"
+              >
+                <FileText className="w-3.5 h-3.5 text-amber-400" />
+                <span>Dokumen</span>
+              </button>
+
               {/* Mark As Sold Action */}
               {permissions?.canMarkAsSold && (
                 <button
@@ -777,6 +833,13 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             </form>
           </div>
         </div>
+      {/* 4-in-1 Official Document Modal */}
+      {docModalInvoice && (
+        <OfficialDocumentModal
+          invoice={docModalInvoice}
+          isOpen={isDocModalOpen}
+          onClose={() => setIsDocModalOpen(false)}
+        />
       )}
     </div>
   );

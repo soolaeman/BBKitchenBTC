@@ -4,6 +4,7 @@ import {
   createInvoice,
   updateInvoiceStatus,
   getFinancialKPIs,
+  getLiveClosingDealLedger,
 } from '@/lib/repositories/finance-repository';
 import { auth } from '@/auth';
 
@@ -14,8 +15,13 @@ export async function GET(request: NextRequest) {
     const session = await auth();
     if (!session?.user?.role) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
     const role = session.user.role;
-    if (!['ADMIN', 'FINANCE', 'INVESTOR'].includes(role)) {
+    if (!['ADMIN', 'FINANCE', 'OPERATOR', 'INVESTOR', 'SALES_DESK'].includes(role)) {
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    if (view === 'ledger') {
+      const ledgerData = await getLiveClosingDealLedger();
+      return NextResponse.json(ledgerData);
     }
 
     if (view === 'kpis') {
@@ -24,7 +30,12 @@ export async function GET(request: NextRequest) {
     }
 
     const invoices = getInvoices();
-    return NextResponse.json({ invoices });
+    const ledgerData = await getLiveClosingDealLedger();
+    return NextResponse.json({
+      invoices,
+      deals: ledgerData.deals,
+      closingKPIs: ledgerData.kpis,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to load invoices' }, { status: 500 });
   }
@@ -35,7 +46,7 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     if (!session?.user?.role) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
     const role = session.user.role;
-    if (!['ADMIN', 'FINANCE'].includes(role)) {
+    if (!['ADMIN', 'FINANCE', 'OPERATOR', 'SALES_DESK'].includes(role)) {
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
 

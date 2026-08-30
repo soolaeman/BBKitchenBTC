@@ -1,5 +1,6 @@
-import { Invoice, FinancialKPIs } from '@/lib/types/finance';
+import { Invoice, FinancialKPIs, ClosingDealItem } from '@/lib/types/finance';
 import { getRawMasterInventory } from './inventory-repository';
+import { getGoogleSheetsInventory } from './google-sheets-inventory';
 
 // Realistic mock invoices for BBKitchen commercial kitchen buyers
 const initialInvoices: Invoice[] = [
@@ -214,4 +215,105 @@ export function getFinancialKPIs(): FinancialKPIs {
     paidInvoicesAmount,
     inventoryAssetValue,
   };
+}
+
+export async function getLiveClosingDealLedger(): Promise<{
+  deals: ClosingDealItem[];
+  kpis: {
+    totalDeals: number;
+    bbkSalesDeals: number;
+    thirdPartyDeals: number;
+    totalRevenue: number;
+    totalProfit: number;
+    avgMarginPercent: number;
+    avgAgingDays: number;
+  };
+}> {
+  try {
+    const rawItems = await getGoogleSheetsInventory();
+    const soldItems = rawItems.filter((i) => i.STATUS_UNIT === 'SOLD');
+
+    let totalRevenue = 0;
+    let totalProfit = 0;
+    let totalAging = 0;
+    let bbkSalesCount = 0;
+    let thirdPartyCount = 0;
+
+    const deals: ClosingDealItem[] = soldItems.map((item) => {
+      const modal = item.HARGA_MODAL || 0;
+      const closing = (item.HARGA_CLOSING !== undefined && item.HARGA_CLOSING > 0)
+        ? item.HARGA_CLOSING
+        : (item.HARGA_DEAL_WA || item.HARGA_BUKA_WA || item.HARGA_ESTIMASI_PUBLIK || 0);
+
+      const isThirdParty = item.HARGA_CLOSING === 0;
+      const realizedProfit = isThirdParty ? 0 : Math.max(0, closing - modal);
+      const marginPercent = (!isThirdParty && closing > 0 && modal > 0)
+        ? Math.round(((closing - modal) / closing) * 100)
+        : 0;
+
+      if (isThirdParty) {
+        thirdPartyCount++;
+      } else {
+        bbkSalesCount++;
+        totalRevenue += closing;
+        totalProfit += realizedProfit;
+      }
+
+      const agingNum = typeof item.DURASI_TERJUAL === 'number' ? item.DURASI_TERJUAL : (parseInt(String(item.DURASI_TERJUAL || '0'), 10) || 0);
+      totalAging += agingNum;
+
+      return {
+        sku: item.SKU,
+        productTitle: item.PRODUCT_TITLE,
+        tanggalMasuk: item.TANGGAL_MASUK,
+        tanggalTerjual: item.TANGGAL_TERJUAL || undefined,
+        durasiTerjual: item.DURASI_TERJUAL || `${agingNum} hari`,
+        lokasiGudang: item.LOKASI_UNIT,
+        hargaModal: modal,
+        hargaClosing: closing,
+        realizedProfit,
+        marginPercent,
+        soldBy: isThirdParty ? 'THIRD_PARTY' : 'SALES_BBK',
+        notes: isThirdParty ? 'Terjual Rekanan Gudang / Pihak Ketiga' : 'Closing Sales WhatsApp BBKitchen',
+      };
+    });
+
+    // Sort newest sold date first
+    deals.sort((a, b) => {
+      const dateA = a.tanggalTerjual ? new Date(a.tanggalTerjual).getTime() : 0;
+      const dateB = b.tanggalTerjual ? new Date(b.tanggalTerjual).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    const totalDeals = deals.length;
+    const avgMarginPercent = totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100) : 0;
+    const avgAgingDays = totalDeals > 0 ? Math.round(totalAging / totalDeals) : 0;
+
+    return {
+      deals,
+      kpis: {
+        totalDeals,
+        bbkSalesDeals: bbkSalesCount,
+        thirdPartyDeals: thirdPartyCount,
+        totalRevenue,
+        totalProfit,
+        avgMarginPercent,
+        avgAgingDays,
+      },
+    };
+  } catch (error) {
+    console.error('Failed to calculate live closing deal ledger:', error);
+    return {
+      deals: [],
+      kpis: {
+        totalDeals: 0,
+        bbkSalesDeals: 0,
+        thirdPartyDeals: 0,
+        totalRevenue: 0,
+        totalProfit: 0,
+        avgMarginPercent: 0,
+        avgAgingDays: 0,
+      },
+    };
+  }
 }
