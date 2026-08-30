@@ -358,6 +358,88 @@ export async function findRowIndexBySku(sku: string): Promise<{ rowIndex: number
   return null;
 }
 
+export async function syncDirectToWooCommerceAndWebhook(payload: {
+  sku: string;
+  status: "SOLD" | "READY" | "AVAILABLE";
+  productId?: string;
+  tanggalTerjual?: string;
+  durasiTerjual?: string;
+  dealPrice?: number;
+}): Promise<{ success: boolean; errors?: string[] }> {
+  const errors: string[] = [];
+  const stockStatus = payload.status === "SOLD" ? "outofstock" : "instock";
+
+  // 1. DIRECT SYNC KE WORDPRESS WOOCOMMERCE REST API (Snippet #2)
+  const wpDomain = (
+    process.env.WOO_DOMAIN ||
+    process.env.NEXT_PUBLIC_WORDPRESS_URL ||
+    "https://origin.bukanbarukitchen.com"
+  ).replace(/\/$/, "");
+  const secretKey = process.env.BBK_API_SECRET || "BBK_SECRET_KEY_2026_XYZ123";
+
+  try {
+    const wpUrl = `${wpDomain}/wp-json/bbk/v1/update-status`;
+    const wpRes = await fetch(wpUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x_bbk_secret": secretKey,
+      },
+      body: JSON.stringify({
+        sku: payload.sku,
+        product_id: payload.productId,
+        status: payload.status,
+        stock_status: stockStatus,
+        tanggal_terjual: payload.tanggalTerjual,
+        harga_deal_wa: payload.dealPrice,
+      }),
+    });
+
+    if (!wpRes.ok) {
+      // Fallback to /tambah-produk if /update-status is not yet registered
+      const fallbackUrl = `${wpDomain}/wp-json/bbk/v1/tambah-produk`;
+      await fetch(fallbackUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x_bbk_secret": secretKey,
+        },
+        body: JSON.stringify({
+          sku: payload.sku,
+          status_unit: payload.status,
+          stock_status: stockStatus,
+        }),
+      }).catch((e) => console.warn("Woo fallback sync warning:", e));
+    }
+  } catch (err: any) {
+    console.warn("Direct WordPress Woo sync warning:", err?.message || err);
+    errors.push(err?.message || "WordPress network timeout");
+  }
+
+  // 2. SYNC KE GOOGLE APPS SCRIPT WEBHOOK (Snippet #3)
+  const webhookUrl =
+    process.env.APPS_SCRIPT_STOCK_WEBHOOK_URL?.trim() ||
+    "https://script.google.com/macros/s/AKfycby7x_1Ityqekh8_nk3IsLJoFUGFm-avvp3rcYNJ4EXBq1MHle7Ma3Yph6paYoa3lEKL/exec";
+
+  try {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_id: payload.productId,
+        sku: payload.sku,
+        status: payload.status,
+        tanggal_terjual: payload.tanggalTerjual,
+        durasi_terjual: payload.durasiTerjual,
+      }),
+    });
+  } catch (err: any) {
+    console.warn("Apps Script webhook sync warning:", err?.message || err);
+  }
+
+  return { success: errors.length === 0, errors: errors.length > 0 ? errors : undefined };
+}
+
 export async function triggerAppsScriptStockWebhook(payload: {
   sku: string;
   status: "SOLD" | "READY" | "AVAILABLE";
@@ -365,25 +447,13 @@ export async function triggerAppsScriptStockWebhook(payload: {
   tanggal_terjual?: string;
   durasi_terjual?: string;
 }): Promise<{ success: boolean; error?: string }> {
-  const webhookUrl = process.env.APPS_SCRIPT_STOCK_WEBHOOK_URL?.trim();
-  if (!webhookUrl) return { success: false, error: "APPS_SCRIPT_STOCK_WEBHOOK_NOT_CONFIGURED" };
-
-  try {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      return { success: false, error: `Apps Script HTTP ${response.status}` };
-    }
-
-    return { success: true };
-  } catch (err: any) {
-    console.error("Failed to trigger Apps Script stock webhook:", err);
-    return { success: false, error: err.message || "Webhook network error" };
-  }
+  return syncDirectToWooCommerceAndWebhook({
+    sku: payload.sku,
+    status: payload.status,
+    productId: payload.product_id,
+    tanggalTerjual: payload.tanggal_terjual,
+    durasiTerjual: payload.durasi_terjual,
+  });
 }
 
 export async function updateGoogleSheetsStockStatus(input: {
@@ -456,14 +526,15 @@ export async function updateGoogleSheetsStockStatus(input: {
     });
   }
 
-  // 4. Trigger Webhook in parallel / background
-  triggerAppsScriptStockWebhook({
+  // 4. Trigger Direct WooCommerce API and Apps Script Webhook in background
+  syncDirectToWooCommerceAndWebhook({
     sku: input.sku,
     status: input.status,
-    product_id: input.productId || rowData?.[18],
-    tanggal_terjual: input.status === "SOLD" ? todayFormatted : undefined,
-    durasi_terjual: durasiStr || undefined,
-  }).catch((e) => console.warn("Background stock webhook trigger failed:", e));
+    productId: input.productId || rowData?.[18],
+    tanggalTerjual: input.status === "SOLD" ? todayFormatted : undefined,
+    durasiTerjual: durasiStr || undefined,
+    dealPrice: input.dealPrice,
+  }).catch((e) => console.warn("Background stock sync trigger failed:", e));
 
   return { success: true };
 }
