@@ -21,6 +21,8 @@ import {
   SlidersHorizontal,
   Lock,
   MessageSquare,
+  Check,
+  Copy,
 } from 'lucide-react';
 
 export function InventoryTable() {
