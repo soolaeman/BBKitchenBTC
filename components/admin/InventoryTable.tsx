@@ -532,7 +532,25 @@ export function InventoryTable() {
 
                     {/* Aging */}
                     <td className="py-3 px-3 text-center whitespace-nowrap font-mono text-[11px] text-slate-400">
-                      {item.DURASI_TERJUAL ? `${item.DURASI_TERJUAL} hr` : '18 hr'}
+                      {(() => {
+                        if (item.STATUS_UNIT === 'SOLD' && item.DURASI_TERJUAL != null) {
+                          return <span className="text-emerald-400 font-bold">{item.DURASI_TERJUAL} hr (laku)</span>;
+                        }
+                        if (item.TANGGAL_MASUK) {
+                          try {
+                            const masuk = new Date(item.TANGGAL_MASUK);
+                            if (!isNaN(masuk.getTime())) {
+                              const diffDays = Math.max(0, Math.floor((Date.now() - masuk.getTime()) / (1000 * 60 * 60 * 24)));
+                              return (
+                                <span className={diffDays > 45 ? 'text-rose-400 font-bold' : diffDays > 20 ? 'text-amber-400' : 'text-slate-400'}>
+                                  {diffDays} hr
+                                </span>
+                              );
+                            }
+                          } catch {}
+                        }
+                        return <span>-</span>;
+                      })()}
                     </td>
 
                     {/* Actions */}
