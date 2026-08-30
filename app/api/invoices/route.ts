@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       invoices,
       deals: ledgerData.deals,
+      categoryEconomics: ledgerData.categoryEconomics,
+      totalAssetValuation: ledgerData.totalAssetValuation,
       closingKPIs: ledgerData.kpis,
     });
   } catch (error: any) {

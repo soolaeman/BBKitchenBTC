@@ -28,50 +28,65 @@ export function updateInvoiceStatus(id: string, status: InvoiceStatus): boolean 
   return true;
 }
 
-export function getFinancialKPIs(): FinancialKPIs {
-  const inventory = getRawMasterInventory();
-  const soldUnits = inventory.filter((i) => i.STATUS_UNIT === 'SOLD');
+// Bulletproof Date Normalizer for Excel Serials, ISO Strings, Timestamps
+export function parseToISODate(raw: any): string | undefined {
+  if (!raw) return undefined;
+  const str = String(raw).trim();
+  if (!str) return undefined;
 
-  let totalRevenue = 0;
-  let totalCOGS = 0;
-
-  for (const item of soldUnits) {
-    if (typeof item.HARGA_CLOSING === 'number' && item.HARGA_CLOSING > 0) {
-      const revenue = item.HARGA_CLOSING;
-      const cogs = item.HARGA_MODAL || 0;
-      totalRevenue += revenue;
-      totalCOGS += cogs;
+  // 1. Check if numeric serial (e.g. 45918 or 46268.454791666665)
+  const num = Number(str);
+  if (!isNaN(num) && num > 30000 && num < 60000) {
+    // Excel base date is Dec 30, 1899 (25569 days from Jan 1 1970)
+    const jsDate = new Date((num - 25569) * 86400 * 1000);
+    if (!isNaN(jsDate.getTime())) {
+      return jsDate.toISOString().split('T')[0];
     }
   }
 
-  const availableUnits = inventory.filter((i) => i.STATUS_UNIT === 'AVAILABLE' || i.STATUS_UNIT === 'READY');
-  const inventoryAssetValue = availableUnits.reduce((acc, curr) => acc + (curr.HARGA_MODAL || 0), 0);
+  // 2. Check standard ISO or YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    const y = isoMatch[1];
+    const m = isoMatch[2].padStart(2, '0');
+    const d = isoMatch[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
 
-  const grossMarginAmount = totalRevenue - totalCOGS;
-  const grossMarginPercentage = totalRevenue > 0 ? (grossMarginAmount / totalRevenue) * 100 : 0;
-  const paidInvoices = initialInvoices.filter((i) => i.status === 'PAID');
-  const outstandingInvoices = initialInvoices.filter((i) => i.status === 'SENT' || i.status === 'GENERATED');
+  // 3. Check DD-MM-YYYY or DD/MM/YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    const d = dmyMatch[1].padStart(2, '0');
+    const m = dmyMatch[2].padStart(2, '0');
+    const y = dmyMatch[3];
+    return `${y}-${m}-${d}`;
+  }
 
-  const paidInvoicesAmount = paidInvoices.reduce((acc, curr) => acc + curr.totalAmount, 0);
-  const outstandingInvoicesAmount = outstandingInvoices.reduce((acc, curr) => acc + curr.totalAmount, 0);
+  // 4. Try native Date constructor
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0];
+  }
 
-  return {
-    period: 'Agustus 2026 (Live Financials)',
-    totalRevenue,
-    totalCOGS,
-    grossMarginAmount,
-    grossMarginPercentage,
-    unitsSold: soldUnits.length,
-    averageOrderValue: totalRevenue > 0 ? totalRevenue / (soldUnits.length || 1) : 0,
-    averageUnitMargin: grossMarginAmount > 0 ? grossMarginAmount / (soldUnits.length || 1) : 0,
-    outstandingInvoicesAmount,
-    paidInvoicesAmount,
-    inventoryAssetValue,
-  };
+  return undefined;
+}
+
+export interface CategoryEconomics {
+  category: string;
+  totalUnits: number;
+  readyUnits: number;
+  soldUnits: number;
+  avgRevenue: number;
+  avgCOGS: number;
+  avgMargin: number;
+  marginPercent: number;
+  assetValue: number;
 }
 
 export async function getLiveClosingDealLedger(): Promise<{
   deals: ClosingDealItem[];
+  categoryEconomics: CategoryEconomics[];
+  totalAssetValuation: number;
   kpis: {
     totalDeals: number;
     bbkSalesDeals: number;
@@ -112,28 +127,21 @@ export async function getLiveClosingDealLedger(): Promise<{
         totalProfit += realizedProfit;
       }
 
-      // Convert serial date or raw string
-      let rawDate = item.TANGGAL_TERJUAL ? String(item.TANGGAL_TERJUAL).trim() : '';
-      if (/^\d{5}$/.test(rawDate)) {
-        // Excel/Sheets serial date number (e.g. 45918 -> 2025-09-18)
-        const serialNum = parseInt(rawDate, 10);
-        const jsDate = new Date((serialNum - (25567 + 2)) * 86400 * 1000);
-        if (!isNaN(jsDate.getTime())) {
-          rawDate = jsDate.toISOString().split('T')[0];
-        }
-      }
+      // Convert serial date or raw string to ISO YYYY-MM-DD
+      const cleanSoldDate = parseToISODate(item.TANGGAL_TERJUAL);
+      const cleanInDate = parseToISODate(item.TANGGAL_MASUK);
 
       const agingNum = typeof item.DURASI_TERJUAL === 'number' 
         ? Math.round(item.DURASI_TERJUAL) 
-        : (parseInt(String(item.DURASI_TERJUAL || '0'), 10) || 0);
+        : (parseInt(String(item.DURASI_TERJUAL || '0').replace(/\D/g, ''), 10) || 0);
         
       totalAging += agingNum;
 
       return {
         sku: item.SKU,
         productTitle: item.PRODUCT_TITLE,
-        tanggalMasuk: item.TANGGAL_MASUK,
-        tanggalTerjual: rawDate || undefined,
+        tanggalMasuk: cleanInDate || item.TANGGAL_MASUK,
+        tanggalTerjual: cleanSoldDate || undefined,
         durasiTerjual: `${agingNum} hari`,
         lokasiGudang: item.LOKASI_UNIT,
         hargaModal: modal,
@@ -156,8 +164,88 @@ export async function getLiveClosingDealLedger(): Promise<{
     const avgMarginPercent = totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100) : 0;
     const avgAgingDays = totalDeals > 0 ? Math.round(totalAging / totalDeals) : 0;
 
+    // Calculate Real Category Unit Economics from All 2,760+ Items
+    const categoryMap = new Map<string, {
+      totalUnits: number;
+      readyUnits: number;
+      soldUnits: number;
+      revenueSum: number;
+      revenueCount: number;
+      cogsSum: number;
+      cogsCount: number;
+      assetSum: number;
+    }>();
+
+    let totalAssetValuation = 0;
+
+    for (const it of rawItems) {
+      const catName = it.CATEGORY_NAME || it.CATEGORY_SLUG || 'Peralatan Dapur Lainnya';
+      const isReady = it.STATUS_UNIT === 'READY' || it.STATUS_UNIT === 'AVAILABLE';
+      const isSold = it.STATUS_UNIT === 'SOLD';
+      const modal = it.HARGA_MODAL || 0;
+      const price = it.HARGA_CLOSING || it.HARGA_DEAL_WA || it.HARGA_BUKA_WA || it.HARGA_ESTIMASI_PUBLIK || 0;
+
+      if (isReady && modal > 0) {
+        totalAssetValuation += modal;
+      }
+
+      if (!categoryMap.has(catName)) {
+        categoryMap.set(catName, {
+          totalUnits: 0,
+          readyUnits: 0,
+          soldUnits: 0,
+          revenueSum: 0,
+          revenueCount: 0,
+          cogsSum: 0,
+          cogsCount: 0,
+          assetSum: 0,
+        });
+      }
+
+      const entry = categoryMap.get(catName)!;
+      entry.totalUnits++;
+      if (isReady) {
+        entry.readyUnits++;
+        if (modal > 0) entry.assetSum += modal;
+      }
+      if (isSold) entry.soldUnits++;
+
+      if (price > 0) {
+        entry.revenueSum += price;
+        entry.revenueCount++;
+      }
+      if (modal > 0) {
+        entry.cogsSum += modal;
+        entry.cogsCount++;
+      }
+    }
+
+    const categoryEconomics: CategoryEconomics[] = Array.from(categoryMap.entries())
+      .filter(([_, stats]) => stats.totalUnits >= 5) // Only significant categories
+      .map(([catName, stats]) => {
+        const avgRev = stats.revenueCount > 0 ? Math.round(stats.revenueSum / stats.revenueCount) : 0;
+        const avgCogs = stats.cogsCount > 0 ? Math.round(stats.cogsSum / stats.cogsCount) : Math.round(avgRev * 0.65);
+        const avgMargin = Math.max(0, avgRev - avgCogs);
+        const marginPct = avgRev > 0 ? Math.round((avgMargin / avgRev) * 100) : 0;
+
+        return {
+          category: catName,
+          totalUnits: stats.totalUnits,
+          readyUnits: stats.readyUnits,
+          soldUnits: stats.soldUnits,
+          avgRevenue: avgRev,
+          avgCOGS: avgCogs,
+          avgMargin,
+          marginPercent: marginPct,
+          assetValue: stats.assetSum,
+        };
+      })
+      .sort((a, b) => b.totalUnits - a.totalUnits);
+
     return {
       deals,
+      categoryEconomics,
+      totalAssetValuation,
       kpis: {
         totalDeals,
         bbkSalesDeals: bbkSalesCount,
@@ -172,6 +260,8 @@ export async function getLiveClosingDealLedger(): Promise<{
     console.error('Failed to calculate live closing deal ledger:', error);
     return {
       deals: [],
+      categoryEconomics: [],
+      totalAssetValuation: 0,
       kpis: {
         totalDeals: 0,
         bbkSalesDeals: 0,
