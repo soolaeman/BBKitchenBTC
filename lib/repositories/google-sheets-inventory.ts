@@ -251,9 +251,7 @@ export async function queryGoogleSheetsInventory(
   if (options.statusUnit && options.statusUnit !== "ALL") {
     if (options.statusUnit === "READY") {
       filtered = filtered.filter(
-        (item) =>
-          (item.STATUS_UNIT === "READY" || item.STATUS_UNIT === "AVAILABLE") &&
-          item.STATUS_UNIT !== "SOLD"
+        (item) => item.STATUS_UNIT === "READY" || item.STATUS_UNIT === "AVAILABLE"
       );
     } else {
       filtered = filtered.filter((item) => item.STATUS_UNIT === options.statusUnit);
