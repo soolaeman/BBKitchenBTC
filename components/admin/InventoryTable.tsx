@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { MasterInventoryItem, PaginatedInventoryResponse } from '@/lib/types/inventory';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { StatusBadge, PipelineBadge, GuardrailBadge } from '@/components/ui/StatusBadges';
-import { formatIDR } from '@/lib/repositories/warehouse-utils';
+import { formatIDR, formatCleanProductUrl } from '@/lib/repositories/warehouse-utils';
 import {
   Search,
   Filter,
@@ -914,8 +914,7 @@ export function InventoryTable() {
             <div className="flex-1 overflow-y-auto bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-emerald-300/90 whitespace-pre-wrap leading-relaxed">
               {(() => {
                 const cleanTitle = waModalItem.PRODUCT_TITLE.replace(/[-|–]\s*BBKitchen.*/gi, '').trim();
-                const slug = cleanTitle.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/[\s_]+/g, '-').replace(/-+/g, '-');
-                const publicUrl = waModalItem.LINK_UNIT || `https://www.bukanbarukitchen.com/shop/${slug}/`;
+                const publicUrl = formatCleanProductUrl(waModalItem.PRODUCT_TITLE, waModalItem.LINK_UNIT);
                 const price = waModalItem.HARGA_BUKA_WA ? formatIDR(waModalItem.HARGA_BUKA_WA) : (waModalItem.HARGA_ESTIMASI_PUBLIK ? formatIDR(waModalItem.HARGA_ESTIMASI_PUBLIK) : 'Hubungi kami');
 
                 return `Halo Kak! Terima kasih sudah menghubungi Bukan Baru Kitchen 🙏
@@ -944,8 +943,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                 type="button"
                 onClick={() => {
                   const cleanTitle = waModalItem.PRODUCT_TITLE.replace(/[-|–]\s*BBKitchen.*/gi, '').trim();
-                  const slug = cleanTitle.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/[\s_]+/g, '-').replace(/-+/g, '-');
-                  const publicUrl = waModalItem.LINK_UNIT || `https://www.bukanbarukitchen.com/shop/${slug}/`;
+                  const publicUrl = formatCleanProductUrl(waModalItem.PRODUCT_TITLE, waModalItem.LINK_UNIT);
                   const price = waModalItem.HARGA_BUKA_WA ? formatIDR(waModalItem.HARGA_BUKA_WA) : (waModalItem.HARGA_ESTIMASI_PUBLIK ? formatIDR(waModalItem.HARGA_ESTIMASI_PUBLIK) : 'Hubungi kami');
                   const text = `Halo Kak! Terima kasih sudah menghubungi Bukan Baru Kitchen 🙏\n\nBerikut informasi detail unit yang sedang *READY* di gudang:\n\n📌 *${cleanTitle}*\n• *Kode SKU:* ${waModalItem.SKU}\n• *Kondisi:* ${waModalItem.KONDISI_UNIT || 'Bekas Siap Pakai'}\n• *Lokasi Gudang:* ${waModalItem.LOKASI_UNIT}\n• *Hasil Uji QC:* 100% Normal Siap Pakai\n\n💰 *Penawaran Khusus:* ${price} *(Nego Halus)*\n🔗 *Foto & Katalog Web:* ${publicUrl}\n\n💡 *Kunjungan Fisik / Video Call:*\nKakak bisa datang langsung cek fisik & test running mesin di gudang (${waModalItem.LOKASI_UNIT.split(',')[0]}), atau mau kami kirimkan video uji fungsi unitnya Kak?\n\n_Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                   navigator.clipboard.writeText(text);
@@ -961,8 +959,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
               <a
                 href={`https://wa.me/?text=${encodeURIComponent((() => {
                   const cleanTitle = waModalItem.PRODUCT_TITLE.replace(/[-|–]\s*BBKitchen.*/gi, '').trim();
-                  const slug = cleanTitle.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/[\s_]+/g, '-').replace(/-+/g, '-');
-                  const publicUrl = waModalItem.LINK_UNIT || `https://www.bukanbarukitchen.com/shop/${slug}/`;
+                  const publicUrl = formatCleanProductUrl(waModalItem.PRODUCT_TITLE, waModalItem.LINK_UNIT);
                   const price = waModalItem.HARGA_BUKA_WA ? formatIDR(waModalItem.HARGA_BUKA_WA) : (waModalItem.HARGA_ESTIMASI_PUBLIK ? formatIDR(waModalItem.HARGA_ESTIMASI_PUBLIK) : 'Hubungi kami');
                   return `Halo Kak! Terima kasih sudah menghubungi Bukan Baru Kitchen 🙏\n\nBerikut informasi detail unit yang sedang *READY* di gudang:\n\n📌 *${cleanTitle}*\n• *Kode SKU:* ${waModalItem.SKU}\n• *Kondisi:* ${waModalItem.KONDISI_UNIT || 'Bekas Siap Pakai'}\n• *Lokasi Gudang:* ${waModalItem.LOKASI_UNIT}\n• *Hasil Uji QC:* 100% Normal Siap Pakai\n\n💰 *Penawaran Khusus:* ${price} *(Nego Halus)*\n🔗 *Foto & Katalog Web:* ${publicUrl}\n\n💡 *Kunjungan Fisik / Video Call:*\nKakak bisa datang langsung cek fisik & test running mesin di gudang (${waModalItem.LOKASI_UNIT.split(',')[0]}), atau mau kami kirimkan video uji fungsi unitnya Kak?\n\n_Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                 })())}`}

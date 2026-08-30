@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import type { MasterInventoryItem, InventoryFilterOptions, PaginatedInventoryResponse } from "@/lib/types/inventory";
 import { OFFICIAL_CATEGORIES } from "./categories";
+import { formatCleanProductUrl } from "./warehouse-utils";
 import type { UserRole } from "@/lib/types/auth";
 import { ROLE_PERMISSIONS } from "@/lib/types/auth";
 
@@ -149,7 +150,7 @@ function toItem(row: string[]): MasterInventoryItem {
     MARGIN_DEAL: numberOrNull(value(row, 30)) ?? undefined,
     STATUS_GUARDRAIL: (value(row, 31) || "SAFE") as MasterInventoryItem["STATUS_GUARDRAIL"],
     HARGA_CLOSING: numberOrNull(value(row, 32)) ?? undefined,
-    LINK_UNIT: value(row, 33),
+    LINK_UNIT: formatCleanProductUrl(value(row, 1), value(row, 33)),
   };
 }
 

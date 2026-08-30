@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { MasterInventoryItem, PaginatedInventoryResponse } from '@/lib/types/inventory';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
-import { formatIDR } from '@/lib/repositories/warehouse-utils';
+import { formatIDR, formatCleanProductUrl } from '@/lib/repositories/warehouse-utils';
 import {
   MessageSquare,
   Search,
@@ -186,14 +186,7 @@ export function SalesHelperView() {
       .replace(/[-|–]\s*BBKitchen.*/gi, '')
       .trim();
 
-    const slug = cleanTitle
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/[\s_]+/g, '-')
-      .replace(/-+/g, '-');
-
-    const publicUrl = searchedItem.LINK_UNIT || `https://www.bukanbarukitchen.com/shop/${slug}/`;
+    const publicUrl = formatCleanProductUrl(searchedItem.PRODUCT_TITLE, searchedItem.LINK_UNIT);
 
     const specsList = Object.entries(searchedItem.SPESIFIKASI || {})
       .slice(0, 4)
@@ -228,9 +221,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
 
   const copyPublicLink = () => {
     if (!searchedItem) return;
-    const cleanTitle = searchedItem.PRODUCT_TITLE.replace(/[-|–]\s*BBKitchen.*/gi, '').trim();
-    const slug = cleanTitle.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/[\s_]+/g, '-');
-    const url = searchedItem.LINK_UNIT || `https://www.bukanbarukitchen.com/shop/${slug}/`;
+    const url = formatCleanProductUrl(searchedItem.PRODUCT_TITLE, searchedItem.LINK_UNIT);
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 3000);

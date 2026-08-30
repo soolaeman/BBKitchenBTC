@@ -75,3 +75,28 @@ export function formatIDR(amount: number | null | undefined): string {
     maximumFractionDigits: 0,
   }).format(amount);
 }
+
+export function formatCleanProductUrl(title: string, rawLinkUnit?: string): string {
+  // If rawLinkUnit is already a clean shop URL on www domain without ?p=
+  if (
+    rawLinkUnit &&
+    rawLinkUnit.includes('www.bukanbarukitchen.com/shop/') &&
+    !rawLinkUnit.includes('?p=')
+  ) {
+    return rawLinkUnit.trim();
+  }
+
+  const cleanTitle = (title || '')
+    .replace(/%%title%%|%%sep%%|%%sitename%%/gi, '')
+    .replace(/[-|–]\s*BBKitchen.*/gi, '')
+    .trim();
+
+  const slug = cleanTitle
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-');
+
+  return `https://www.bukanbarukitchen.com/shop/${slug}/`;
+}
