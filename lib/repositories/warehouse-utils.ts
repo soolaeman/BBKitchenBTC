@@ -91,12 +91,12 @@ export function formatCleanProductUrl(title: string, rawLinkUnit?: string): stri
     .replace(/[-|–]\s*BBKitchen.*/gi, '')
     .trim();
 
+  // Exact WordPress sanitize_title replica:
   const slug = cleanTitle
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/-+/g, '-');
+    .replace(/[^a-z0-9]+/g, '-') // Replace all non-alphanumeric (slashes, symbols, spaces, etc.) with hyphens
+    .replace(/^-+|-+$/g, ''); // Trim leading and trailing hyphens
 
   return `https://www.bukanbarukitchen.com/shop/${slug}/`;
 }
