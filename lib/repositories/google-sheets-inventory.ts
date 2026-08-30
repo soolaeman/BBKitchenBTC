@@ -385,50 +385,49 @@ export async function syncDirectToWooCommerceAndWebhook(payload: {
   const stockStatus = payload.status === "SOLD" ? "outofstock" : "instock";
 
   // 1. DIRECT SYNC KE WORDPRESS WOOCOMMERCE REST API (Snippet #2)
-  const wpDomain = (
-    process.env.WOO_DOMAIN ||
-    process.env.NEXT_PUBLIC_WORDPRESS_URL ||
-    "https://origin.bukanbarukitchen.com"
-  ).replace(/\/$/, "");
+  const domainsToTry = [
+    (process.env.WOO_DOMAIN || "").replace(/\/$/, ""),
+    (process.env.NEXT_PUBLIC_WORDPRESS_URL || "").replace(/\/$/, ""),
+    "https://origin.bukanbarukitchen.com",
+    "https://www.bukanbarukitchen.com",
+  ].filter(Boolean);
+
   const secretKey = process.env.BBK_API_SECRET || "BBK_SECRET_KEY_2026_XYZ123";
+  let wooSuccess = false;
 
-  try {
-    const wpUrl = `${wpDomain}/wp-json/bbk/v1/update-status`;
-    const wpRes = await fetch(wpUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x_bbk_secret": secretKey,
-      },
-      body: JSON.stringify({
-        sku: payload.sku,
-        product_id: payload.productId,
-        status: payload.status,
-        stock_status: stockStatus,
-        tanggal_terjual: payload.tanggalTerjual,
-        harga_deal_wa: payload.dealPrice,
-      }),
-    });
-
-    if (!wpRes.ok) {
-      // Fallback to /tambah-produk if /update-status is not yet registered
-      const fallbackUrl = `${wpDomain}/wp-json/bbk/v1/tambah-produk`;
-      await fetch(fallbackUrl, {
+  for (const wpDomain of domainsToTry) {
+    if (wooSuccess) break;
+    try {
+      const wpUrl = `${wpDomain}/wp-json/bbk/v1/update-status?bbk_secret=${encodeURIComponent(secretKey)}`;
+      const wpRes = await fetch(wpUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-BBK-Secret": secretKey,
+          "x-bbk-secret": secretKey,
           "x_bbk_secret": secretKey,
         },
         body: JSON.stringify({
           sku: payload.sku,
-          status_unit: payload.status,
+          product_id: payload.productId,
+          status: payload.status,
           stock_status: stockStatus,
+          tanggal_terjual: payload.tanggalTerjual,
+          harga_deal_wa: payload.dealPrice,
         }),
-      }).catch((e) => console.warn("Woo fallback sync warning:", e));
+      });
+
+      if (wpRes.ok) {
+        wooSuccess = true;
+        break;
+      }
+    } catch (err: any) {
+      console.warn(`Woo sync to ${wpDomain} failed:`, err?.message || err);
     }
-  } catch (err: any) {
-    console.warn("Direct WordPress Woo sync warning:", err?.message || err);
-    errors.push(err?.message || "WordPress network timeout");
+  }
+
+  if (!wooSuccess) {
+    errors.push("WordPress update-status endpoint did not respond OK");
   }
 
   // 2. SYNC KE GOOGLE APPS SCRIPT WEBHOOK (Snippet #3)
@@ -541,15 +540,15 @@ export async function updateGoogleSheetsStockStatus(input: {
     });
   }
 
-  // 4. Trigger Direct WooCommerce API and Apps Script Webhook in background
-  syncDirectToWooCommerceAndWebhook({
+  // 4. Trigger Direct WooCommerce API and Apps Script Webhook
+  await syncDirectToWooCommerceAndWebhook({
     sku: input.sku,
     status: input.status,
     productId: input.productId || rowData?.[18],
     tanggalTerjual: input.status === "SOLD" ? todayFormatted : undefined,
     durasiTerjual: durasiStr || undefined,
     dealPrice: input.dealPrice,
-  }).catch((e) => console.warn("Background stock sync trigger failed:", e));
+  }).catch((e) => console.warn("Stock sync trigger warning:", e));
 
   return { success: true };
 }
