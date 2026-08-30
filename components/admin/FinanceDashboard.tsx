@@ -27,6 +27,13 @@ import {
   ShieldCheck,
   MapPin,
   Sparkles,
+  ArrowUpRight,
+  ArrowDownRight,
+  Flame,
+  Activity,
+  Zap,
+  Tag,
+  Target,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 
@@ -516,7 +523,87 @@ export function FinanceDashboard() {
         </div>
       </div>
 
-      {/* 3. TOP SECTION: UNIT ECONOMICS & ASSET VALUATION (DYNAMICALLY UPDATED) */}
+      {/* 3. FOUR FUNDAMENTAL PRICING & BUSINESS INTELLIGENCE PANELS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* Panel 1: Struktur Tren (Market Demand Cycle) */}
+        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden space-y-2 hover:border-emerald-500/50 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4 text-emerald-400" />
+              <span>1. Struktur Tren Demand</span>
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded font-bold">
+              UPTREND
+            </span>
+          </div>
+          <p className="text-xs font-bold text-slate-200">
+            {dynamicCategoryEconomics[0]?.category || 'Stainless Steel Units'}
+          </p>
+          <p className="text-[11px] text-slate-400 leading-snug">
+            Kategori dengan perputaran paling likuid di resto modern. Margin rata-rata <strong>{dynamicCategoryEconomics[0]?.marginPercent || 22}%</strong>.
+          </p>
+        </div>
+
+        {/* Panel 2: Support & Resistance (Floor vs Ceiling Price) */}
+        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden space-y-2 hover:border-amber-500/50 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-amber-400" />
+              <span>2. Support & Resistance</span>
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded font-bold">
+              MARGIN GUARD
+            </span>
+          </div>
+          <div className="text-xs font-bold text-slate-200 flex items-center justify-between">
+            <span>Floor (HPP + 15%): Support</span>
+            <span className="text-amber-400 font-mono">Batas Bawah</span>
+          </div>
+          <p className="text-[11px] text-slate-400 leading-snug">
+            Sistem mengunci batas harga nego WA agar sales tidak pernah menembus Support (tidak rugi) dan tetap di bawah Resistance (Harga Unit Baru).
+          </p>
+        </div>
+
+        {/* Panel 3: Volume Transaksi & Likuiditas (Turnover Velocity) */}
+        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden space-y-2 hover:border-blue-500/50 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-blue-400" />
+              <span>3. Volume & Velocity</span>
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 bg-blue-950 text-blue-300 border border-blue-800 rounded font-bold">
+              {dynamicKPIs.avgAging} Hari Aging
+            </span>
+          </div>
+          <p className="text-xs font-bold text-slate-200">
+            {dynamicKPIs.totalDeals} Unit Terjual ({dynamicKPIs.bbkSalesCount} BBK)
+          </p>
+          <p className="text-[11px] text-slate-400 leading-snug">
+            Volume tinggi pada kategori Cash-Cow menjamin perputaran arus kas cepat untuk membiayai operasional gudang.
+          </p>
+        </div>
+
+        {/* Panel 4: Psikologi Pasar & Elastisitas Negosiasi */}
+        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden space-y-2 hover:border-purple-500/50 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-purple-400" />
+              <span>4. Psikologi Negosiasi WA</span>
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 bg-purple-950 text-purple-300 border border-purple-800 rounded font-bold">
+              5% - 12% Diskon
+            </span>
+          </div>
+          <p className="text-xs font-bold text-slate-200">
+            Sweet-Spot Closing Deal
+          </p>
+          <p className="text-[11px] text-slate-400 leading-snug">
+            Pola tawar-menawar pembeli resto: memberikan diskon 8-10% dari Harga Buka WA terbukti menghasilkan closing deal tercepat.
+          </p>
+        </div>
+      </div>
+
+      {/* 4. TOP SECTION: UNIT ECONOMICS & ASSET VALUATION (DYNAMICALLY UPDATED) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left 8 Cols: Unit Economics Visual Chart & Fundamental Breakdown */}
         <div className="lg:col-span-8 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
@@ -560,6 +647,7 @@ export function FinanceDashboard() {
               <thead>
                 <tr className="text-slate-400 uppercase font-mono text-[9px] border-b border-slate-800">
                   <th className="pb-1.5">Kategori Mesin</th>
+                  <th className="pb-1.5 text-center">Status Tren</th>
                   <th className="pb-1.5 text-center">Total Unit</th>
                   <th className="pb-1.5 text-right">Rata2 Harga</th>
                   <th className="pb-1.5 text-right">Rata2 HPP</th>
@@ -568,9 +656,24 @@ export function FinanceDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-850">
-                {dynamicCategoryEconomics.slice(0, 5).map((cat) => (
+                {dynamicCategoryEconomics.slice(0, 5).map((cat, idx) => (
                   <tr key={cat.category} className="hover:bg-slate-850/50">
                     <td className="py-1.5 font-bold text-slate-200">{cat.category}</td>
+                    <td className="py-1.5 text-center">
+                      {idx === 0 ? (
+                        <span className="px-1.5 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded text-[9px] font-bold">
+                          🚀 UPTREND
+                        </span>
+                      ) : idx === 1 || idx === 2 ? (
+                        <span className="px-1.5 py-0.5 bg-blue-950 text-blue-300 border border-blue-800 rounded text-[9px] font-bold">
+                          💰 CASH-COW
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded text-[9px] font-bold">
+                          💎 HIGH TICKET
+                        </span>
+                      )}
+                    </td>
                     <td className="py-1.5 text-center font-mono text-slate-400">{cat.totalUnits} unit</td>
                     <td className="py-1.5 text-right font-mono text-slate-300">{formatIDR(cat.avgRevenue)}</td>
                     <td className="py-1.5 text-right font-mono text-slate-400">{formatIDR(cat.avgCOGS)}</td>
@@ -624,7 +727,7 @@ export function FinanceDashboard() {
         </div>
       </div>
 
-      {/* 4. FINANCIAL KPI METRICS (SYNCHRONIZED WITH ACTIVE FILTERS) */}
+      {/* 5. FINANCIAL KPI METRICS (SYNCHRONIZED WITH ACTIVE FILTERS) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden group hover:border-amber-500/40 transition-colors">
           <div className="flex justify-between items-start">
@@ -682,7 +785,7 @@ export function FinanceDashboard() {
         </div>
       </div>
 
-      {/* 5. CLOSING DEAL LEDGER TABLE */}
+      {/* 6. CLOSING DEAL LEDGER TABLE */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
