@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryInventory, markUnitAsSold } from '@/lib/repositories/inventory-repository';
 import { UserRole } from '@/lib/types/auth';
-import { queryGoogleSheetsInventory } from '@/lib/repositories/google-sheets-inventory';
+import { queryGoogleSheetsInventory, updateGoogleSheetsStockStatus } from '@/lib/repositories/google-sheets-inventory';
 import { auth } from '@/auth';
 
 export async function GET(request: NextRequest) {
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, sku, dealPrice, notes } = body;
+    const { action, sku, dealPrice, notes, status } = body;
 
     const session = await auth();
     if (!session?.user?.role) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
@@ -89,9 +89,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (action === 'MARK_AS_SOLD') {
-      if (!sku) {
-        return NextResponse.json({ error: 'SKU is required' }, { status: 400 });
+    if (!sku) {
+      return NextResponse.json({ error: 'SKU is required' }, { status: 400 });
+    }
+
+    const isGoogleSheets = process.env.BBK_INVENTORY_SOURCE === 'google_sheets';
+
+    if (action === 'MARK_AS_SOLD' || status === 'SOLD') {
+      if (isGoogleSheets) {
+        const gsResult = await updateGoogleSheetsStockStatus({
+          sku,
+          status: 'SOLD',
+          dealPrice: dealPrice ? Number(dealPrice) : undefined,
+          notes,
+        });
+
+        if (!gsResult.success) {
+          return NextResponse.json({ error: gsResult.error }, { status: 404 });
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: `Unit ${sku} successfully marked as SOLD in Google Sheets`,
+        });
       }
 
       const result = markUnitAsSold(sku, dealPrice, notes);
@@ -100,6 +120,27 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json({ success: true, item: result.item });
+    }
+
+    if (action === 'MARK_AS_READY' || status === 'READY') {
+      if (isGoogleSheets) {
+        const gsResult = await updateGoogleSheetsStockStatus({
+          sku,
+          status: 'READY',
+          notes,
+        });
+
+        if (!gsResult.success) {
+          return NextResponse.json({ error: gsResult.error }, { status: 404 });
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: `Unit ${sku} successfully marked as READY in Google Sheets`,
+        });
+      }
+
+      return NextResponse.json({ success: true, message: `Unit ${sku} set to READY (mock)` });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

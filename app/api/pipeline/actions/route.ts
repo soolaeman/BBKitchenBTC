@@ -1,14 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updatePipelineStatus } from '@/lib/repositories/inventory-repository';
+import { updateGoogleSheetsPipelineStatus } from '@/lib/repositories/google-sheets-inventory';
 import { PipelineStatus } from '@/lib/types/inventory';
+import { auth } from '@/auth';
+import { UserRole } from '@/lib/types/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.role) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+    const roleHeader = session.user.role as UserRole;
+    if (roleHeader !== 'ADMIN' && roleHeader !== 'OPERATOR') {
+      return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { sku, newStatus, clearDirty } = body;
 
     if (!sku || !newStatus) {
       return NextResponse.json({ error: 'SKU and newStatus are required' }, { status: 400 });
+    }
+
+    if (process.env.BBK_INVENTORY_SOURCE === 'google_sheets') {
+      const gsResult = await updateGoogleSheetsPipelineStatus({
+        sku,
+        newStatus,
+        clearDirty: clearDirty ?? true,
+      });
+
+      if (!gsResult.success) {
+        return NextResponse.json({ error: gsResult.error }, { status: 404 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Unit ${sku} pipeline status updated to ${newStatus} in Google Sheets`,
+      });
     }
 
     const success = updatePipelineStatus(sku, newStatus as PipelineStatus, clearDirty ?? true);
@@ -24,3 +51,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message || 'Pipeline update failed' }, { status: 500 });
   }
 }
+

@@ -207,3 +207,166 @@ export async function queryGoogleSheetsInventory(
 
   return { items, total, page, pageSize, totalPages, stats };
 }
+
+export async function findRowIndexBySku(sku: string): Promise<{ rowIndex: number; rowData?: string[] } | null> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_NOT_CONFIGURED");
+
+  const sheets = getSheetsClient();
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: "MASTER_INVENTORY!A:S",
+  });
+
+  const rows = response.data.values ?? [];
+  const normalizedSku = sku.trim().toUpperCase();
+
+  for (let i = 1; i < rows.length; i++) {
+    const rowSku = String(rows[i][0] ?? "").trim().toUpperCase();
+    const rowProductId = String(rows[i][18] ?? "").trim();
+    if (rowSku === normalizedSku || (rowProductId && rowProductId === normalizedSku)) {
+      return { rowIndex: i + 1, rowData: rows[i] as string[] }; // 1-based index
+    }
+  }
+
+  return null;
+}
+
+export async function triggerAppsScriptStockWebhook(payload: {
+  sku: string;
+  status: "SOLD" | "READY" | "AVAILABLE";
+  product_id?: string;
+  tanggal_terjual?: string;
+  durasi_terjual?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const webhookUrl = process.env.APPS_SCRIPT_STOCK_WEBHOOK_URL?.trim();
+  if (!webhookUrl) return { success: false, error: "APPS_SCRIPT_STOCK_WEBHOOK_NOT_CONFIGURED" };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      return { success: false, error: `Apps Script HTTP ${response.status}` };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("Failed to trigger Apps Script stock webhook:", err);
+    return { success: false, error: err.message || "Webhook network error" };
+  }
+}
+
+export async function updateGoogleSheetsStockStatus(input: {
+  sku: string;
+  status: "SOLD" | "READY" | "AVAILABLE";
+  dealPrice?: number;
+  notes?: string;
+  productId?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_NOT_CONFIGURED");
+
+  const target = await findRowIndexBySku(input.sku);
+  if (!target) {
+    return { success: false, error: `Unit with SKU ${input.sku} not found in Google Sheets` };
+  }
+
+  const { rowIndex, rowData } = target;
+  const sheets = getSheetsClient();
+  const now = new Date();
+  const todayFormatted = now.toISOString().replace("T", " ").substring(0, 19);
+
+  let durasiStr = "";
+  if (input.status === "SOLD") {
+    const tanggalMasukRaw = rowData?.[14]; // Column O
+    if (tanggalMasukRaw) {
+      try {
+        const tglMasuk = new Date(tanggalMasukRaw);
+        const diffDays = Math.max(0, Math.floor((now.getTime() - tglMasuk.getTime()) / (1000 * 60 * 60 * 24)));
+        durasiStr = `${diffDays} hari`;
+      } catch {
+        durasiStr = "0 hari";
+      }
+    }
+  }
+
+  // 1. Update Column E (STATUS_UNIT)
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `MASTER_INVENTORY!E${rowIndex}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[input.status]] },
+  });
+
+  // 2. Update Column P (TANGGAL_TERJUAL) and Column Q (DURASI_TERJUAL)
+  const soldValues = input.status === "SOLD" ? [[todayFormatted, durasiStr]] : [["", ""]];
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `MASTER_INVENTORY!P${rowIndex}:Q${rowIndex}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: soldValues },
+  });
+
+  // 3. Update Column AB (HARGA_DEAL_WA) if provided
+  if (input.dealPrice !== undefined && input.dealPrice > 0) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `MASTER_INVENTORY!AB${rowIndex}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[input.dealPrice]] },
+    });
+  }
+
+  // 4. Trigger Webhook in parallel / background
+  triggerAppsScriptStockWebhook({
+    sku: input.sku,
+    status: input.status,
+    product_id: input.productId || rowData?.[18],
+    tanggal_terjual: input.status === "SOLD" ? todayFormatted : undefined,
+    durasi_terjual: durasiStr || undefined,
+  }).catch((e) => console.warn("Background stock webhook trigger failed:", e));
+
+  return { success: true };
+}
+
+export async function updateGoogleSheetsPipelineStatus(input: {
+  sku: string;
+  newStatus: string;
+  clearDirty?: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_NOT_CONFIGURED");
+
+  const target = await findRowIndexBySku(input.sku);
+  if (!target) {
+    return { success: false, error: `Unit with SKU ${input.sku} not found in Google Sheets` };
+  }
+
+  const { rowIndex } = target;
+  const sheets = getSheetsClient();
+
+  // 1. Update Column F (STATUS_PIPELINE)
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `MASTER_INVENTORY!F${rowIndex}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[input.newStatus]] },
+  });
+
+  // 2. Clear dirty flag in Column T if requested
+  if (input.clearDirty) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `MASTER_INVENTORY!T${rowIndex}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [["OPTIMIZED"]] },
+    });
+  }
+
+  return { success: true };
+}
+
