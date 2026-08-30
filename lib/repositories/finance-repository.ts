@@ -83,10 +83,22 @@ export interface CategoryEconomics {
   assetValue: number;
 }
 
+export interface InventorySummaryItem {
+  sku: string;
+  category: string;
+  statusUnit: string;
+  modal: number;
+  price: number;
+  inDate?: string;
+  soldDate?: string;
+  warehouse: string;
+}
+
 export async function getLiveClosingDealLedger(): Promise<{
   deals: ClosingDealItem[];
   categoryEconomics: CategoryEconomics[];
   totalAssetValuation: number;
+  inventorySummary: InventorySummaryItem[];
   kpis: {
     totalDeals: number;
     bbkSalesDeals: number;
@@ -242,10 +254,22 @@ export async function getLiveClosingDealLedger(): Promise<{
       })
       .sort((a, b) => b.totalUnits - a.totalUnits);
 
+    const inventorySummary: InventorySummaryItem[] = rawItems.map((it) => ({
+      sku: it.SKU,
+      category: it.CATEGORY_NAME || it.CATEGORY_SLUG || 'Peralatan Dapur Lainnya',
+      statusUnit: it.STATUS_UNIT,
+      modal: it.HARGA_MODAL || 0,
+      price: it.HARGA_CLOSING || it.HARGA_DEAL_WA || it.HARGA_BUKA_WA || it.HARGA_ESTIMASI_PUBLIK || 0,
+      inDate: parseToISODate(it.TANGGAL_MASUK),
+      soldDate: parseToISODate(it.TANGGAL_TERJUAL),
+      warehouse: it.LOKASI_UNIT || 'Pamulang 2',
+    }));
+
     return {
       deals,
       categoryEconomics,
       totalAssetValuation,
+      inventorySummary,
       kpis: {
         totalDeals,
         bbkSalesDeals: bbkSalesCount,
@@ -262,6 +286,7 @@ export async function getLiveClosingDealLedger(): Promise<{
       deals: [],
       categoryEconomics: [],
       totalAssetValuation: 0,
+      inventorySummary: [],
       kpis: {
         totalDeals: 0,
         bbkSalesDeals: 0,

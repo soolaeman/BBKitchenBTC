@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
       deals: ledgerData.deals,
       categoryEconomics: ledgerData.categoryEconomics,
       totalAssetValuation: ledgerData.totalAssetValuation,
+      inventorySummary: ledgerData.inventorySummary,
       closingKPIs: ledgerData.kpis,
     });
   } catch (error: any) {

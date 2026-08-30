@@ -24,9 +24,9 @@ import {
   Truck,
   FileText,
   BarChart3,
-  ChevronRight,
   ShieldCheck,
-  ArrowUpRight,
+  MapPin,
+  Sparkles,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 
@@ -44,17 +44,28 @@ interface CategoryEconomics {
   assetValue: number;
 }
 
+interface InventorySummaryItem {
+  sku: string;
+  category: string;
+  statusUnit: string;
+  modal: number;
+  price: number;
+  inDate?: string;
+  soldDate?: string;
+  warehouse: string;
+}
+
 export function FinanceDashboard() {
   const { role, permissions } = useAuth();
   const [deals, setDeals] = useState<ClosingDealItem[]>([]);
-  const [categoryEconomics, setCategoryEconomics] = useState<CategoryEconomics[]>([]);
-  const [totalAssetValuation, setTotalAssetValuation] = useState<number>(0);
+  const [inventoryItems, setInventoryItems] = useState<InventorySummaryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [channelFilter, setChannelFilter] = useState<'ALL' | 'SALES_BBK' | 'THIRD_PARTY'>('ALL');
+  const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL');
   const [datePreset, setDatePreset] = useState<DatePreset>('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -84,8 +95,7 @@ export function FinanceDashboard() {
       });
       const data = await res.json();
       if (data.deals) setDeals(data.deals);
-      if (data.categoryEconomics) setCategoryEconomics(data.categoryEconomics);
-      if (data.totalAssetValuation) setTotalAssetValuation(data.totalAssetValuation);
+      if (data.inventorySummary) setInventoryItems(data.inventorySummary);
     } catch (err) {
       console.error('Failed to load finance data', err);
     } finally {
@@ -98,8 +108,8 @@ export function FinanceDashboard() {
     loadData();
   }, [loadData]);
 
-  // Synchronized Date Range Filter Engine
-  const filteredDeals = useMemo(() => {
+  // Synchronized Date Range Boundary Resolver
+  const dateBounds = useMemo(() => {
     let startFilter: string | null = null;
     let endFilter: string | null = null;
 
@@ -129,6 +139,13 @@ export function FinanceDashboard() {
       if (endDate) endFilter = endDate;
     }
 
+    return { startFilter, endFilter };
+  }, [datePreset, startDate, endDate, now]);
+
+  // 1. FILTERED DEALS (FOR CLOSING LEDGER & REVENUE/PROFIT KPIS)
+  const filteredDeals = useMemo(() => {
+    const { startFilter, endFilter } = dateBounds;
+
     return deals.filter((deal) => {
       // Keyword search
       const q = searchQuery.toLowerCase().trim();
@@ -142,6 +159,10 @@ export function FinanceDashboard() {
       const matchChannel =
         channelFilter === 'ALL' || deal.soldBy === channelFilter;
 
+      // Warehouse filter
+      const matchWarehouse =
+        warehouseFilter === 'ALL' || deal.lokasiGudang.toLowerCase().includes(warehouseFilter.toLowerCase());
+
       // Date filtering comparison on clean ISO YYYY-MM-DD
       let matchDate = true;
       if (startFilter || endFilter) {
@@ -154,11 +175,11 @@ export function FinanceDashboard() {
         }
       }
 
-      return matchQ && matchChannel && matchDate;
+      return matchQ && matchChannel && matchWarehouse && matchDate;
     });
-  }, [deals, searchQuery, channelFilter, datePreset, startDate, endDate, now]);
+  }, [deals, searchQuery, channelFilter, warehouseFilter, dateBounds]);
 
-  // Synchronized Dynamic Financial KPIs
+  // 2. DYNAMIC FINANCIAL KPIS (CALCULATED LIVE FROM FILTERED DEALS)
   const dynamicKPIs = useMemo(() => {
     let revenue = 0;
     let profit = 0;
@@ -192,6 +213,122 @@ export function FinanceDashboard() {
       avgAging,
     };
   }, [filteredDeals]);
+
+  // 3. DYNAMIC INVENTORY ITEMS FILTER (BY WAREHOUSE & DATE FOR ASSET VALUATION & UNIT ECONOMICS)
+  const filteredInventory = useMemo(() => {
+    const { startFilter, endFilter } = dateBounds;
+
+    return inventoryItems.filter((item) => {
+      // Warehouse filter
+      if (warehouseFilter !== 'ALL' && !item.warehouse.toLowerCase().includes(warehouseFilter.toLowerCase())) {
+        return false;
+      }
+
+      // If a date range is active, match items created/entered or sold within that date range
+      if (startFilter || endFilter) {
+        const itemDate = item.inDate || item.soldDate || '';
+        if (itemDate) {
+          if (startFilter && itemDate < startFilter) return false;
+          if (endFilter && itemDate > endFilter) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [inventoryItems, warehouseFilter, dateBounds]);
+
+  // 4. DYNAMIC TOTAL ASSET VALUATION (UPDATABLE BY DATE & WAREHOUSE)
+  const dynamicAssetValuation = useMemo(() => {
+    return filteredInventory
+      .filter((item) => item.statusUnit === 'READY' || item.statusUnit === 'AVAILABLE')
+      .reduce((sum, item) => sum + (item.modal || 0), 0);
+  }, [filteredInventory]);
+
+  // 5. DYNAMIC CATEGORY UNIT ECONOMICS (UPDATABLE BY DATE & WAREHOUSE)
+  const dynamicCategoryEconomics = useMemo(() => {
+    const categoryMap = new Map<string, {
+      totalUnits: number;
+      readyUnits: number;
+      soldUnits: number;
+      revenueSum: number;
+      revenueCount: number;
+      cogsSum: number;
+      cogsCount: number;
+      assetSum: number;
+    }>();
+
+    for (const it of filteredInventory) {
+      const catName = it.category || 'Peralatan Dapur Lainnya';
+      const isReady = it.statusUnit === 'READY' || it.statusUnit === 'AVAILABLE';
+      const isSold = it.statusUnit === 'SOLD';
+      const modal = it.modal || 0;
+      const price = it.price || 0;
+
+      if (!categoryMap.has(catName)) {
+        categoryMap.set(catName, {
+          totalUnits: 0,
+          readyUnits: 0,
+          soldUnits: 0,
+          revenueSum: 0,
+          revenueCount: 0,
+          cogsSum: 0,
+          cogsCount: 0,
+          assetSum: 0,
+        });
+      }
+
+      const entry = categoryMap.get(catName)!;
+      entry.totalUnits++;
+      if (isReady) {
+        entry.readyUnits++;
+        if (modal > 0) entry.assetSum += modal;
+      }
+      if (isSold) entry.soldUnits++;
+
+      if (price > 0) {
+        entry.revenueSum += price;
+        entry.revenueCount++;
+      }
+      if (modal > 0) {
+        entry.cogsSum += modal;
+        entry.cogsCount++;
+      }
+    }
+
+    return Array.from(categoryMap.entries())
+      .map(([catName, stats]) => {
+        const avgRev = stats.revenueCount > 0 ? Math.round(stats.revenueSum / stats.revenueCount) : 0;
+        const avgCogs = stats.cogsCount > 0 ? Math.round(stats.cogsSum / stats.cogsCount) : Math.round(avgRev * 0.65);
+        const avgMargin = Math.max(0, avgRev - avgCogs);
+        const marginPct = avgRev > 0 ? Math.round((avgMargin / avgRev) * 100) : 0;
+
+        return {
+          category: catName,
+          totalUnits: stats.totalUnits,
+          readyUnits: stats.readyUnits,
+          soldUnits: stats.soldUnits,
+          avgRevenue: avgRev,
+          avgCOGS: avgCogs,
+          avgMargin,
+          marginPercent: marginPct,
+          assetValue: stats.assetSum,
+        };
+      })
+      .sort((a, b) => b.totalUnits - a.totalUnits);
+  }, [filteredInventory]);
+
+  // Top 6 categories for Chart
+  const chartData = useMemo(() => {
+    return dynamicCategoryEconomics.slice(0, 6).map((c) => ({
+      category: c.category.length > 15 ? `${c.category.slice(0, 14)}…` : c.category,
+      fullCategory: c.category,
+      avgRevenue: c.avgRevenue,
+      avgCOGS: c.avgCOGS,
+      avgMargin: c.avgMargin,
+      marginPercent: c.marginPercent,
+      totalUnits: c.totalUnits,
+    }));
+  }, [dynamicCategoryEconomics]);
 
   const handleOpenDocFromDeal = (deal: ClosingDealItem, type: DocumentType = 'INVOICE') => {
     const issueDate = now.toISOString().split('T')[0];
@@ -246,19 +383,6 @@ export function FinanceDashboard() {
     setIsDocModalOpen(true);
   };
 
-  // Top 6 categories for Chart
-  const chartData = useMemo(() => {
-    return categoryEconomics.slice(0, 6).map((c) => ({
-      category: c.category.length > 15 ? `${c.category.slice(0, 14)}…` : c.category,
-      fullCategory: c.category,
-      avgRevenue: c.avgRevenue,
-      avgCOGS: c.avgCOGS,
-      avgMargin: c.avgMargin,
-      marginPercent: c.marginPercent,
-      totalUnits: c.totalUnits,
-    }));
-  }, [categoryEconomics]);
-
   if (!permissions?.canViewFinanceReports && role !== 'ADMIN' && role !== 'INVESTOR') {
     return (
       <div className="p-8 bg-slate-900/80 border border-slate-800 rounded-2xl text-center space-y-3">
@@ -298,7 +422,101 @@ export function FinanceDashboard() {
         </button>
       </div>
 
-      {/* 2. TOP SECTION: UNIT ECONOMICS & ASSET VALUATION (DITARUH DI ATAS!) */}
+      {/* 2. DATE RANGE & FILTERS CONTROL BAR (AT THE VERY TOP) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-black text-white uppercase tracking-wider">
+              Kontrol Periode Transaksi & Filter Gudang
+            </span>
+          </div>
+          <span className="text-xs text-slate-400 font-mono">
+            Menganalisa <strong>{filteredDeals.length}</strong> deal closing & <strong>{filteredInventory.length}</strong> unit stok
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 text-xs">
+          {/* Dynamic Updatable Date Presets */}
+          <div className="lg:col-span-4">
+            <label className="block text-slate-400 font-bold mb-1">📅 Jangka Penanggalan (Periode):</label>
+            <select
+              value={datePreset}
+              onChange={(e) => setDatePreset(e.target.value as DatePreset)}
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-bold text-amber-400"
+            >
+              <option value="ALL">📅 Semua Waktu (All Time)</option>
+              <option value="THIS_MONTH">📅 Bulan Ini ({currentMonthName} {currentYear})</option>
+              <option value="LAST_MONTH">📅 Bulan Lalu ({prevMonthName} {prevMonthYear})</option>
+              <option value="LAST_7_DAYS">📅 7 Hari Terakhir</option>
+              <option value="LAST_30_DAYS">📅 30 Hari Terakhir</option>
+              <option value="THIS_YEAR">📅 Tahun Ini ({currentYear})</option>
+              <option value="CUSTOM">📅 Kustom Tanggal (Dari - Sampai)</option>
+            </select>
+          </div>
+
+          {/* Hub Warehouse Filter */}
+          <div className="lg:col-span-4">
+            <label className="block text-slate-400 font-bold mb-1">🏢 Hub / Lokasi Gudang:</label>
+            <select
+              value={warehouseFilter}
+              onChange={(e) => setWarehouseFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+            >
+              <option value="ALL">Semua Hub Gudang (10 Gudang)</option>
+              <option value="Pamulang 2">Pamulang 2 (GK)</option>
+              <option value="Pamulang Barat">Pamulang Barat (ML)</option>
+              <option value="Pamulang">Pamulang (BB)</option>
+              <option value="Sawangan">Sawangan (PE)</option>
+              <option value="Setu">Setu (PY)</option>
+              <option value="Kedaung">Kedaung (WT)</option>
+              <option value="Ciputat">Ciputat (SM)</option>
+              <option value="Serpong">Serpong (BL)</option>
+              <option value="Bintaro">Bintaro (RB)</option>
+            </select>
+          </div>
+
+          {/* Channel Filter */}
+          <div className="lg:col-span-4">
+            <label className="block text-slate-400 font-bold mb-1">💼 Channel Closing:</label>
+            <select
+              value={channelFilter}
+              onChange={(e) => setChannelFilter(e.target.value as any)}
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+            >
+              <option value="ALL">Semua Channel Closing ({deals.length} Total)</option>
+              <option value="SALES_BBK">Hanya Closing Sales BBKitchen ({dynamicKPIs.bbkSalesCount})</option>
+              <option value="THIRD_PARTY">Terjual Rekanan Gudang / Pihak Ketiga ({dynamicKPIs.thirdPartyCount})</option>
+            </select>
+          </div>
+
+          {/* Custom Date Range Inputs */}
+          {datePreset === 'CUSTOM' && (
+            <div className="lg:col-span-12 grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/60">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-400 font-bold shrink-0">Dari Tanggal:</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-mono text-xs focus:ring-1 focus:ring-amber-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-400 font-bold shrink-0">Sampai Tanggal:</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-mono text-xs focus:ring-1 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 3. TOP SECTION: UNIT ECONOMICS & ASSET VALUATION (DYNAMICALLY UPDATED) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left 8 Cols: Unit Economics Visual Chart & Fundamental Breakdown */}
         <div className="lg:col-span-8 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
@@ -309,7 +527,7 @@ export function FinanceDashboard() {
                 <span>Unit Economics: Rata-Rata Harga Jual vs HPP per Kategori</span>
               </h2>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Kalkulasi fundamental dari 2.760+ unit live: Rata-rata Harga Pasar, HPP Modal, dan Gross Margin per kategori.
+                Kalkulasi fundamental dari {filteredInventory.length} unit stok live: Rata-rata Harga Pasar, HPP Modal, dan Gross Margin.
               </p>
             </div>
             <span className="text-[10px] px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded font-mono font-bold shrink-0">
@@ -350,7 +568,7 @@ export function FinanceDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-850">
-                {categoryEconomics.slice(0, 5).map((cat) => (
+                {dynamicCategoryEconomics.slice(0, 5).map((cat) => (
                   <tr key={cat.category} className="hover:bg-slate-850/50">
                     <td className="py-1.5 font-bold text-slate-200">{cat.category}</td>
                     <td className="py-1.5 text-center font-mono text-slate-400">{cat.totalUnits} unit</td>
@@ -365,7 +583,7 @@ export function FinanceDashboard() {
           </div>
         </div>
 
-        {/* Right 4 Cols: Valuasi Total Aset Inventaris di Gudang */}
+        {/* Right 4 Cols: Valuasi Total Aset Inventaris di Gudang (Dynamic) */}
         <div className="lg:col-span-4 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/40 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-center justify-between">
@@ -376,7 +594,7 @@ export function FinanceDashboard() {
                 </h3>
               </div>
               <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded font-mono">
-                10 Hub Gudang
+                {warehouseFilter === 'ALL' ? '10 Hub Gudang' : warehouseFilter}
               </span>
             </div>
 
@@ -385,12 +603,12 @@ export function FinanceDashboard() {
                 Total Nilai Modal Inventaris Aktif:
               </span>
               <div className="text-2xl sm:text-3xl font-black text-amber-400 font-mono tracking-tight mt-1">
-                {formatIDR(totalAssetValuation || 86427500)}
+                {formatIDR(dynamicAssetValuation)}
               </div>
             </div>
 
             <p className="text-xs text-slate-400 mt-3 leading-relaxed">
-              Dihitung otomatis dari akumulasi harga modal (HPP) seluruh unit berstatus <strong>READY & AVAILABLE</strong> yang siap dipasarkan di 10 Hub Jabodetabek (Pamulang, Sawangan, Setu, Kedaung, Ciputat, Serpong, dll).
+              Dihitung otomatis dari akumulasi harga modal (HPP) seluruh unit berstatus <strong>READY & AVAILABLE</strong> pada filter periode dan gudang yang dipilih.
             </p>
           </div>
 
@@ -406,90 +624,7 @@ export function FinanceDashboard() {
         </div>
       </div>
 
-      {/* 3. FILTER TRANSAKSI & JANGKA PENANGGALAN (DYNAMIC MONTH LABELS) */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              Filter Transaksi & Jangka Penanggalan (Date Range)
-            </span>
-          </div>
-          <span className="text-xs text-slate-400 font-mono">
-            Menampilkan <strong>{filteredDeals.length}</strong> transaksi closing pada periode terpilih
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 text-xs">
-          {/* Keyword Search */}
-          <div className="lg:col-span-4 relative">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Cari SKU, nama mesin, lokasi..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-          </div>
-
-          {/* Channel Filter */}
-          <div className="lg:col-span-4">
-            <select
-              value={channelFilter}
-              onChange={(e) => setChannelFilter(e.target.value as any)}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
-            >
-              <option value="ALL">Semua Channel Closing ({deals.length} Total)</option>
-              <option value="SALES_BBK">Hanya Closing Sales BBKitchen ({dynamicKPIs.bbkSalesCount})</option>
-              <option value="THIRD_PARTY">Terjual Rekanan Gudang / Pihak Ketiga ({dynamicKPIs.thirdPartyCount})</option>
-            </select>
-          </div>
-
-          {/* Dynamic Updatable Date Presets */}
-          <div className="lg:col-span-4">
-            <select
-              value={datePreset}
-              onChange={(e) => setDatePreset(e.target.value as DatePreset)}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-bold text-amber-400"
-            >
-              <option value="ALL">📅 Semua Waktu (All Time)</option>
-              <option value="THIS_MONTH">📅 Bulan Ini ({currentMonthName} {currentYear})</option>
-              <option value="LAST_MONTH">📅 Bulan Lalu ({prevMonthName} {prevMonthYear})</option>
-              <option value="LAST_7_DAYS">📅 7 Hari Terakhir</option>
-              <option value="LAST_30_DAYS">📅 30 Hari Terakhir</option>
-              <option value="THIS_YEAR">📅 Tahun Ini ({currentYear})</option>
-              <option value="CUSTOM">📅 Kustom Tanggal (Dari - Sampai)</option>
-            </select>
-          </div>
-
-          {/* Custom Date Range Inputs */}
-          {datePreset === 'CUSTOM' && (
-            <div className="lg:col-span-12 grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/60">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-400 font-bold shrink-0">Dari Tanggal:</span>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-mono text-xs focus:ring-1 focus:ring-amber-500"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-400 font-bold shrink-0">Sampai Tanggal:</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-mono text-xs focus:ring-1 focus:ring-amber-500"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 4. FINANCIAL KPI METRICS (SYNCHRONIZED WITH DATE RANGE) */}
+      {/* 4. FINANCIAL KPI METRICS (SYNCHRONIZED WITH ACTIVE FILTERS) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden group hover:border-amber-500/40 transition-colors">
           <div className="flex justify-between items-start">
@@ -549,12 +684,23 @@ export function FinanceDashboard() {
 
       {/* 5. CLOSING DEAL LEDGER TABLE */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-amber-500" />
             <h2 className="text-xs font-bold text-white uppercase tracking-wider">
               Buku Rekap Closing Deal Ledger ({filteredDeals.length} Baris Transaksi)
             </h2>
+          </div>
+
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Cari SKU, nama mesin..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
           </div>
         </div>
 
