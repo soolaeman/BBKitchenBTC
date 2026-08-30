@@ -32,6 +32,7 @@ import {
   Bell,
   CheckCircle2,
   Sparkles,
+  ChevronDown,
 } from 'lucide-react';
 
 type AdminTab =
@@ -153,10 +154,49 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Main App Container with Sidebar Layout */}
+      {/* Main App Container with Responsive Layout */}
       <div className="flex-1 flex flex-col lg:flex-row">
-        {/* Executive Sidebar */}
-        <aside className="w-full lg:w-72 bg-[#141417] border-r border-white/[0.08] flex flex-col justify-between shrink-0 p-6">
+        {/* Mobile Dropdown Navigation (Visible ONLY on Mobile & Tablet) */}
+        <div className="lg:hidden bg-[#141417] border-b border-white/[0.08] p-3.5 sticky top-0 z-30 shadow-xl space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-[#3b82f6] font-bold">
+              PILIH MODUL DASHBOARD:
+            </span>
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded">
+              Online
+            </span>
+          </div>
+
+          <div className="relative">
+            <select
+              value={activeTab}
+              onChange={(e) => {
+                const val = e.target.value as AdminTab;
+                if (val === 'SALES_QUOTE') {
+                  router.push('/admin/sales');
+                } else {
+                  setActiveTab(val);
+                }
+              }}
+              className="w-full pl-3 pr-9 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none shadow-md"
+            >
+              {navItems.map((item) => {
+                if (!item.allowed) return null;
+                return (
+                  <option key={item.id} value={item.id}>
+                    {item.label} {item.badge ? `(${item.badge})` : ''}
+                  </option>
+                );
+              })}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+              <ChevronDown className="w-4 h-4 text-slate-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Executive Sidebar (Visible ONLY on Desktop) */}
+        <aside className="hidden lg:flex w-72 bg-[#141417] border-r border-white/[0.08] flex-col justify-between shrink-0 p-6">
           <div className="space-y-6">
             {/* Brand Header */}
             <div className="brand mb-6">
