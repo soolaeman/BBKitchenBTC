@@ -214,7 +214,7 @@ export async function queryGoogleSheetsInventory(
       const title = (item.PRODUCT_TITLE || "").toLowerCase();
       const cat = (item.CATEGORY_SLUG || "").toLowerCase();
       const loc = (item.LOKASI_UNIT || "").toLowerCase();
-      const prodId = (item.PRODUCT_ID || "").toLowerCase();
+      const prodId = String(item.PRODUCT_ID ?? "").toLowerCase();
 
       return (
         sku.includes(q) ||
