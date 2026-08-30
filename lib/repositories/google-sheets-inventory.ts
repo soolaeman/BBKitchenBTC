@@ -256,7 +256,7 @@ export async function queryGoogleSheetsInventory(
 }
 
 export async function findRowIndexBySku(sku: string): Promise<{ rowIndex: number; rowData?: string[] } | null> {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || "").replace(/['"]/g, "").trim();
   if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_NOT_CONFIGURED");
 
   const sheets = getSheetsClient();
@@ -266,13 +266,40 @@ export async function findRowIndexBySku(sku: string): Promise<{ rowIndex: number
   });
 
   const rows = response.data.values ?? [];
-  const normalizedSku = sku.trim().toUpperCase();
+  const rawSku = (sku || "").trim();
+  const upperSku = rawSku.toUpperCase();
+  const alphanumericSku = upperSku.replace(/[^A-Z0-9]/g, "");
+  const numericOnly = upperSku.replace(/[^0-9]/g, "");
 
+  // 1. Exact & Alphanumeric Matching across all rows
   for (let i = 1; i < rows.length; i++) {
-    const rowSku = String(rows[i][0] ?? "").trim().toUpperCase();
+    const rowSku = String(rows[i][0] ?? "").trim();
+    const upperRowSku = rowSku.toUpperCase();
+    const alphaRowSku = upperRowSku.replace(/[^A-Z0-9]/g, "");
     const rowProductId = String(rows[i][18] ?? "").trim();
-    if (rowSku === normalizedSku || (rowProductId && rowProductId === normalizedSku)) {
-      return { rowIndex: i + 1, rowData: rows[i] as string[] }; // 1-based index
+
+    // Exact Match
+    if (upperRowSku === upperSku) {
+      return { rowIndex: i + 1, rowData: rows[i] as string[] };
+    }
+
+    // Alphanumeric Match (e.g. "BBK-2766" <=> "BBK2766")
+    if (alphaRowSku && alphanumericSku && alphaRowSku === alphanumericSku) {
+      return { rowIndex: i + 1, rowData: rows[i] as string[] };
+    }
+
+    // Product ID Match
+    if (rowProductId && (rowProductId === upperSku || (numericOnly && rowProductId === numericOnly))) {
+      return { rowIndex: i + 1, rowData: rows[i] as string[] };
+    }
+  }
+
+  // 2. Numeric row index fallback (e.g. "BBK2766" refers to row 2766 in sheet)
+  if (numericOnly) {
+    const candidateRowIndex = Number(numericOnly);
+    // Row 2 is index 1, row N is index N - 1
+    if (candidateRowIndex >= 2 && candidateRowIndex <= rows.length) {
+      return { rowIndex: candidateRowIndex, rowData: rows[candidateRowIndex - 1] as string[] };
     }
   }
 

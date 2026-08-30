@@ -64,6 +64,7 @@ export function InventoryTable() {
   const [soldModalItem, setSoldModalItem] = useState<MasterInventoryItem | null>(null);
   const [dealPriceInput, setDealPriceInput] = useState('');
   const [soldNotesInput, setSoldNotesInput] = useState('');
+  const [soldByOther, setSoldByOther] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState('');
 
   const fetchInventory = useCallback(async () => {
@@ -121,6 +122,12 @@ export function InventoryTable() {
     if (!soldModalItem) return;
 
     try {
+      const finalNotes = soldByOther
+        ? (soldNotesInput.trim() ? `[Terjual Pihak Ketiga/Orang Lain] ${soldNotesInput.trim()}` : 'Terjual Pihak Ketiga / Rekanan Gudang (Harga Deal Tidak Diketahui)')
+        : soldNotesInput.trim();
+
+      const finalPrice = soldByOther ? 0 : (dealPriceInput ? Number(dealPriceInput) : soldModalItem.HARGA_BUKA_WA);
+
       const res = await fetch('/api/inventory', {
         method: 'POST',
         headers: {
@@ -130,8 +137,8 @@ export function InventoryTable() {
         body: JSON.stringify({
           action: 'MARK_AS_SOLD',
           sku: soldModalItem.SKU,
-          dealPrice: dealPriceInput ? Number(dealPriceInput) : soldModalItem.HARGA_BUKA_WA,
-          notes: soldNotesInput,
+          dealPrice: finalPrice,
+          notes: finalNotes,
         }),
       });
 
@@ -141,6 +148,7 @@ export function InventoryTable() {
         setSoldModalItem(null);
         setDealPriceInput('');
         setSoldNotesInput('');
+        setSoldByOther(false);
         fetchInventory();
         setTimeout(() => setActionSuccessMsg(''), 4000);
       } else {
@@ -723,30 +731,72 @@ export function InventoryTable() {
             </p>
 
             <form onSubmit={handleMarkAsSoldSubmit} className="space-y-3">
+              {/* Sales Channel Selector */}
               <div>
-                <label className="block text-xs text-slate-300 font-medium mb-1">
-                  Harga Deal Kesepakatan (IDR)
+                <label className="block text-xs text-slate-300 font-medium mb-1.5">
+                  Siapa yang Menjual Unit Ini?
                 </label>
-                <input
-                  type="number"
-                  required
-                  value={dealPriceInput}
-                  onChange={(e) => setDealPriceInput(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  placeholder="Contoh: 45000000"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSoldByOther(false);
+                      setSoldNotesInput('');
+                    }}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all text-left ${
+                      !soldByOther
+                        ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/30'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="font-bold">🟢 Sales BBKitchen</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">Ada harga deal riil</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSoldByOther(true);
+                      setSoldNotesInput('Dijual Orang Lain / Rekanan Gudang');
+                    }}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all text-left ${
+                      soldByOther
+                        ? 'bg-amber-950/80 border-amber-500 text-amber-300 ring-1 ring-amber-500/30'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="font-bold">🟠 Pihak Ketiga / Gudang</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">Harga tidak diketahui</div>
+                  </button>
+                </div>
               </div>
+
+              {!soldByOther && (
+                <div>
+                  <label className="block text-xs text-slate-300 font-medium mb-1">
+                    Harga Deal Kesepakatan (IDR)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={dealPriceInput}
+                    onChange={(e) => setDealPriceInput(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    placeholder="Contoh: 45000000"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs text-slate-300 font-medium mb-1">
-                  Catatan Pembeli / Invoice
+                  Catatan Pembeli / Keterangan
                 </label>
                 <textarea
                   rows={2}
                   value={soldNotesInput}
                   onChange={(e) => setSoldNotesInput(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  placeholder="Contoh: Deal via WA Sales, dikirim ke Resto BSD"
+                  placeholder={soldByOther ? "Contoh: Terjual oleh pemilik gudang Pamulang" : "Contoh: Deal via WA Sales, dikirim ke Resto BSD"}
                 />
               </div>
 
