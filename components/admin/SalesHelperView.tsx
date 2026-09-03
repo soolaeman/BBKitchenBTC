@@ -107,6 +107,17 @@ export function SalesHelperView() {
     setQuotePrice(item.HARGA_BUKA_WA || item.HARGA_ESTIMASI_PUBLIK || '');
   };
 
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+
+  // Debounce live typing search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   // Fetch ready items with pagination & filters
   const fetchItems = useCallback(async () => {
     setIsLoading(true);
@@ -115,12 +126,11 @@ export function SalesHelperView() {
         page: String(page),
         pageSize: String(pageSize),
         statusUnit: 'READY',
-        hasProductId: 'true',
         sortBy: 'TANGGAL_MASUK',
         sortOrder: 'desc',
       });
 
-      if (searchQuery.trim()) params.append('search', searchQuery.trim());
+      if (debouncedSearch.trim()) params.append('search', debouncedSearch.trim());
       if (category !== 'ALL') params.append('category', category);
       if (warehouse !== 'ALL') params.append('warehouse', warehouse);
 
@@ -135,7 +145,7 @@ export function SalesHelperView() {
 
         // If searching, prioritize exact SKU or title match
         if (data.items.length > 0) {
-          const q = searchQuery.trim().toLowerCase();
+          const q = debouncedSearch.trim().toLowerCase();
           const exactMatch = q ? data.items.find((i) => i.SKU.toLowerCase() === q || i.SKU.toLowerCase().replace(/\D/g, '') === q.replace(/\D/g, '')) : null;
           const found = data.items.find((i) => i.SKU === searchedItem?.SKU);
 
@@ -155,7 +165,7 @@ export function SalesHelperView() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, pageSize, searchQuery, category, warehouse, role]);
+  }, [page, pageSize, debouncedSearch, category, warehouse, role]);
 
   useEffect(() => {
     fetchItems();
@@ -163,8 +173,8 @@ export function SalesHelperView() {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setDebouncedSearch(searchQuery);
     setPage(1);
-    fetchItems();
   };
 
   // Mark as Sold Handler (Optimistic & Blazing Fast)

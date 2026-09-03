@@ -105,6 +105,17 @@ export function InventoryTable() {
     }
   };
 
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+
+  // Debounce live typing search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search]);
+
   const fetchInventory = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -115,7 +126,7 @@ export function InventoryTable() {
         sortOrder,
       });
 
-      if (search) params.append('search', search);
+      if (debouncedSearch.trim()) params.append('search', debouncedSearch.trim());
       if (category !== 'ALL') params.append('category', category);
       if (warehouse !== 'ALL') params.append('warehouse', warehouse);
       if (statusUnit !== 'ALL') params.append('statusUnit', statusUnit);
@@ -140,7 +151,20 @@ export function InventoryTable() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, pageSize, sortBy, sortOrder, search, category, warehouse, statusUnit, statusPipeline, guardrailStatus, isDirtyOnly, role]);
+  }, [
+    page,
+    pageSize,
+    sortBy,
+    sortOrder,
+    debouncedSearch,
+    category,
+    warehouse,
+    statusUnit,
+    statusPipeline,
+    guardrailStatus,
+    isDirtyOnly,
+    role,
+  ]);
 
   useEffect(() => {
     let ignore = false;
@@ -291,8 +315,8 @@ export function InventoryTable() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              setDebouncedSearch(search);
               setPage(1);
-              fetchInventory();
             }}
             className="relative flex items-center"
           >
