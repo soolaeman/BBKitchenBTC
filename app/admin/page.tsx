@@ -50,7 +50,26 @@ type AdminTab =
 export default function AdminPage() {
   const { user, role, permissions } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('OVERVIEW');
+  const [liveStockCount, setLiveStockCount] = useState<number>(2797);
+  const [readyStockCount, setReadyStockCount] = useState<number>(2229);
   const router = useRouter();
+
+  useEffect(() => {
+    // Fetch live counts for synced header badge
+    fetch('/api/inventory?pageSize=1')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.total) setLiveStockCount(d.total);
+      })
+      .catch(() => {});
+
+    fetch('/api/inventory?pageSize=1&statusUnit=READY')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.total) setReadyStockCount(d.total);
+      })
+      .catch(() => {});
+  }, []);
 
   if (!user) return null;
 
@@ -281,9 +300,16 @@ export default function AdminPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1 border border-white/[0.08] rounded-full text-[11px] font-mono text-white/60">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                <span>2,700+ Stock Sync</span>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-950/40 border border-emerald-800/60 rounded-full text-[11px] font-mono text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+                </span>
+                <span className="font-bold tracking-wide">
+                  {activeTab === 'SALES_HELPER'
+                    ? `${readyStockCount.toLocaleString('id-ID')} Ready Stock Sync`
+                    : `${liveStockCount.toLocaleString('id-ID')} Stock Sync`}
+                </span>
               </div>
             </div>
           </header>
