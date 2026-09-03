@@ -253,12 +253,13 @@ export async function queryGoogleSheetsInventory(
     const wh = options.warehouse.toUpperCase().trim();
     filtered = filtered.filter((item) => {
       const code = (item.asal_gudang || "").toUpperCase();
+      if (code === wh) return true;
       const sku = (item.SKU || "").toUpperCase();
       return (
-        code === wh ||
-        sku.startsWith(wh) ||
-        sku.startsWith(`BBK-${wh}`) ||
-        sku.startsWith(`BBK${wh}`) ||
+        sku.startsWith(`${wh}-`) ||
+        sku.startsWith(`${wh}_`) ||
+        sku.startsWith(`BBK-${wh}-`) ||
+        sku.startsWith(`BBK_${wh}_`) ||
         sku.includes(`-${wh}-`)
       );
     });

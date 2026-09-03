@@ -156,28 +156,19 @@ export function FinanceDashboard() {
     const wh = hubFilter.toUpperCase().trim();
     const code = (itemAsalGudang || '').toUpperCase().trim();
     const sku = (skuStr || '').toUpperCase().trim();
-    const loc = (itemLocation || '').toUpperCase().trim();
 
-    // 1. Direct match on asal_gudang code
+    // 1. Exact match on asal_gudang code (GK, BB, SM, BL, ML, RB, PY, PE, WT, ON)
     if (code && code === wh) return true;
 
-    // 2. Direct match on SKU prefix / pattern (e.g. BBK-GK-..., GK-..., BBKGK...)
+    // 2. Exact match on SKU with explicit delimiter (e.g. GK-1234, BBK-BB-1234) - Never match bare 'BB' with 'BBK'
     if (
-      sku.startsWith(wh) ||
-      sku.startsWith(`BBK-${wh}`) ||
-      sku.startsWith(`BBK${wh}`) ||
+      sku.startsWith(`${wh}-`) ||
+      sku.startsWith(`${wh}_`) ||
+      sku.startsWith(`BBK-${wh}-`) ||
+      sku.startsWith(`BBK_${wh}_`) ||
       sku.includes(`-${wh}-`)
     ) {
       return true;
-    }
-
-    // 3. Fallback only if item has no valid code and matches unique location
-    if (!code) {
-      if (wh === 'PE' && loc.includes('SAWANGAN')) return true;
-      if (wh === 'PY' && loc.includes('SETU')) return true;
-      if (wh === 'WT' && loc.includes('KEDAUNG')) return true;
-      if (wh === 'ML' && loc.includes('PAMULANG BARAT')) return true;
-      if (wh === 'GK' && loc.includes('PAMULANG 2')) return true;
     }
 
     return false;
