@@ -149,19 +149,6 @@ export function FinanceDashboard() {
     return { startFilter, endFilter };
   }, [datePreset, startDate, endDate, now]);
 
-  // 1. FILTERED DEALS (FOR CLOSING LEDGER & REVENUE/PROFIT KPIS)
-  const filteredDeals = useMemo(() => {
-    const { startFilter, endFilter } = dateBounds;
-
-    return deals.filter((deal) => {
-      // Keyword search
-      const q = searchQuery.toLowerCase().trim();
-      const matchQ =
-        !q ||
-        deal.sku.toLowerCase().includes(q) ||
-        deal.productTitle.toLowerCase().includes(q) ||
-        deal.lokasiGudang.toLowerCase().includes(q);
-
   // Helper to match official 10 Warehouse Hub codes (GK, BB, SM, BL, ML, RB, PY, PE, WT, ON)
   const matchWarehouseHub = (itemLocation: string, itemAsalGudang?: string, hubFilter: string = 'ALL') => {
     if (!hubFilter || hubFilter === 'ALL') return true;
