@@ -106,6 +106,12 @@ export function InventoryTable() {
   };
 
   const [debouncedSearch, setDebouncedSearch] = useState(search);
+  const [pageInput, setPageInput] = useState(String(page));
+
+  // Sync pageInput whenever page changes
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
 
   // Debounce live typing search
   useEffect(() => {
@@ -767,22 +773,53 @@ export function InventoryTable() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                disabled={page <= 1}
+                disabled={page <= 1 || isLoading}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800"
+                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors"
+                title="Halaman Sebelumnya"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
 
-              <span className="font-mono text-slate-200 px-2">
-                Hal {page} dari {data.totalPages}
-              </span>
+              <div className="flex items-center gap-1.5 font-mono text-slate-200">
+                <span>Hal</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={data.totalPages}
+                  value={pageInput}
+                  onChange={(e) => setPageInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const num = parseInt(pageInput, 10);
+                      if (!isNaN(num) && num >= 1 && num <= data.totalPages) {
+                        setPage(num);
+                      } else {
+                        setPageInput(String(page));
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    const num = parseInt(pageInput, 10);
+                    if (!isNaN(num) && num >= 1 && num <= data.totalPages) {
+                      setPage(num);
+                    } else {
+                      setPageInput(String(page));
+                    }
+                  }}
+                  className="w-14 px-2 py-1 text-center bg-slate-950 border border-slate-700 rounded-lg text-amber-400 font-bold focus:outline-none focus:ring-1 focus:ring-amber-500 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none shadow-inner"
+                  title="Ketik nomor halaman & tekan Enter"
+                />
+                <span>dari {data.totalPages}</span>
+              </div>
 
               <button
                 type="button"
-                disabled={page >= data.totalPages}
+                disabled={page >= data.totalPages || isLoading}
                 onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800"
+                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors"
+                title="Halaman Selanjutnya"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

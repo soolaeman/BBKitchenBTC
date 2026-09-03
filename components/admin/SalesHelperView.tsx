@@ -51,6 +51,12 @@ export function SalesHelperView() {
   const [buyerPhone, setBuyerPhone] = useState('');
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [pageInput, setPageInput] = useState(String(page));
+
+  // Sync pageInput whenever page changes
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
 
   // Mark Sold modal states
   const [showSoldModal, setShowSoldModal] = useState(false);
@@ -435,11 +441,40 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             </span>
           </div>
 
-          {/* Pagination Controls */}
+          {/* Pagination Controls (Top) */}
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-400 font-mono text-[11px]">
-              Hal {page} dari {totalPages || 1}
-            </span>
+            <div className="flex items-center gap-1.5 font-mono text-slate-300">
+              <span className="text-[11px] text-slate-400">Hal</span>
+              <input
+                type="number"
+                min={1}
+                max={totalPages || 1}
+                value={pageInput}
+                onChange={(e) => setPageInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const num = parseInt(pageInput, 10);
+                    if (!isNaN(num) && num >= 1 && num <= (totalPages || 1)) {
+                      setPage(num);
+                    } else {
+                      setPageInput(String(page));
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  const num = parseInt(pageInput, 10);
+                  if (!isNaN(num) && num >= 1 && num <= (totalPages || 1)) {
+                    setPage(num);
+                  } else {
+                    setPageInput(String(page));
+                  }
+                }}
+                className="w-12 px-1.5 py-0.5 text-center bg-slate-950 border border-slate-700 rounded-lg text-emerald-400 font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                title="Ketik nomor halaman & tekan Enter"
+              />
+              <span className="text-[11px] text-slate-400">dari {totalPages || 1}</span>
+            </div>
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -474,42 +509,106 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             Tidak ada unit ready yang sesuai dengan filter pencarian.
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
-            {items.map((item) => (
-              <button
-                key={item.SKU}
-                type="button"
-                onClick={() => selectItem(item)}
-                className={`p-2 rounded-xl border text-left transition-all relative group ${
-                  searchedItem?.SKU === item.SKU
-                    ? 'bg-emerald-950/90 border-emerald-500 ring-2 ring-emerald-500/40 shadow-xl'
-                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="relative aspect-square w-full rounded-lg bg-slate-900 overflow-hidden mb-1.5">
-                  {item.FEATURED_IMAGE ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={item.FEATURED_IMAGE}
-                      alt={item.PRODUCT_TITLE}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+              {items.map((item) => (
+                <button
+                  key={item.SKU}
+                  type="button"
+                  onClick={() => selectItem(item)}
+                  className={`p-2 rounded-xl border text-left transition-all relative group ${
+                    searchedItem?.SKU === item.SKU
+                      ? 'bg-emerald-950/90 border-emerald-500 ring-2 ring-emerald-500/40 shadow-xl'
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="relative aspect-square w-full rounded-lg bg-slate-900 overflow-hidden mb-1.5">
+                    {item.FEATURED_IMAGE ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={item.FEATURED_IMAGE}
+                        alt={item.PRODUCT_TITLE}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-600">
+                        No Pic
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-[11px] font-mono font-bold text-amber-400 truncate">{item.SKU}</div>
+                  <div className="text-[10px] text-slate-300 truncate leading-tight mt-0.5">{item.PRODUCT_TITLE}</div>
+                  <div className="text-[10px] text-emerald-400 font-mono mt-1">
+                    {item.HARGA_BUKA_WA ? formatIDR(item.HARGA_BUKA_WA) : 'Tanya Harga'}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Pagination Controls (Bottom) */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-3 border-t border-slate-800/80 text-xs text-slate-400">
+                <span className="text-[11px]">
+                  Menampilkan {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalItems)} dari {totalItems} Unit Ready
+                </span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 font-mono text-slate-300">
+                    <span className="text-[11px] text-slate-400">Hal</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalPages || 1}
+                      value={pageInput}
+                      onChange={(e) => setPageInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const num = parseInt(pageInput, 10);
+                          if (!isNaN(num) && num >= 1 && num <= (totalPages || 1)) {
+                            setPage(num);
+                          } else {
+                            setPageInput(String(page));
+                          }
+                        }
+                      }}
+                      onBlur={() => {
+                        const num = parseInt(pageInput, 10);
+                        if (!isNaN(num) && num >= 1 && num <= (totalPages || 1)) {
+                          setPage(num);
+                        } else {
+                          setPageInput(String(page));
+                        }
+                      }}
+                      className="w-12 px-1.5 py-0.5 text-center bg-slate-950 border border-slate-700 rounded-lg text-emerald-400 font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-600">
-                      No Pic
-                    </div>
-                  )}
+                    <span className="text-[11px] text-slate-400">dari {totalPages || 1}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={page <= 1 || isLoading}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="Halaman Sebelumnya"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={page >= totalPages || isLoading}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="Halaman Selanjutnya"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="text-[11px] font-mono font-bold text-amber-400 truncate">{item.SKU}</div>
-                <div className="text-[10px] text-slate-300 truncate leading-tight mt-0.5">{item.PRODUCT_TITLE}</div>
-                <div className="text-[10px] text-emerald-400 font-mono mt-1">
-                  {item.HARGA_BUKA_WA ? formatIDR(item.HARGA_BUKA_WA) : 'Tanya Harga'}
-                </div>
-              </button>
-            ))}
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
