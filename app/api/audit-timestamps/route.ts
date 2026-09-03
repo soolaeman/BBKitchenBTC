@@ -1,30 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Global in-memory cache shared across desktop and mobile devices
 declare global {
   // eslint-disable-next-line no-var
   var __bbk_audit_timestamps: Record<string, string> | undefined;
+  // eslint-disable-next-line no-var
+  var __bbk_active_sku: string | null | undefined;
 }
 
-const globalStore = global.__bbk_audit_timestamps || {};
-global.__bbk_audit_timestamps = globalStore;
+if (!global.__bbk_audit_timestamps) {
+  global.__bbk_audit_timestamps = {};
+}
+if (global.__bbk_active_sku === undefined) {
+  global.__bbk_active_sku = null;
+}
 
 export async function GET() {
-  return NextResponse.json({ timestamps: globalStore });
+  return NextResponse.json({
+    timestamps: global.__bbk_audit_timestamps,
+    activeSku: global.__bbk_active_sku,
+  });
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sku, timestamp, batch } = body;
+    const { sku, timestamp, batch, activeSku } = body;
 
     if (batch && typeof batch === 'object') {
-      Object.assign(globalStore, batch);
-    } else if (sku && timestamp) {
-      globalStore[sku] = timestamp;
+      Object.assign(global.__bbk_audit_timestamps!, batch);
+    }
+    if (sku && timestamp) {
+      global.__bbk_audit_timestamps![sku] = timestamp;
+      global.__bbk_active_sku = sku;
+    }
+    if (activeSku !== undefined) {
+      global.__bbk_active_sku = activeSku;
     }
 
-    return NextResponse.json({ success: true, timestamps: globalStore });
+    return NextResponse.json({
+      success: true,
+      timestamps: global.__bbk_audit_timestamps,
+      activeSku: global.__bbk_active_sku,
+    });
   } catch {
     return NextResponse.json({ success: false }, { status: 400 });
   }

@@ -328,15 +328,23 @@ export async function queryGoogleSheetsInventory(
     dirtyCount: allItems.filter((i) => i.IS_DIRTY).length,
   };
 
-  const sortBy = options.sortBy || "TANGGAL_MASUK";
-  const direction = options.sortOrder === "asc" ? 1 : -1;
-
+  // Default: Sort by SKU number descending (Newest BBK at the top)
   filtered.sort((a, b) => {
-    const av = a[sortBy as keyof MasterInventoryItem];
-    const bv = b[sortBy as keyof MasterInventoryItem];
-    if (av == null) return 1;
-    if (bv == null) return -1;
-    return String(av).localeCompare(String(bv), undefined, { numeric: true }) * direction;
+    if (options.sortBy && options.sortBy !== "TANGGAL_MASUK" && options.sortBy !== "SKU") {
+      const av = a[options.sortBy as keyof MasterInventoryItem];
+      const bv = b[options.sortBy as keyof MasterInventoryItem];
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      const dir = options.sortOrder === "asc" ? 1 : -1;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true }) * dir;
+    }
+
+    const numA = parseInt(String(a.SKU || "").replace(/\D/g, ""), 10) || 0;
+    const numB = parseInt(String(b.SKU || "").replace(/\D/g, ""), 10) || 0;
+    if (numA !== numB) {
+      return numB - numA; // Descending: BBK2803, BBK2802, BBK2801...
+    }
+    return (b.SKU || "").localeCompare(a.SKU || "");
   });
 
   const page = Math.max(1, options.page || 1);
