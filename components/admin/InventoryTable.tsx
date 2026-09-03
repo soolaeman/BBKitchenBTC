@@ -401,6 +401,17 @@ export function InventoryTable() {
                 <th className="py-3.5 px-4">SKU</th>
                 <th className="py-3.5 px-3">Foto</th>
                 <th className="py-3.5 px-4 min-w-[220px]">Nama Produk & Spesifikasi</th>
+
+                {/* Telegram Source (Protected) */}
+                {permissions?.canViewTelegramLink && (
+                  <th className="py-3.5 px-3 text-center text-blue-400">
+                    Telegram
+                  </th>
+                )}
+
+                {/* Actions (Moved right next to Product Title) */}
+                <th className="py-3.5 px-4 text-center">Aksi Cepat</th>
+
                 <th className="py-3.5 px-3">Lokasi Gudang</th>
                 <th className="py-3.5 px-3">Status Unit</th>
                 <th className="py-3.5 px-3">Pipeline</th>
@@ -417,14 +428,8 @@ export function InventoryTable() {
                     Modal (HPP)
                   </th>
                 )}
-                {permissions?.canViewTelegramLink && (
-                  <th className="py-3.5 px-3 text-center text-blue-400">
-                    Telegram
-                  </th>
-                )}
 
                 <th className="py-3.5 px-3 text-center">Aging</th>
-                <th className="py-3.5 px-4 text-center">Aksi</th>
               </tr>
             </thead>
 
@@ -490,45 +495,6 @@ export function InventoryTable() {
                       </div>
                     </td>
 
-                    {/* Location */}
-                    <td className="py-3 px-3 whitespace-nowrap text-slate-300">
-                      <span className="px-2 py-0.5 rounded bg-slate-800 text-[11px] font-mono">
-                        {item.asal_gudang}
-                      </span>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        {item.LOKASI_UNIT.split(',')[0]}
-                      </div>
-                    </td>
-
-                    {/* Status Unit */}
-                    <td className="py-3 px-3 whitespace-nowrap">
-                      <StatusBadge status={item.STATUS_UNIT} />
-                    </td>
-
-                    {/* Pipeline */}
-                    <td className="py-3 px-3 whitespace-nowrap">
-                      <PipelineBadge status={item.STATUS_PIPELINE} />
-                    </td>
-
-                    {/* Public Price */}
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-100 whitespace-nowrap">
-                      {item.HARGA_BUKA_WA != null ? formatIDR(item.HARGA_BUKA_WA) : item.HARGA_ESTIMASI_PUBLIK != null ? formatIDR(item.HARGA_ESTIMASI_PUBLIK) : 'Hubungi kami'}
-                    </td>
-
-                    {/* Floor Price (Protected) */}
-                    {permissions?.canViewFloorPrice && (
-                      <td className="py-3 px-3 text-right font-mono text-amber-300 bg-amber-950/10 whitespace-nowrap">
-                        {item.HARGA_FLOOR_WA ? formatIDR(item.HARGA_FLOOR_WA) : '-'}
-                      </td>
-                    )}
-
-                    {/* Cost COGS (Protected) */}
-                    {permissions?.canViewInternalCost && (
-                      <td className="py-3 px-3 text-right font-mono text-purple-300 bg-purple-950/10 whitespace-nowrap">
-                        {item.HARGA_MODAL ? formatIDR(item.HARGA_MODAL) : <Lock className="w-3.5 h-3.5 inline text-slate-600" />}
-                      </td>
-                    )}
-
                     {/* Telegram Source (Protected) */}
                     {permissions?.canViewTelegramLink && (
                       <td className="py-3 px-3 text-center whitespace-nowrap">
@@ -548,30 +514,7 @@ export function InventoryTable() {
                       </td>
                     )}
 
-                    {/* Aging */}
-                    <td className="py-3 px-3 text-center whitespace-nowrap font-mono text-[11px] text-slate-400">
-                      {(() => {
-                        if (item.STATUS_UNIT === 'SOLD' && item.DURASI_TERJUAL != null) {
-                          return <span className="text-emerald-400 font-bold">{item.DURASI_TERJUAL} hr (laku)</span>;
-                        }
-                        if (item.TANGGAL_MASUK) {
-                          try {
-                            const masuk = new Date(item.TANGGAL_MASUK);
-                            if (!isNaN(masuk.getTime())) {
-                              const diffDays = Math.max(0, Math.floor((Date.now() - masuk.getTime()) / (1000 * 60 * 60 * 24)));
-                              return (
-                                <span className={diffDays > 45 ? 'text-rose-400 font-bold' : diffDays > 20 ? 'text-amber-400' : 'text-slate-400'}>
-                                  {diffDays} hr
-                                </span>
-                              );
-                            }
-                          } catch {}
-                        }
-                        return <span>-</span>;
-                      })()}
-                    </td>
-
-                    {/* Actions */}
+                    {/* Actions (Moved right next to Product Title & Telegram) */}
                     <td className="py-3 px-4 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
@@ -618,6 +561,68 @@ export function InventoryTable() {
                           )
                         )}
                       </div>
+                    </td>
+
+                    {/* Location */}
+                    <td className="py-3 px-3 whitespace-nowrap text-slate-300">
+                      <span className="px-2 py-0.5 rounded bg-slate-800 text-[11px] font-mono">
+                        {item.asal_gudang}
+                      </span>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {item.LOKASI_UNIT.split(',')[0]}
+                      </div>
+                    </td>
+
+                    {/* Status Unit */}
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <StatusBadge status={item.STATUS_UNIT} />
+                    </td>
+
+                    {/* Pipeline */}
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <PipelineBadge status={item.STATUS_PIPELINE} />
+                    </td>
+
+                    {/* Public Price */}
+                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-100 whitespace-nowrap">
+                      {item.HARGA_BUKA_WA != null ? formatIDR(item.HARGA_BUKA_WA) : item.HARGA_ESTIMASI_PUBLIK != null ? formatIDR(item.HARGA_ESTIMASI_PUBLIK) : 'Hubungi kami'}
+                    </td>
+
+                    {/* Floor Price (Protected) */}
+                    {permissions?.canViewFloorPrice && (
+                      <td className="py-3 px-3 text-right font-mono text-amber-300 bg-amber-950/10 whitespace-nowrap">
+                        {item.HARGA_FLOOR_WA ? formatIDR(item.HARGA_FLOOR_WA) : '-'}
+                      </td>
+                    )}
+
+                    {/* Cost COGS (Protected) */}
+                    {permissions?.canViewInternalCost && (
+                      <td className="py-3 px-3 text-right font-mono text-purple-300 bg-purple-950/10 whitespace-nowrap">
+                        {item.HARGA_MODAL ? formatIDR(item.HARGA_MODAL) : <Lock className="w-3.5 h-3.5 inline text-slate-600" />}
+                      </td>
+                    )}
+
+                    {/* Aging */}
+                    <td className="py-3 px-3 text-center whitespace-nowrap font-mono text-[11px] text-slate-400">
+                      {(() => {
+                        if (item.STATUS_UNIT === 'SOLD' && item.DURASI_TERJUAL != null) {
+                          return <span className="text-emerald-400 font-bold">{item.DURASI_TERJUAL} hr (laku)</span>;
+                        }
+                        if (item.TANGGAL_MASUK) {
+                          try {
+                            const masuk = new Date(item.TANGGAL_MASUK);
+                            if (!isNaN(masuk.getTime())) {
+                              const diffDays = Math.max(0, Math.floor((Date.now() - masuk.getTime()) / (1000 * 60 * 60 * 24)));
+                              return (
+                                <span className={diffDays > 45 ? 'text-rose-400 font-bold' : diffDays > 20 ? 'text-amber-400' : 'text-slate-400'}>
+                                  {diffDays} hr
+                                </span>
+                              );
+                            }
+                          } catch {}
+                        }
+                        return <span>-</span>;
+                      })()}
                     </td>
                   </tr>
                 ))
