@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { ClosingDealItem, Invoice, DocumentType } from '@/lib/types/finance';
-import { formatIDR } from '@/lib/repositories/warehouse-utils';
+import { formatIDR, resolveLocationFromCode } from '@/lib/repositories/warehouse-utils';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
 import {
@@ -633,21 +633,39 @@ export function FinanceDashboard() {
       estPartnerCapital: 0,
     };
 
-    const hubDeals = filteredDeals.filter((d) => matchWarehouseHub(d.lokasiGudang, d.asalGudang, d.sku, warehouseFilter));
-    const hubSoldUnits = hubDeals.length;
+    // Total items terdata di hub ini (Ready + Sold)
+    const allItemsInHub = inventoryItems.filter((it) =>
+      matchWarehouseHub(it.warehouse, it.asalGudang, it.sku, warehouseFilter)
+    );
+    const totalUnitsInHub = allItemsInHub.length;
+    const readyUnitsInHub = allItemsInHub.filter((it) => it.statusUnit === 'READY' || it.statusUnit === 'AVAILABLE').length;
+    const soldUnitsInHub = allItemsInHub.filter((it) => it.statusUnit === 'SOLD').length;
 
-    const ratioPercent = allHubsSupply.totalReadyGlobal > 0
-      ? Math.round((hub.availableUnits / allHubsSupply.totalReadyGlobal) * 100)
+    // Filtered deals in active filter
+    const hubDeals = filteredDeals.filter((d) => matchWarehouseHub(d.lokasiGudang, d.asalGudang, d.sku, warehouseFilter));
+    const hubDealsCount = hubDeals.length;
+
+    const ratioVsGlobalReady = allHubsSupply.totalReadyGlobal > 0
+      ? Math.round((readyUnitsInHub / allHubsSupply.totalReadyGlobal) * 100)
+      : 0;
+
+    const ratioVsHubTotal = totalUnitsInHub > 0
+      ? Math.round((readyUnitsInHub / totalUnitsInHub) * 100)
       : 0;
 
     return {
       ...hub,
-      hubSoldUnits,
-      ratioPercent,
+      availableUnits: readyUnitsInHub,
+      totalUnitsInHub,
+      soldUnitsInHub,
+      hubDealsCount,
+      ratioVsGlobalReady,
+      ratioVsHubTotal,
       totalReadyGlobal: allHubsSupply.totalReadyGlobal,
       totalCapitalGlobal: allHubsSupply.totalCapitalGlobal,
+      totalAllUnitsGlobal: allHubsSupply.totalAllUnitsGlobal,
     };
-  }, [warehouseFilter, allHubsSupply, filteredDeals]);
+  }, [warehouseFilter, allHubsSupply, inventoryItems, filteredDeals]);
 
   // 8. RISKS & OPPORTUNITIES (DATA-DRIVEN INSIGHTS)
   const businessInsights = useMemo(() => {
@@ -1381,13 +1399,13 @@ export function FinanceDashboard() {
 
                 <div className="pt-3 space-y-3">
                   {/* Valuasi Pergudang */}
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                  <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
                         Valuasi Modal Stok Ready {selectedHubOverview.code}
                       </span>
                       <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-950 border border-indigo-800 text-indigo-300 font-mono font-bold">
-                        {selectedHubOverview.ratioPercent}% Total Pasokan
+                        {selectedHubOverview.ratioVsGlobalReady}% Pasokan Global
                       </span>
                     </div>
                     <div className="text-xl font-black text-indigo-400 font-mono">
@@ -1396,26 +1414,46 @@ export function FinanceDashboard() {
                     <p className="text-[10px] text-slate-500 font-medium">{selectedHubOverview.label}</p>
                   </div>
 
-                  {/* Rasio Unit (Unit Ready / Total Unit Ready) */}
-                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-300 font-semibold text-[11px]">Rasio Stok Siap Jual:</span>
-                      <span className="font-mono font-bold text-slate-200 text-[11px]">
-                        <strong className="text-indigo-400 text-xs">{selectedHubOverview.availableUnits} Unit Ready</strong> / {selectedHubOverview.totalReadyGlobal} Unit (Total)
+                  {/* 2 Detail Rasio Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Rasio 1: vs Total Unit Ready Global */}
+                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
+                      <span className="text-[10px] text-slate-400 font-bold block">
+                        Pasokan vs Total Ready Global:
+                      </span>
+                      <div className="font-mono text-xs font-bold text-slate-200">
+                        <span className="text-indigo-400 font-black text-sm">{selectedHubOverview.availableUnits} Unit</span>
+                        <span className="text-slate-400 text-xs"> / {selectedHubOverview.totalReadyGlobal} Unit Ready</span>
+                      </div>
+                      <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden border border-slate-800 mt-1">
+                        <div
+                          className="bg-indigo-500 h-full rounded-full transition-all"
+                          style={{ width: `${Math.min(100, Math.max(2, selectedHubOverview.ratioVsGlobalReady))}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-indigo-300/90 font-mono block">
+                        {selectedHubOverview.ratioVsGlobalReady}% dari seluruh pasokan mitra
                       </span>
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
-                      <div
-                        className="bg-indigo-500 h-full rounded-full transition-all"
-                        style={{ width: `${Math.min(100, Math.max(4, selectedHubOverview.ratioPercent))}%` }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
-                      <span>Closing pada filter ini: <strong className="text-emerald-400 font-mono">{selectedHubOverview.hubSoldUnits} Unit Terjual</strong></span>
-                      <span>Porsi Pasokan: <strong className="text-indigo-300">{selectedHubOverview.ratioPercent}%</strong></span>
+                    {/* Rasio 2: vs Total Unit Terdata di Hub Ini */}
+                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
+                      <span className="text-[10px] text-slate-400 font-bold block">
+                        Ketersediaan di Hub {selectedHubOverview.code}:
+                      </span>
+                      <div className="font-mono text-xs font-bold text-slate-200">
+                        <span className="text-emerald-400 font-black text-sm">{selectedHubOverview.availableUnits} Unit</span>
+                        <span className="text-slate-400 text-xs"> / {selectedHubOverview.totalUnitsInHub} Unit Terdata</span>
+                      </div>
+                      <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden border border-slate-800 mt-1">
+                        <div
+                          className="bg-emerald-500 h-full rounded-full transition-all"
+                          style={{ width: `${Math.min(100, Math.max(2, selectedHubOverview.ratioVsHubTotal))}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono block">
+                        {selectedHubOverview.ratioVsHubTotal}% Ready • <strong className="text-amber-400">{selectedHubOverview.soldUnitsInHub} Terjual</strong>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1645,9 +1683,14 @@ export function FinanceDashboard() {
                       {deal.durasiTerjual}
                     </td>
                     <td className="py-3 px-3.5 text-slate-300">
-                      <span className="inline-block px-2 py-0.5 bg-slate-950 border border-slate-800 rounded text-[10px] text-slate-300">
-                        {deal.lokasiGudang || 'Gudang Rekanan'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono font-bold text-[10px] text-indigo-300">
+                          {deal.asalGudang || 'GK'}
+                        </span>
+                        <span className="text-[11px] text-slate-300">
+                          {resolveLocationFromCode((deal.asalGudang || 'GK') as any)}
+                        </span>
+                      </div>
                     </td>
                     <td className="py-3 px-3.5 text-right font-mono text-slate-400">
                       {deal.hargaModal > 0 ? formatIDR(deal.hargaModal) : '-'}
