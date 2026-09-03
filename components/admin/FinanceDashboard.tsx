@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { FinancialKPIs, ClosingDealItem, Invoice, DocumentType } from '@/lib/types/finance';
+import { ClosingDealItem, Invoice, DocumentType } from '@/lib/types/finance';
 import { formatIDR } from '@/lib/repositories/warehouse-utils';
+import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
 import {
   Banknote,
   Percent,
   Receipt,
-  FileCheck,
   Building,
   DollarSign,
   Lock,
@@ -25,31 +25,34 @@ import {
   FileText,
   BarChart3,
   ShieldCheck,
-  MapPin,
-  Sparkles,
   ArrowUpRight,
   ArrowDownRight,
   Flame,
   Activity,
+  AlertTriangle,
+  Award,
   Zap,
-  Tag,
-  Target,
+  ChevronRight,
+  CheckCircle2,
 } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+} from 'recharts';
 
-type DatePreset = 'ALL' | 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'THIS_YEAR' | 'CUSTOM';
-
-interface CategoryEconomics {
-  category: string;
-  totalUnits: number;
-  readyUnits: number;
-  soldUnits: number;
-  avgRevenue: number;
-  avgCOGS: number;
-  avgMargin: number;
-  marginPercent: number;
-  assetValue: number;
-}
+type DatePreset = 'ALL' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR' | 'CUSTOM';
+type GrowthMetric = 'REVENUE' | 'PROFIT' | 'CLOSING' | 'UNITS';
+type UnitEconomicsMetric = 'PROFIT' | 'MARGIN' | 'UNITS';
 
 interface InventorySummaryItem {
   sku: string;
@@ -70,30 +73,26 @@ export function FinanceDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Filter States
-  const [searchQuery, setSearchQuery] = useState('');
-  const [channelFilter, setChannelFilter] = useState<'ALL' | 'SALES_BBK' | 'THIRD_PARTY'>('ALL');
-  const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL');
+  // 1. PRIMARY FILTERS
   const [datePreset, setDatePreset] = useState<DatePreset>('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [channelFilter, setChannelFilter] = useState<'ALL' | 'SALES_BBK' | 'THIRD_PARTY'>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // UI Interactive States
+  const [growthMetric, setGrowthMetric] = useState<GrowthMetric>('REVENUE');
+  const [unitEconMetric, setUnitEconMetric] = useState<UnitEconomicsMetric>('PROFIT');
 
   // Modal State
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [documentModalType, setDocumentModalType] = useState<DocumentType>('INVOICE');
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
 
-  // Dynamic Month & Year Names (100% Updatable for any month/year!)
-  const now = new Date();
-  const monthNames = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-  ];
-  const currentMonthName = monthNames[now.getMonth()];
+  const now = useMemo(() => new Date(), []);
   const currentYear = now.getFullYear();
-  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prevMonthName = monthNames[prevMonthDate.getMonth()];
-  const prevMonthYear = prevMonthDate.getFullYear();
 
   const loadData = React.useCallback(async () => {
     setIsLoading(true);
@@ -116,51 +115,15 @@ export function FinanceDashboard() {
     loadData();
   }, [loadData]);
 
-  // Synchronized Date Range Boundary Resolver
-  const dateBounds = useMemo(() => {
-    let startFilter: string | null = null;
-    let endFilter: string | null = null;
-
-    if (datePreset === 'THIS_MONTH') {
-      const startObj = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endObj = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      startFilter = startObj.toISOString().split('T')[0];
-      endFilter = endObj.toISOString().split('T')[0];
-    } else if (datePreset === 'LAST_MONTH') {
-      const startObj = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const endObj = new Date(now.getFullYear(), now.getMonth(), 0);
-      startFilter = startObj.toISOString().split('T')[0];
-      endFilter = endObj.toISOString().split('T')[0];
-    } else if (datePreset === 'LAST_7_DAYS') {
-      const startObj = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      startFilter = startObj.toISOString().split('T')[0];
-      endFilter = now.toISOString().split('T')[0];
-    } else if (datePreset === 'LAST_30_DAYS') {
-      const startObj = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      startFilter = startObj.toISOString().split('T')[0];
-      endFilter = now.toISOString().split('T')[0];
-    } else if (datePreset === 'THIS_YEAR') {
-      startFilter = `${now.getFullYear()}-01-01`;
-      endFilter = `${now.getFullYear()}-12-31`;
-    } else if (datePreset === 'CUSTOM') {
-      if (startDate) startFilter = startDate;
-      if (endDate) endFilter = endDate;
-    }
-
-    return { startFilter, endFilter };
-  }, [datePreset, startDate, endDate, now]);
-
-  // Helper to match official 10 Warehouse Hub codes (GK, BB, SM, BL, ML, RB, PY, PE, WT, ON)
+  // Helper to match official 13 Warehouse Hub codes (GK, BB, SM, BL, ML, RB, KG, PY, PE, SK, WT, ON, RK)
   const matchWarehouseHub = (itemLocation: string, itemAsalGudang?: string, skuStr?: string, hubFilter: string = 'ALL') => {
     if (!hubFilter || hubFilter === 'ALL') return true;
     const wh = hubFilter.toUpperCase().trim();
     const code = (itemAsalGudang || '').toUpperCase().trim();
     const sku = (skuStr || '').toUpperCase().trim();
 
-    // 1. Exact match on asal_gudang code (GK, BB, SM, BL, ML, RB, PY, PE, WT, ON)
     if (code && code === wh) return true;
 
-    // 2. Exact match on SKU with explicit delimiter (e.g. GK-1234, BBK-BB-1234) - Never match bare 'BB' with 'BBK'
     if (
       sku.startsWith(`${wh}-`) ||
       sku.startsWith(`${wh}_`) ||
@@ -174,7 +137,78 @@ export function FinanceDashboard() {
     return false;
   };
 
-  // 1. DYNAMIC DEALS FILTER (BY SEARCH, CHANNEL, WAREHOUSE & DATE RANGE)
+  // Helper to match Category
+  const matchCategory = (categoryNameOrSlug: string, filter: string) => {
+    if (!filter || filter === 'ALL') return true;
+    const cleanTarget = (categoryNameOrSlug || '').toLowerCase();
+    const cleanFilter = filter.toLowerCase();
+    return cleanTarget.includes(cleanFilter) || cleanFilter.includes(cleanTarget);
+  };
+
+  // Dynamic Date Bounds for Active Period & Previous Period (For Growth Calculation)
+  const { dateBounds, prevDateBounds } = useMemo(() => {
+    let startFilter: string | null = null;
+    let endFilter: string | null = null;
+    let prevStartFilter: string | null = null;
+    let prevEndFilter: string | null = null;
+
+    if (datePreset === 'LAST_7_DAYS') {
+      const endObj = new Date(now);
+      const startObj = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const prevEndObj = new Date(startObj.getTime() - 1 * 24 * 60 * 60 * 1000);
+      const prevStartObj = new Date(startObj.getTime() - 8 * 24 * 60 * 60 * 1000);
+
+      startFilter = startObj.toISOString().split('T')[0];
+      endFilter = endObj.toISOString().split('T')[0];
+      prevStartFilter = prevStartObj.toISOString().split('T')[0];
+      prevEndFilter = prevEndObj.toISOString().split('T')[0];
+    } else if (datePreset === 'LAST_30_DAYS') {
+      const endObj = new Date(now);
+      const startObj = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const prevEndObj = new Date(startObj.getTime() - 1 * 24 * 60 * 60 * 1000);
+      const prevStartObj = new Date(startObj.getTime() - 31 * 24 * 60 * 60 * 1000);
+
+      startFilter = startObj.toISOString().split('T')[0];
+      endFilter = endObj.toISOString().split('T')[0];
+      prevStartFilter = prevStartObj.toISOString().split('T')[0];
+      prevEndFilter = prevEndObj.toISOString().split('T')[0];
+    } else if (datePreset === 'THIS_MONTH') {
+      const startObj = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endObj = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const prevStartObj = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevEndObj = new Date(now.getFullYear(), now.getMonth(), 0);
+
+      startFilter = startObj.toISOString().split('T')[0];
+      endFilter = endObj.toISOString().split('T')[0];
+      prevStartFilter = prevStartObj.toISOString().split('T')[0];
+      prevEndFilter = prevEndObj.toISOString().split('T')[0];
+    } else if (datePreset === 'LAST_MONTH') {
+      const startObj = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endObj = new Date(now.getFullYear(), now.getMonth(), 0);
+      const prevStartObj = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      const prevEndObj = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+
+      startFilter = startObj.toISOString().split('T')[0];
+      endFilter = endObj.toISOString().split('T')[0];
+      prevStartFilter = prevStartObj.toISOString().split('T')[0];
+      prevEndFilter = prevEndObj.toISOString().split('T')[0];
+    } else if (datePreset === 'THIS_YEAR') {
+      startFilter = `${now.getFullYear()}-01-01`;
+      endFilter = `${now.getFullYear()}-12-31`;
+      prevStartFilter = `${now.getFullYear() - 1}-01-01`;
+      prevEndFilter = `${now.getFullYear() - 1}-12-31`;
+    } else if (datePreset === 'CUSTOM') {
+      if (startDate) startFilter = startDate;
+      if (endDate) endFilter = endDate;
+    }
+
+    return {
+      dateBounds: { startFilter, endFilter },
+      prevDateBounds: { startFilter: prevStartFilter, endFilter: prevEndFilter },
+    };
+  }, [datePreset, startDate, endDate, now]);
+
+  // 1. FILTERED DEALS (ACTIVE PERIOD)
   const filteredDeals = useMemo(() => {
     const { startFilter, endFilter } = dateBounds;
 
@@ -189,11 +223,13 @@ export function FinanceDashboard() {
         (deal.notes ? deal.notes.toLowerCase().includes(q) : false);
 
       // Channel filter
-      const matchChannel =
-        channelFilter === 'ALL' || deal.soldBy === channelFilter;
+      const matchChannel = channelFilter === 'ALL' || deal.soldBy === channelFilter;
 
-      // Warehouse filter (Matching exact 10 Hub codes: GK, BB, SM, BL, ML, RB, PY, PE, WT, ON)
+      // Warehouse filter
       const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, deal.asalGudang, deal.sku, warehouseFilter);
+
+      // Category filter (match on title / SKU notes)
+      const matchCat = categoryFilter === 'ALL' || matchCategory(deal.productTitle, categoryFilter);
 
       // Date filtering comparison on clean ISO YYYY-MM-DD
       let matchDate = true;
@@ -207,56 +243,39 @@ export function FinanceDashboard() {
         }
       }
 
-      return matchQ && matchChannel && matchWarehouse && matchDate;
+      return matchQ && matchChannel && matchWarehouse && matchCat && matchDate;
     });
-  }, [deals, searchQuery, channelFilter, warehouseFilter, dateBounds]);
+  }, [deals, searchQuery, channelFilter, warehouseFilter, categoryFilter, dateBounds]);
 
-  // 2. DYNAMIC FINANCIAL KPIS (CALCULATED LIVE FROM FILTERED DEALS)
-  const dynamicKPIs = useMemo(() => {
-    let revenue = 0;
-    let profit = 0;
-    let bbkSalesCount = 0;
-    let thirdPartyCount = 0;
-    let totalAging = 0;
+  // PREVIOUS PERIOD DEALS (FOR GROWTH COMPARISON)
+  const previousDeals = useMemo(() => {
+    const { startFilter, endFilter } = prevDateBounds;
+    if (!startFilter && !endFilter) return [];
 
-    filteredDeals.forEach((d) => {
-      if (d.soldBy === 'SALES_BBK') {
-        bbkSalesCount++;
-        revenue += d.hargaClosing;
-        profit += d.realizedProfit;
-      } else {
-        thirdPartyCount++;
-      }
-      const agingNum = parseInt(String(d.durasiTerjual || '0').replace(/\D/g, ''), 10) || 0;
-      totalAging += agingNum;
+    return deals.filter((deal) => {
+      const matchChannel = channelFilter === 'ALL' || deal.soldBy === channelFilter;
+      const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, deal.asalGudang, deal.sku, warehouseFilter);
+      const matchCat = categoryFilter === 'ALL' || matchCategory(deal.productTitle, categoryFilter);
+
+      const dealDateStr = deal.tanggalTerjual ? deal.tanggalTerjual.split('T')[0] : '';
+      if (!dealDateStr) return false;
+      if (startFilter && dealDateStr < startFilter) return false;
+      if (endFilter && dealDateStr > endFilter) return false;
+
+      return matchChannel && matchWarehouse && matchCat;
     });
+  }, [deals, channelFilter, warehouseFilter, categoryFilter, prevDateBounds]);
 
-    const totalDeals = filteredDeals.length;
-    const avgMargin = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
-    const avgAging = totalDeals > 0 ? Math.round(totalAging / totalDeals) : 0;
-
-    return {
-      totalDeals,
-      bbkSalesCount,
-      thirdPartyCount,
-      revenue,
-      profit,
-      avgMargin,
-      avgAging,
-    };
-  }, [filteredDeals]);
-
-  // 3. DYNAMIC INVENTORY ITEMS FILTER (BY WAREHOUSE & DATE FOR ASSET VALUATION & UNIT ECONOMICS)
+  // 2. FILTERED INVENTORY (FOR SUPPLY & ASSET VALUATION)
   const filteredInventory = useMemo(() => {
     const { startFilter, endFilter } = dateBounds;
 
     return inventoryItems.filter((item) => {
-      // Warehouse filter
-      if (!matchWarehouseHub(item.warehouse, item.asalGudang, item.sku, warehouseFilter)) {
-        return false;
-      }
+      const matchWarehouse = matchWarehouseHub(item.warehouse, item.asalGudang, item.sku, warehouseFilter);
+      const matchCat = categoryFilter === 'ALL' || matchCategory(item.category, categoryFilter);
 
-      // If a date range is active, match items created/entered or sold within that date range
+      if (!matchWarehouse || !matchCat) return false;
+
       if (startFilter || endFilter) {
         const itemDate = item.inDate || item.soldDate || '';
         if (itemDate) {
@@ -267,101 +286,293 @@ export function FinanceDashboard() {
 
       return true;
     });
-  }, [inventoryItems, warehouseFilter, dateBounds]);
+  }, [inventoryItems, warehouseFilter, categoryFilter, dateBounds]);
 
-  // 4. DYNAMIC TOTAL ASSET VALUATION (UPDATABLE BY DATE & WAREHOUSE)
-  const dynamicAssetValuation = useMemo(() => {
-    return filteredInventory
-      .filter((item) => item.statusUnit === 'READY' || item.statusUnit === 'AVAILABLE')
-      .reduce((sum, item) => sum + (item.modal || 0), 0);
-  }, [filteredInventory]);
+  // 3. FINANCIAL HEALTH METRICS
+  const healthKPIs = useMemo(() => {
+    let revenue = 0;
+    let profit = 0;
+    let bbkSalesCount = 0;
+    let thirdPartyCount = 0;
+    let totalCogs = 0;
 
-  // 5. DYNAMIC CATEGORY UNIT ECONOMICS (UPDATABLE BY DATE & WAREHOUSE)
-  const dynamicCategoryEconomics = useMemo(() => {
-    const categoryMap = new Map<string, {
-      totalUnits: number;
-      readyUnits: number;
-      soldUnits: number;
-      revenueSum: number;
-      revenueCount: number;
-      cogsSum: number;
-      cogsCount: number;
-      assetSum: number;
-    }>();
+    filteredDeals.forEach((d) => {
+      if (d.soldBy === 'SALES_BBK') {
+        bbkSalesCount++;
+        revenue += d.hargaClosing;
+        profit += d.realizedProfit;
+        totalCogs += d.hargaModal || (d.hargaClosing - d.realizedProfit);
+      } else {
+        thirdPartyCount++;
+      }
+    });
 
-    for (const it of filteredInventory) {
-      const catName = it.category || 'Peralatan Dapur Lainnya';
-      const isReady = it.statusUnit === 'READY' || it.statusUnit === 'AVAILABLE';
-      const isSold = it.statusUnit === 'SOLD';
-      const modal = it.modal || 0;
-      const price = it.price || 0;
+    const totalDeals = filteredDeals.length;
+    const unitsSold = totalDeals; // Each deal corresponds to 1 unit in BBKitchen deal ledger
+    const grossMarginPct = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
 
-      if (!categoryMap.has(catName)) {
-        categoryMap.set(catName, {
-          totalUnits: 0,
-          readyUnits: 0,
-          soldUnits: 0,
-          revenueSum: 0,
-          revenueCount: 0,
-          cogsSum: 0,
-          cogsCount: 0,
-          assetSum: 0,
+    return {
+      revenue,
+      grossProfit: profit,
+      grossMarginPct,
+      totalDeals,
+      bbkSalesCount,
+      thirdPartyCount,
+      unitsSold,
+      totalCogs,
+    };
+  }, [filteredDeals]);
+
+  // 4. GROWTH CALCULATIONS (COMPARED TO PREVIOUS PERIOD)
+  const growthKPIs = useMemo(() => {
+    let prevRevenue = 0;
+    let prevProfit = 0;
+    let prevDealsCount = 0;
+
+    previousDeals.forEach((d) => {
+      if (d.soldBy === 'SALES_BBK') {
+        prevRevenue += d.hargaClosing;
+        prevProfit += d.realizedProfit;
+      }
+      prevDealsCount++;
+    });
+
+    const prevUnitsSold = prevDealsCount;
+
+    const calcGrowth = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
+    const revenueGrowth = calcGrowth(healthKPIs.revenue, prevRevenue);
+    const profitGrowth = calcGrowth(healthKPIs.grossProfit, prevProfit);
+    const closingGrowth = calcGrowth(healthKPIs.totalDeals, prevDealsCount);
+    const unitsGrowth = calcGrowth(healthKPIs.unitsSold, prevUnitsSold);
+
+    return {
+      prevRevenue,
+      prevProfit,
+      prevDealsCount,
+      prevUnitsSold,
+      revenueGrowth,
+      profitGrowth,
+      closingGrowth,
+      unitsGrowth,
+      hasPrevData: previousDeals.length > 0,
+    };
+  }, [previousDeals, healthKPIs]);
+
+  // 5. TIME-SERIES TIMELINE CHART DATA
+  const timelineChartData = useMemo(() => {
+    const timelineMap = new Map<string, { date: string; revenue: number; profit: number; closing: number; units: number }>();
+
+    filteredDeals.forEach((deal) => {
+      const dateStr = deal.tanggalTerjual ? deal.tanggalTerjual.split('T')[0] : 'Unknown';
+      if (dateStr === 'Unknown') return;
+
+      if (!timelineMap.has(dateStr)) {
+        timelineMap.set(dateStr, {
+          date: dateStr,
+          revenue: 0,
+          profit: 0,
+          closing: 0,
+          units: 0,
         });
       }
 
-      const entry = categoryMap.get(catName)!;
-      entry.totalUnits++;
-      if (isReady) {
-        entry.readyUnits++;
-        if (modal > 0) entry.assetSum += modal;
+      const bucket = timelineMap.get(dateStr)!;
+      bucket.closing++;
+      bucket.units++;
+      if (deal.soldBy === 'SALES_BBK') {
+        bucket.revenue += deal.hargaClosing;
+        bucket.profit += deal.realizedProfit;
       }
-      if (isSold) entry.soldUnits++;
+    });
 
-      if (price > 0) {
-        entry.revenueSum += price;
-        entry.revenueCount++;
+    return Array.from(timelineMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [filteredDeals]);
+
+  // 6. UNIT ECONOMICS METRICS & TOP CATEGORIES BREAKDOWN
+  const categoryEconomics = useMemo(() => {
+    const map = new Map<string, {
+      category: string;
+      unitsSold: number;
+      revenueSum: number;
+      cogsSum: number;
+      profitSum: number;
+      readyUnits: number;
+      readyCostSum: number;
+    }>();
+
+    // Aggregate from filtered deals
+    filteredDeals.forEach((deal) => {
+      const cat = deal.productTitle.split(' ')[0] || 'Umum';
+      if (!map.has(cat)) {
+        map.set(cat, {
+          category: cat,
+          unitsSold: 0,
+          revenueSum: 0,
+          cogsSum: 0,
+          profitSum: 0,
+          readyUnits: 0,
+          readyCostSum: 0,
+        });
       }
-      if (modal > 0) {
-        entry.cogsSum += modal;
-        entry.cogsCount++;
+      const entry = map.get(cat)!;
+      entry.unitsSold++;
+      if (deal.soldBy === 'SALES_BBK') {
+        entry.revenueSum += deal.hargaClosing;
+        entry.cogsSum += deal.hargaModal;
+        entry.profitSum += deal.realizedProfit;
       }
+    });
+
+    // Aggregate ready supply from inventory
+    filteredInventory.forEach((item) => {
+      const isReady = item.statusUnit === 'READY' || item.statusUnit === 'AVAILABLE';
+      if (isReady) {
+        const cat = item.category || 'Umum';
+        if (!map.has(cat)) {
+          map.set(cat, {
+            category: cat,
+            unitsSold: 0,
+            revenueSum: 0,
+            cogsSum: 0,
+            profitSum: 0,
+            readyUnits: 0,
+            readyCostSum: 0,
+          });
+        }
+        const entry = map.get(cat)!;
+        entry.readyUnits++;
+        entry.readyCostSum += item.modal || 0;
+      }
+    });
+
+    return Array.from(map.values()).map((c) => {
+      const asp = c.unitsSold > 0 ? Math.round(c.revenueSum / c.unitsSold) : 0;
+      const avgCost = c.unitsSold > 0 ? Math.round(c.cogsSum / c.unitsSold) : 0;
+      const avgProfit = c.unitsSold > 0 ? Math.round(c.profitSum / c.unitsSold) : 0;
+      const marginPct = c.revenueSum > 0 ? Math.round((c.profitSum / c.revenueSum) * 100) : 0;
+
+      return {
+        ...c,
+        asp,
+        avgCost,
+        avgProfit,
+        marginPct,
+      };
+    });
+  }, [filteredDeals, filteredInventory]);
+
+  // Overall Unit Economics averages
+  const unitEconomicsAverages = useMemo(() => {
+    const bbkDeals = filteredDeals.filter((d) => d.soldBy === 'SALES_BBK');
+    const totalCount = bbkDeals.length;
+
+    const asp = totalCount > 0 ? Math.round(healthKPIs.revenue / totalCount) : 0;
+    const avgHpp = totalCount > 0 ? Math.round(healthKPIs.totalCogs / totalCount) : 0;
+    const avgProfit = totalCount > 0 ? Math.round(healthKPIs.grossProfit / totalCount) : 0;
+    const avgMargin = healthKPIs.grossMarginPct;
+
+    return { asp, avgHpp, avgProfit, avgMargin };
+  }, [filteredDeals, healthKPIs]);
+
+  // Top Products / Categories Chart Data
+  const topCategoriesChartData = useMemo(() => {
+    const sorted = [...categoryEconomics];
+    if (unitEconMetric === 'PROFIT') {
+      sorted.sort((a, b) => b.profitSum - a.profitSum);
+    } else if (unitEconMetric === 'MARGIN') {
+      sorted.sort((a, b) => b.marginPct - a.marginPct);
+    } else {
+      sorted.sort((a, b) => b.unitsSold - a.unitsSold);
     }
 
-    return Array.from(categoryMap.entries())
-      .map(([catName, stats]) => {
-        const avgRev = stats.revenueCount > 0 ? Math.round(stats.revenueSum / stats.revenueCount) : 0;
-        const avgCogs = stats.cogsCount > 0 ? Math.round(stats.cogsSum / stats.cogsCount) : Math.round(avgRev * 0.65);
-        const avgMargin = Math.max(0, avgRev - avgCogs);
-        const marginPct = avgRev > 0 ? Math.round((avgMargin / avgRev) * 100) : 0;
+    return sorted.slice(0, 7).map((c) => ({
+      category: c.category.length > 14 ? `${c.category.slice(0, 13)}…` : c.category,
+      fullCategory: c.category,
+      value:
+        unitEconMetric === 'PROFIT'
+          ? c.profitSum
+          : unitEconMetric === 'MARGIN'
+          ? c.marginPct
+          : c.unitsSold,
+      profit: c.profitSum,
+      margin: c.marginPct,
+      units: c.unitsSold,
+    }));
+  }, [categoryEconomics, unitEconMetric]);
 
-        return {
-          category: catName,
-          totalUnits: stats.totalUnits,
-          readyUnits: stats.readyUnits,
-          soldUnits: stats.soldUnits,
-          avgRevenue: avgRev,
-          avgCOGS: avgCogs,
-          avgMargin,
-          marginPercent: marginPct,
-          assetValue: stats.assetSum,
-        };
-      })
-      .sort((a, b) => b.totalUnits - a.totalUnits);
+  // 7. DEMAND & SUPPLY BREAKDOWN
+  // Demand: Top Selling Categories
+  const topDemandCategories = useMemo(() => {
+    return [...categoryEconomics]
+      .filter((c) => c.unitsSold > 0)
+      .sort((a, b) => b.unitsSold - a.unitsSold)
+      .slice(0, 5);
+  }, [categoryEconomics]);
+
+  // Supply: Available Units by Partner Hub
+  const partnerHubSupply = useMemo(() => {
+    const hubMap = new Map<string, { code: string; label: string; availableUnits: number; estPartnerCapital: number }>();
+
+    const hubLabels: Record<string, string> = {
+      GK: 'GK - Pamulang 2',
+      BB: 'BB - Pamulang 2',
+      SM: 'SM - Pamulang 2',
+      BL: 'BL - Pamulang 2',
+      ML: 'ML - Pamulang Barat',
+      RB: 'RB - Pamulang Barat',
+      KG: 'KG - Kitchen Gembel',
+      PY: 'PY - Setu Tangsel',
+      PE: 'PE - Sawangan Depok',
+      SK: 'SK - Sanjaya Kitchen',
+      WT: 'WT - Kedaung Tangsel',
+      ON: 'ON - Kedaung Tangsel',
+      RK: 'RK - Rizki Kitchen',
+    };
+
+    filteredInventory.forEach((item) => {
+      const isReady = item.statusUnit === 'READY' || item.statusUnit === 'AVAILABLE';
+      if (isReady) {
+        const code = item.asalGudang || 'GK';
+        if (!hubMap.has(code)) {
+          hubMap.set(code, {
+            code,
+            label: hubLabels[code] || `${code} Hub`,
+            availableUnits: 0,
+            estPartnerCapital: 0,
+          });
+        }
+        const entry = hubMap.get(code)!;
+        entry.availableUnits++;
+        entry.estPartnerCapital += item.modal || 0;
+      }
+    });
+
+    return Array.from(hubMap.values()).sort((a, b) => b.availableUnits - a.availableUnits);
   }, [filteredInventory]);
 
-  // Top 6 categories for Chart
-  const chartData = useMemo(() => {
-    return dynamicCategoryEconomics.slice(0, 6).map((c) => ({
-      category: c.category.length > 15 ? `${c.category.slice(0, 14)}…` : c.category,
-      fullCategory: c.category,
-      avgRevenue: c.avgRevenue,
-      avgCOGS: c.avgCOGS,
-      avgMargin: c.avgMargin,
-      marginPercent: c.marginPercent,
-      totalUnits: c.totalUnits,
-    }));
-  }, [dynamicCategoryEconomics]);
+  // 8. RISKS & OPPORTUNITIES (DATA-DRIVEN INSIGHTS)
+  const businessInsights = useMemo(() => {
+    const lowMarginCats = categoryEconomics
+      .filter((c) => c.unitsSold >= 2 && c.marginPct < 18)
+      .sort((a, b) => a.marginPct - b.marginPct);
 
+    const mostProfitableCat = [...categoryEconomics].sort((a, b) => b.profitSum - a.profitSum)[0];
+    const topVolumeCat = [...categoryEconomics].sort((a, b) => b.unitsSold - a.unitsSold)[0];
+    const topSupplyHub = partnerHubSupply[0];
+
+    return {
+      lowMarginCats,
+      mostProfitableCat,
+      topVolumeCat,
+      topSupplyHub,
+    };
+  }, [categoryEconomics, partnerHubSupply]);
+
+  // Handle Document Modal Trigger
   const handleOpenDocFromDeal = (deal: ClosingDealItem, type: DocumentType = 'INVOICE') => {
     const issueDate = now.toISOString().split('T')[0];
     const dueDateObj = new Date(now);
@@ -429,15 +640,15 @@ export function FinanceDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* 1. HEADER */}
+      {/* 1. HEADER & REFRESH */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2 font-mono">
-            <Banknote className="w-6 h-6 text-amber-500" />
-            <span>FINANCIALS, MARGINS & CLOSING DEAL LEDGER</span>
+            <Banknote className="w-6 h-6 text-emerald-400" />
+            <span>EXECUTIVE OWNER DASHBOARD & FINANCIALS</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400">
-            Analisis unit economics fundamental, valuasi aset inventaris gudang, dan buku rekap closing deal live Google Sheets.
+          <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+            Ringkasan 30-detik performa bisnis: Penjualan, Margin Laba Kotor, Pertumbuhan, Demand & Supply Rekanan.
           </p>
         </div>
 
@@ -449,53 +660,82 @@ export function FinanceDashboard() {
           }}
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition-colors self-start sm:self-auto"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-amber-500' : ''}`} />
-          <span>Sync Real-Time</span>
+          <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span>{isRefreshing ? 'Memuat Data...' : 'Sync Real-Time'}</span>
         </button>
       </div>
 
-      {/* 2. DATE RANGE & FILTERS CONTROL BAR (AT THE VERY TOP) */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-black text-white uppercase tracking-wider">
-              Kontrol Periode Transaksi & Filter Gudang
-            </span>
+      {/* 2. FILTER UTAMA (PERIODE, CHANNEL, KATEGORI, HUB) */}
+      <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4.5 space-y-3 shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-200">
+            <Filter className="w-4 h-4 text-emerald-400" />
+            <span>Filter Utama Bisnis</span>
           </div>
-          <span className="text-xs text-slate-400 font-mono">
-            Menganalisa <strong>{filteredDeals.length}</strong> deal closing & <strong>{filteredInventory.length}</strong> unit stok
+          <span className="text-[11px] font-mono text-slate-400">
+            Menganalisa <strong className="text-emerald-400">{filteredDeals.length}</strong> deal closing & <strong className="text-amber-400">{filteredInventory.length}</strong> unit stok live
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 text-xs">
-          {/* Dynamic Updatable Date Presets */}
-          <div className="lg:col-span-4">
-            <label className="block text-slate-400 font-bold mb-1">📅 Jangka Penanggalan (Periode):</label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          {/* Periode Preset */}
+          <div>
+            <label className="block text-slate-400 font-bold mb-1">📅 Periode Waktu:</label>
             <select
               value={datePreset}
               onChange={(e) => setDatePreset(e.target.value as DatePreset)}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-bold text-amber-400"
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold text-xs"
             >
-              <option value="ALL">📅 Semua Waktu (All Time)</option>
-              <option value="THIS_MONTH">📅 Bulan Ini ({currentMonthName} {currentYear})</option>
-              <option value="LAST_MONTH">📅 Bulan Lalu ({prevMonthName} {prevMonthYear})</option>
-              <option value="LAST_7_DAYS">📅 7 Hari Terakhir</option>
-              <option value="LAST_30_DAYS">📅 30 Hari Terakhir</option>
-              <option value="THIS_YEAR">📅 Tahun Ini ({currentYear})</option>
-              <option value="CUSTOM">📅 Kustom Tanggal (Dari - Sampai)</option>
+              <option value="ALL">Semua Waktu (All Time)</option>
+              <option value="LAST_7_DAYS">7 Hari Terakhir</option>
+              <option value="LAST_30_DAYS">30 Hari Terakhir</option>
+              <option value="THIS_MONTH">Bulan Ini</option>
+              <option value="LAST_MONTH">Bulan Lalu</option>
+              <option value="THIS_YEAR">Tahun Ini ({currentYear})</option>
+              <option value="CUSTOM">Kustom Tanggal</option>
             </select>
           </div>
 
-          {/* Hub Warehouse Filter */}
-          <div className="lg:col-span-4">
-            <label className="block text-slate-400 font-bold mb-1">🏢 Hub / Lokasi Gudang:</label>
+          {/* Channel Closing */}
+          <div>
+            <label className="block text-slate-400 font-bold mb-1">💼 Channel Closing:</label>
+            <select
+              value={channelFilter}
+              onChange={(e) => setChannelFilter(e.target.value as any)}
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold text-xs"
+            >
+              <option value="ALL">Semua Channel ({deals.length} Total)</option>
+              <option value="SALES_BBK">Sales WhatsApp BBKitchen</option>
+              <option value="THIRD_PARTY">Rekanan Gudang / Pihak Ketiga</option>
+            </select>
+          </div>
+
+          {/* Kategori */}
+          <div>
+            <label className="block text-slate-400 font-bold mb-1">📁 Kategori Produk:</label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold text-xs"
+            >
+              <option value="ALL">Semua Kategori</option>
+              {OFFICIAL_CATEGORIES.map((cat) => (
+                <option key={cat.slug} value={cat.name}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Hub Rekanan Gudang */}
+          <div>
+            <label className="block text-slate-400 font-bold mb-1">🏢 Hub Rekanan:</label>
             <select
               value={warehouseFilter}
               onChange={(e) => setWarehouseFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold text-xs"
             >
-              <option value="ALL">Semua Hub</option>
+              <option value="ALL">Semua Hub Rekanan</option>
               <option value="GK">GK - Pamulang 2</option>
               <option value="BB">BB - Pamulang 2</option>
               <option value="SM">SM - Pamulang 2</option>
@@ -512,39 +752,25 @@ export function FinanceDashboard() {
             </select>
           </div>
 
-          {/* Channel Filter */}
-          <div className="lg:col-span-4">
-            <label className="block text-slate-400 font-bold mb-1">💼 Channel Closing:</label>
-            <select
-              value={channelFilter}
-              onChange={(e) => setChannelFilter(e.target.value as any)}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
-            >
-              <option value="ALL">Semua Channel Closing ({deals.length} Total)</option>
-              <option value="SALES_BBK">Hanya Closing Sales BBKitchen ({dynamicKPIs.bbkSalesCount})</option>
-              <option value="THIRD_PARTY">Terjual Rekanan Gudang / Pihak Ketiga ({dynamicKPIs.thirdPartyCount})</option>
-            </select>
-          </div>
-
-          {/* Custom Date Range Inputs */}
+          {/* Custom Date Inputs */}
           {datePreset === 'CUSTOM' && (
-            <div className="lg:col-span-12 grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/60">
+            <div className="sm:col-span-2 lg:col-span-4 grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-400 font-bold shrink-0">Dari Tanggal:</span>
+                <span className="text-[11px] text-slate-400 font-bold shrink-0">Dari:</span>
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-mono text-xs focus:ring-1 focus:ring-amber-500"
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-mono text-xs focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-400 font-bold shrink-0">Sampai Tanggal:</span>
+                <span className="text-[11px] text-slate-400 font-bold shrink-0">Sampai:</span>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-mono text-xs focus:ring-1 focus:ring-amber-500"
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-mono text-xs focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
             </div>
@@ -552,324 +778,657 @@ export function FinanceDashboard() {
         </div>
       </div>
 
-      {/* 3. FOUR FUNDAMENTAL PRICING & BUSINESS INTELLIGENCE PANELS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Panel 1: Struktur Tren (Market Demand Cycle) */}
-        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden space-y-2 hover:border-emerald-500/50 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-emerald-400" />
-              <span>1. Struktur Tren Demand</span>
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded font-bold">
-              UPTREND
-            </span>
-          </div>
-          <p className="text-xs font-bold text-slate-200">
-            {dynamicCategoryEconomics[0]?.category || 'Stainless Steel Units'}
-          </p>
-          <p className="text-[11px] text-slate-400 leading-snug">
-            Kategori dengan perputaran paling likuid di resto modern. Margin rata-rata <strong>{dynamicCategoryEconomics[0]?.marginPercent || 22}%</strong>.
-          </p>
+      {/* ========================================================================= */}
+      {/* 1. FINANCIAL HEALTH (REVENUE, GROSS PROFIT, MARGIN, ORDERS, UNITS) */}
+      {/* ========================================================================= */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>1. Financial Health (Kesehatan Finansial)</span>
+          </h2>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-800 text-emerald-400 font-mono font-bold">
+            Realized Closing Data
+          </span>
         </div>
 
-        {/* Panel 2: Support & Resistance (Floor vs Ceiling Price) */}
-        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden space-y-2 hover:border-amber-500/50 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-amber-400" />
-              <span>2. Support & Resistance</span>
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded font-bold">
-              MARGIN GUARD
-            </span>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {/* Revenue */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Penjualan (Revenue)</span>
+            <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono">
+              {formatIDR(healthKPIs.revenue)}
+            </div>
+            <p className="text-[10px] text-slate-500">Closing Sales WhatsApp</p>
           </div>
-          <div className="text-xs font-bold text-slate-200 flex items-center justify-between">
-            <span>Floor (HPP + 15%): Support</span>
-            <span className="text-amber-400 font-mono">Batas Bawah</span>
+
+          {/* Gross Profit */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Gross Profit (Laba Kotor)</span>
+            <div className="text-lg sm:text-xl font-black text-amber-400 font-mono">
+              {formatIDR(healthKPIs.grossProfit)}
+            </div>
+            <p className="text-[10px] text-slate-500">Laba Bersih Realisasi</p>
           </div>
-          <p className="text-[11px] text-slate-400 leading-snug">
-            Sistem mengunci batas harga nego WA agar sales tidak pernah menembus Support (tidak rugi) dan tetap di bawah Resistance (Harga Unit Baru).
-          </p>
+
+          {/* Gross Margin */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Gross Margin %</span>
+            <div className="text-lg sm:text-xl font-black text-purple-400 font-mono">
+              {healthKPIs.grossMarginPct}%
+            </div>
+            <p className="text-[10px] text-slate-500">Persentase Margin Rata-rata</p>
+          </div>
+
+          {/* Closing Deals / Orders */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Closing / Orders</span>
+            <div className="text-lg sm:text-xl font-black text-white font-mono">
+              {healthKPIs.totalDeals} <span className="text-xs font-normal text-slate-400">Deals</span>
+            </div>
+            <p className="text-[10px] text-slate-500">{healthKPIs.bbkSalesCount} WA • {healthKPIs.thirdPartyCount} Rekanan</p>
+          </div>
+
+          {/* Units Sold */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1 col-span-2 sm:col-span-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Units Sold (Terjual)</span>
+            <div className="text-lg sm:text-xl font-black text-blue-400 font-mono">
+              {healthKPIs.unitsSold} <span className="text-xs font-normal text-slate-400">Unit</span>
+            </div>
+            <p className="text-[10px] text-slate-500">Unit Fisik Terkirim</p>
+          </div>
         </div>
 
-        {/* Panel 3: Volume Transaksi & Likuiditas (Turnover Velocity) */}
-        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden space-y-2 hover:border-blue-500/50 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-blue-400" />
-              <span>3. Volume & Velocity</span>
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 bg-blue-950 text-blue-300 border border-blue-800 rounded font-bold">
-              {dynamicKPIs.avgAging} Hari Aging
-            </span>
-          </div>
-          <p className="text-xs font-bold text-slate-200">
-            {dynamicKPIs.totalDeals} Unit Terjual ({dynamicKPIs.bbkSalesCount} BBK)
-          </p>
-          <p className="text-[11px] text-slate-400 leading-snug">
-            Volume tinggi pada kategori Cash-Cow menjamin perputaran arus kas cepat untuk membiayai operasional gudang.
-          </p>
-        </div>
-
-        {/* Panel 4: Psikologi Pasar & Elastisitas Negosiasi */}
-        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden space-y-2 hover:border-purple-500/50 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Zap className="w-4 h-4 text-purple-400" />
-              <span>4. Psikologi Negosiasi WA</span>
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 bg-purple-950 text-purple-300 border border-purple-800 rounded font-bold">
-              5% - 12% Diskon
-            </span>
-          </div>
-          <p className="text-xs font-bold text-slate-200">
-            Sweet-Spot Closing Deal
-          </p>
-          <p className="text-[11px] text-slate-400 leading-snug">
-            Pola tawar-menawar pembeli resto: memberikan diskon 8-10% dari Harga Buka WA terbukti menghasilkan closing deal tercepat.
-          </p>
-        </div>
-      </div>
-
-      {/* 4. TOP SECTION: UNIT ECONOMICS & ASSET VALUATION (DYNAMICALLY UPDATED) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left 8 Cols: Unit Economics Visual Chart & Fundamental Breakdown */}
-        <div className="lg:col-span-8 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        {/* Revenue vs Gross Profit Chart */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                 <BarChart3 className="w-4 h-4 text-emerald-400" />
-                <span>Unit Economics: Rata-Rata Harga Jual vs HPP per Kategori</span>
-              </h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Kalkulasi fundamental dari {filteredInventory.length} unit stok live: Rata-rata Harga Pasar, HPP Modal, dan Gross Margin.
-              </p>
+                <span>Grafik Penjualan vs Laba Kotor (Revenue vs Gross Profit)</span>
+              </h3>
+              <p className="text-[11px] text-slate-400">Tren nominal omset penjualan dan profit riil berdasarkan periode aktif.</p>
             </div>
-            <span className="text-[10px] px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded font-mono font-bold shrink-0">
-              Live Database
-            </span>
           </div>
 
-          {/* Bar Chart Visualization */}
+          <div className="h-64 w-full pt-2">
+            {timelineChartData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                Tidak ada data transaksi closing pada periode ini.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={timelineChartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                  <defs>
+                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickFormatter={(d) => d.slice(5)} />
+                  <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={(val) => `Rp ${(val / 1000000).toFixed(0)}Jt`} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '11px' }}
+                    formatter={(val: any) => formatIDR(Number(val))}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '11px' }} />
+                  <Area type="monotone" dataKey="revenue" name="Total Penjualan" stroke="#10b981" fillOpacity={1} fill="url(#colorRev)" />
+                  <Area type="monotone" dataKey="profit" name="Gross Profit" stroke="#f59e0b" fillOpacity={1} fill="url(#colorProfit)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 2. GROWTH (BISNIS NAIK ATAU TURUN?) */}
+      {/* ========================================================================= */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <TrendingUp className="w-4 h-4 text-blue-400" />
+            <span>2. Growth (Pertumbuhan Bisnis vs Periode Sebelumnya)</span>
+          </h2>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-blue-950/80 border border-blue-800 text-blue-400 font-mono font-bold">
+            Period-over-Period
+          </span>
+        </div>
+
+        {/* Growth Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Revenue Growth */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Revenue Growth</span>
+            <div className={`text-lg sm:text-xl font-black font-mono flex items-center gap-1 ${growthKPIs.revenueGrowth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {growthKPIs.revenueGrowth >= 0 ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+              <span>{growthKPIs.revenueGrowth > 0 ? `+${growthKPIs.revenueGrowth}%` : `${growthKPIs.revenueGrowth}%`}</span>
+            </div>
+            <p className="text-[10px] text-slate-500">Lalu: {formatIDR(growthKPIs.prevRevenue)}</p>
+          </div>
+
+          {/* Profit Growth */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Profit Growth</span>
+            <div className={`text-lg sm:text-xl font-black font-mono flex items-center gap-1 ${growthKPIs.profitGrowth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {growthKPIs.profitGrowth >= 0 ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+              <span>{growthKPIs.profitGrowth > 0 ? `+${growthKPIs.profitGrowth}%` : `${growthKPIs.profitGrowth}%`}</span>
+            </div>
+            <p className="text-[10px] text-slate-500">Lalu: {formatIDR(growthKPIs.prevProfit)}</p>
+          </div>
+
+          {/* Closing Growth */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Closing Growth</span>
+            <div className={`text-lg sm:text-xl font-black font-mono flex items-center gap-1 ${growthKPIs.closingGrowth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {growthKPIs.closingGrowth >= 0 ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+              <span>{growthKPIs.closingGrowth > 0 ? `+${growthKPIs.closingGrowth}%` : `${growthKPIs.closingGrowth}%`}</span>
+            </div>
+            <p className="text-[10px] text-slate-500">Lalu: {growthKPIs.prevDealsCount} Deals</p>
+          </div>
+
+          {/* Unit Growth */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Unit Sold Growth</span>
+            <div className={`text-lg sm:text-xl font-black font-mono flex items-center gap-1 ${growthKPIs.unitsGrowth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {growthKPIs.unitsGrowth >= 0 ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+              <span>{growthKPIs.unitsGrowth > 0 ? `+${growthKPIs.unitsGrowth}%` : `${growthKPIs.unitsGrowth}%`}</span>
+            </div>
+            <p className="text-[10px] text-slate-500">Lalu: {growthKPIs.prevUnitsSold} Unit</p>
+          </div>
+        </div>
+
+        {/* Interactive Growth Performance Over Time Chart */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-blue-400" />
+                <span>Performance Over Time (Tren Performa Interaktif)</span>
+              </h3>
+              <p className="text-[11px] text-slate-400">Pilih metrik pertumbuhan yang ingin ditinjau sepanjang waktu.</p>
+            </div>
+
+            {/* Metric Switcher Tabs */}
+            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 gap-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setGrowthMetric('REVENUE')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  growthMetric === 'REVENUE' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Penjualan
+              </button>
+              <button
+                type="button"
+                onClick={() => setGrowthMetric('PROFIT')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  growthMetric === 'PROFIT' ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Profit
+              </button>
+              <button
+                type="button"
+                onClick={() => setGrowthMetric('CLOSING')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  growthMetric === 'CLOSING' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Closing Deals
+              </button>
+              <button
+                type="button"
+                onClick={() => setGrowthMetric('UNITS')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  growthMetric === 'UNITS' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Units
+              </button>
+            </div>
+          </div>
+
           <div className="h-60 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 25 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
-                <XAxis dataKey="category" stroke="#94a3b8" fontSize={10} interval={0} angle={-12} textAnchor="end" />
-                <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={(val) => `Rp ${(val / 1000000).toFixed(0)}Jt`} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '11px' }}
-                  formatter={(val: any) => formatIDR(Number(val))}
-                />
-                <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '11px' }} />
-                <Bar dataKey="avgRevenue" name="Harga Buka / Pasar" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="avgCOGS" name="HPP Modal" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="avgMargin" name="Laba Kotor Unit" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {timelineChartData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                Tidak ada data pada periode ini.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={timelineChartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickFormatter={(d) => d.slice(5)} />
+                  <YAxis
+                    stroke="#94a3b8"
+                    fontSize={10}
+                    tickFormatter={(val) =>
+                      growthMetric === 'REVENUE' || growthMetric === 'PROFIT'
+                        ? `Rp ${(val / 1000000).toFixed(0)}Jt`
+                        : `${val}`
+                    }
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '11px' }}
+                    formatter={(val: any) =>
+                      growthMetric === 'REVENUE' || growthMetric === 'PROFIT'
+                        ? formatIDR(Number(val))
+                        : `${val} Unit/Deal`
+                    }
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={
+                      growthMetric === 'REVENUE'
+                        ? 'revenue'
+                        : growthMetric === 'PROFIT'
+                        ? 'profit'
+                        : growthMetric === 'CLOSING'
+                        ? 'closing'
+                        : 'units'
+                    }
+                    name={
+                      growthMetric === 'REVENUE'
+                        ? 'Penjualan'
+                        : growthMetric === 'PROFIT'
+                        ? 'Gross Profit'
+                        : growthMetric === 'CLOSING'
+                        ? 'Jumlah Closing'
+                        : 'Jumlah Unit'
+                    }
+                    stroke={
+                      growthMetric === 'REVENUE'
+                        ? '#10b981'
+                        : growthMetric === 'PROFIT'
+                        ? '#f59e0b'
+                        : growthMetric === 'CLOSING'
+                        ? '#3b82f6'
+                        : '#a855f7'
+                    }
+                    strokeWidth={2.5}
+                    dot={{ r: 3 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. UNIT ECONOMICS (PRODUK MANA YANG MENGHASILKAN?) */}
+      {/* ========================================================================= */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <Percent className="w-4 h-4 text-amber-400" />
+            <span>3. Unit Economics (Rata-Rata per Transaksi Unit)</span>
+          </h2>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950/80 border border-amber-800 text-amber-400 font-mono font-bold">
+            Average Economics
+          </span>
+        </div>
+
+        {/* 4 Unit Economics Metrics */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Average Selling Price (ASP)</span>
+            <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono">
+              {formatIDR(unitEconomicsAverages.asp)}
+            </div>
+            <p className="text-[10px] text-slate-500">Rata-rata Harga Closing</p>
           </div>
 
-          {/* Fundamental Business Economics Mini Table */}
-          <div className="overflow-x-auto pt-2 border-t border-slate-800/80">
-            <table className="w-full text-[11px] text-left">
-              <thead>
-                <tr className="text-slate-400 uppercase font-mono text-[9px] border-b border-slate-800">
-                  <th className="pb-1.5">Kategori Mesin</th>
-                  <th className="pb-1.5 text-center">Status Tren</th>
-                  <th className="pb-1.5 text-center">Total Unit</th>
-                  <th className="pb-1.5 text-right">Rata2 Harga</th>
-                  <th className="pb-1.5 text-right">Rata2 HPP</th>
-                  <th className="pb-1.5 text-right text-amber-400">Laba Kotor</th>
-                  <th className="pb-1.5 text-right text-emerald-400">Margin %</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-850">
-                {dynamicCategoryEconomics.slice(0, 5).map((cat, idx) => (
-                  <tr key={cat.category} className="hover:bg-slate-850/50">
-                    <td className="py-1.5 font-bold text-slate-200">{cat.category}</td>
-                    <td className="py-1.5 text-center">
-                      {idx === 0 ? (
-                        <span className="px-1.5 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded text-[9px] font-bold">
-                          🚀 UPTREND
-                        </span>
-                      ) : idx === 1 || idx === 2 ? (
-                        <span className="px-1.5 py-0.5 bg-blue-950 text-blue-300 border border-blue-800 rounded text-[9px] font-bold">
-                          💰 CASH-COW
-                        </span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded text-[9px] font-bold">
-                          💎 HIGH TICKET
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-1.5 text-center font-mono text-slate-400">{cat.totalUnits} unit</td>
-                    <td className="py-1.5 text-right font-mono text-slate-300">{formatIDR(cat.avgRevenue)}</td>
-                    <td className="py-1.5 text-right font-mono text-slate-400">{formatIDR(cat.avgCOGS)}</td>
-                    <td className="py-1.5 text-right font-mono font-bold text-amber-400">+{formatIDR(cat.avgMargin)}</td>
-                    <td className="py-1.5 text-right font-mono font-bold text-emerald-400">{cat.marginPercent}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Average HPP Modal</span>
+            <div className="text-lg sm:text-xl font-black text-indigo-400 font-mono">
+              {formatIDR(unitEconomicsAverages.avgHpp)}
+            </div>
+            <p className="text-[10px] text-slate-500">Rata-rata HPP per Unit</p>
+          </div>
+
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Average Profit per Unit</span>
+            <div className="text-lg sm:text-xl font-black text-amber-400 font-mono">
+              {formatIDR(unitEconomicsAverages.avgProfit)}
+            </div>
+            <p className="text-[10px] text-slate-500">Laba Kotor per Transaksi</p>
+          </div>
+
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Average Margin</span>
+            <div className="text-lg sm:text-xl font-black text-purple-400 font-mono">
+              {unitEconomicsAverages.avgMargin}%
+            </div>
+            <p className="text-[10px] text-slate-500">Rata-rata Margin Realisasi</p>
           </div>
         </div>
 
-        {/* Right 4 Cols: Valuasi Total Aset Inventaris di Gudang (Dynamic) */}
-        <div className="lg:col-span-4 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/40 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+        {/* Top Products / Categories Chart */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-amber-400" />
+                <span>Top Kategori / Produk Paling Menguntungkan</span>
+              </h3>
+              <p className="text-[11px] text-slate-400">Peringkat kontribusi keuntungan per kategori mesin restoran.</p>
+            </div>
+
+            {/* Toggle Profit / Margin / Units Sold */}
+            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 gap-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setUnitEconMetric('PROFIT')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  unitEconMetric === 'PROFIT' ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Laba Kotor (Rp)
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnitEconMetric('MARGIN')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  unitEconMetric === 'MARGIN' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Margin (%)
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnitEconMetric('UNITS')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  unitEconMetric === 'UNITS' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Unit Terjual
+              </button>
+            </div>
+          </div>
+
+          <div className="h-60 w-full pt-2">
+            {topCategoriesChartData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                Tidak ada data kategori yang sesuai.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topCategoriesChartData} margin={{ top: 10, right: 10, left: 10, bottom: 25 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <XAxis dataKey="category" stroke="#94a3b8" fontSize={10} interval={0} angle={-10} textAnchor="end" />
+                  <YAxis
+                    stroke="#94a3b8"
+                    fontSize={10}
+                    tickFormatter={(val) =>
+                      unitEconMetric === 'PROFIT'
+                        ? `Rp ${(val / 1000000).toFixed(0)}Jt`
+                        : unitEconMetric === 'MARGIN'
+                        ? `${val}%`
+                        : `${val}`
+                    }
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '11px' }}
+                    formatter={(val: any) =>
+                      unitEconMetric === 'PROFIT'
+                        ? formatIDR(Number(val))
+                        : unitEconMetric === 'MARGIN'
+                        ? `${val}%`
+                        : `${val} Unit Terjual`
+                    }
+                  />
+                  <Bar
+                    dataKey="value"
+                    name={
+                      unitEconMetric === 'PROFIT'
+                        ? 'Total Gross Profit'
+                        : unitEconMetric === 'MARGIN'
+                        ? 'Margin %'
+                        : 'Unit Terjual'
+                    }
+                    fill={unitEconMetric === 'PROFIT' ? '#f59e0b' : unitEconMetric === 'MARGIN' ? '#a855f7' : '#10b981'}
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 4. DEMAND & SUPPLY (SUPPLY ADA DI MANA?) */}
+      {/* ========================================================================= */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <Building className="w-4 h-4 text-indigo-400" />
+            <span>4. Demand & Supply Rekanan</span>
+          </h2>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-950/80 border border-indigo-800 text-indigo-400 font-mono font-bold">
+            Stok Siap Jual Rekanan Gudang
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Panel DEMAND: Top Products by Units Sold */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-3 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    DEMAND: Kategori Paling Cepat Terjual
+                  </h3>
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono">Closing Velocity</span>
+              </div>
+
+              <div className="divide-y divide-slate-800/60 mt-2">
+                {topDemandCategories.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-6 text-center">Tidak ada transaksi pada filter ini.</p>
+                ) : (
+                  topDemandCategories.map((item, idx) => (
+                    <div key={item.category} className="py-2.5 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center font-bold text-[10px] text-amber-400 font-mono">
+                          {idx + 1}
+                        </span>
+                        <div>
+                          <span className="font-bold text-slate-200 block">{item.category}</span>
+                          <span className="text-[10px] text-slate-400">ASP: {formatIDR(item.asp)}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono font-bold text-emerald-400">{item.unitsSold} Unit Terjual</span>
+                        <span className="text-[10px] text-slate-400 block">Margin: {item.marginPct}%</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500 border-t border-slate-800/60 pt-2">
+              💡 Kategori di atas memiliki perputaran paling cepat di pasar resto.
+            </p>
+          </div>
+
+          {/* Panel SUPPLY: Available Units by Partner Hub */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-3 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Building className="w-4 h-4 text-indigo-400" />
+                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    SUPPLY: Stok Siap Jual Rekanan Gudang
+                  </h3>
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono">Mitra Lokasi</span>
+              </div>
+
+              <div className="divide-y divide-slate-800/60 mt-2 max-h-56 overflow-y-auto pr-1">
+                {partnerHubSupply.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-6 text-center">Tidak ada unit ready di hub rekanan.</p>
+                ) : (
+                  partnerHubSupply.map((hub) => (
+                    <div key={hub.code} className="py-2.5 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono font-bold text-[10px] text-indigo-300">
+                          {hub.code}
+                        </span>
+                        <div>
+                          <span className="font-semibold text-slate-200 block">{hub.label}</span>
+                          <span className="text-[10px] text-slate-400">Modal Rekanan: {formatIDR(hub.estPartnerCapital)}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono font-bold text-indigo-400">{hub.availableUnits} Unit Ready</span>
+                        <span className="text-[10px] text-slate-500 block">Siap Dijualkan</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500 border-t border-slate-800/60 pt-2">
+              ℹ️ Stok di atas adalah unit siap jual di lokasi rekanan gudang mitra BBKitchen.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 5. RISKS & OPPORTUNITIES (APA YANG PERLU DIPERHATIKAN?) */}
+      {/* ========================================================================= */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <span>5. Risks & Opportunities (Insight Aktual Berbasis Data)</span>
+          </h2>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950/80 border border-amber-800 text-amber-400 font-mono font-bold">
+            Real Analytics
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Risk: Low Margin */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2">
+            <div className="flex items-center gap-1.5 text-rose-400 font-bold text-xs">
+              <AlertTriangle className="w-4 h-4" />
+              <span>Produk Margin Rendah</span>
+            </div>
+            {businessInsights.lowMarginCats.length > 0 ? (
+              <div>
+                <p className="text-sm font-bold text-white">{businessInsights.lowMarginCats[0].category}</p>
+                <p className="text-[11px] text-rose-300/90 mt-0.5">
+                  Margin rata-rata hanya <strong>{businessInsights.lowMarginCats[0].marginPct}%</strong>. Perlu naikkan Harga Buka WA.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">Seluruh kategori saat ini memiliki margin sehat di atas 18%.</p>
+            )}
+          </div>
+
+          {/* Opportunity: Most Profitable */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2">
+            <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
+              <Award className="w-4 h-4" />
+              <span>Paling Profitable</span>
+            </div>
+            {businessInsights.mostProfitableCat ? (
+              <div>
+                <p className="text-sm font-bold text-white">{businessInsights.mostProfitableCat.category}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Total Laba Kotor: <strong className="text-amber-400 font-mono">{formatIDR(businessInsights.mostProfitableCat.profitSum)}</strong> ({businessInsights.mostProfitableCat.marginPct}% margin).
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">-</p>
+            )}
+          </div>
+
+          {/* Volume Leader */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2">
+            <div className="flex items-center gap-1.5 text-blue-400 font-bold text-xs">
+              <Flame className="w-4 h-4" />
+              <span>Volume Terlaris</span>
+            </div>
+            {businessInsights.topVolumeCat ? (
+              <div>
+                <p className="text-sm font-bold text-white">{businessInsights.topVolumeCat.category}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Terjual <strong className="text-emerald-400 font-mono">{businessInsights.topVolumeCat.unitsSold} Unit</strong>. Demand sangat likuid di pasar resto.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">-</p>
+            )}
+          </div>
+
+          {/* Supply Concentration */}
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2">
+            <div className="flex items-center gap-1.5 text-purple-400 font-bold text-xs">
+              <Building className="w-4 h-4" />
+              <span>Fokus Pasokan Rekanan</span>
+            </div>
+            {businessInsights.topSupplyHub ? (
+              <div>
+                <p className="text-sm font-bold text-white">{businessInsights.topSupplyHub.label}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Tersedia <strong className="text-purple-300 font-mono">{businessInsights.topSupplyHub.availableUnits} Unit</strong> siap closing untuk sales desk.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">-</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 6. BUKU REKAP CLOSING DEAL LEDGER (TABLE & 4-IN-1 DOCUMENT PRINT) */}
+      {/* ========================================================================= */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden space-y-0 shadow-xl">
+        <div className="p-4.5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900">
           <div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-amber-400">
-                <Building className="w-5 h-5" />
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
-                  Valuasi Total Aset Gudang
-                </h3>
-              </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded font-mono">
-                {warehouseFilter === 'ALL'
-                  ? 'Semua Hub'
-                  : warehouseFilter === 'GK'
-                  ? 'GK - Pamulang 2'
-                  : warehouseFilter === 'BB'
-                  ? 'BB - Pamulang 2'
-                  : warehouseFilter === 'SM'
-                  ? 'SM - Pamulang 2'
-                  : warehouseFilter === 'BL'
-                  ? 'BL - Pamulang 2'
-                  : warehouseFilter === 'ML'
-                  ? 'ML - Pamulang Barat'
-                  : warehouseFilter === 'RB'
-                  ? 'RB - Pamulang Barat'
-                  : warehouseFilter === 'KG'
-                  ? 'KG - Kitchen Gembel'
-                  : warehouseFilter === 'PY'
-                  ? 'PY - Setu Tangsel'
-                  : warehouseFilter === 'PE'
-                  ? 'PE - Sawangan Depok'
-                  : warehouseFilter === 'SK'
-                  ? 'SK - Sanjaya Kitchen'
-                  : warehouseFilter === 'WT'
-                  ? 'WT - Kedaung Tangsel'
-                  : warehouseFilter === 'ON'
-                  ? 'ON - Kedaung Tangsel'
-                  : warehouseFilter === 'RK'
-                  ? 'RK - Rizki Kitchen'
-                  : warehouseFilter}
-              </span>
-            </div>
-
-            <div className="mt-4">
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
-                Total Nilai Modal Inventaris Aktif:
-              </span>
-              <div className="text-2xl sm:text-3xl font-black text-amber-400 font-mono tracking-tight mt-1">
-                {formatIDR(dynamicAssetValuation)}
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-400 mt-3 leading-relaxed">
-              Dihitung otomatis dari akumulasi harga modal (HPP) seluruh unit berstatus <strong>READY & AVAILABLE</strong> pada filter periode dan gudang yang dipilih.
-            </p>
-          </div>
-
-          <div className="p-3.5 bg-slate-950/90 border border-slate-800 rounded-xl space-y-1.5 text-xs">
-            <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
-              <ShieldCheck className="w-4 h-4" />
-              <span>Fundamental Kontrol Margin:</span>
-            </div>
-            <p className="text-slate-400 text-[11px] leading-snug">
-              Setiap deal closing tim sales dikontrol secara otomatis agar tidak menembus batas Floor Price untuk mengamankan <strong>realized margin 20% - 35%</strong>.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* 5. FINANCIAL KPI METRICS (SYNCHRONIZED WITH ACTIVE FILTERS) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden group hover:border-amber-500/40 transition-colors">
-          <div className="flex justify-between items-start">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Omzet Closing BBKitchen</span>
-            <DollarSign className="w-4 h-4 text-amber-400" />
-          </div>
-          <p className="text-lg sm:text-2xl font-black text-amber-400 font-mono mt-1">
-            {formatIDR(dynamicKPIs.revenue)}
-          </p>
-          <p className="text-[10px] text-slate-500 mt-1">
-            Dari {dynamicKPIs.bbkSalesCount} unit closing sales resmi
-          </p>
-        </div>
-
-        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden group hover:border-emerald-500/40 transition-colors">
-          <div className="flex justify-between items-start">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Realized Gross Profit</span>
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-          </div>
-          <p className="text-lg sm:text-2xl font-black text-emerald-400 font-mono mt-1">
-            {formatIDR(dynamicKPIs.profit)}
-          </p>
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="inline-block px-1.5 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800/80 rounded text-[10px] font-bold font-mono">
-              Margin {dynamicKPIs.avgMargin}%
-            </span>
-            <span className="text-[10px] text-slate-500">bersih vs HPP</span>
-          </div>
-        </div>
-
-        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden group hover:border-blue-500/40 transition-colors">
-          <div className="flex justify-between items-start">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Unit Terjual</span>
-            <Package className="w-4 h-4 text-blue-400" />
-          </div>
-          <p className="text-lg sm:text-2xl font-black text-white font-mono mt-1">
-            {dynamicKPIs.totalDeals} <span className="text-xs text-slate-400 font-normal">Unit</span>
-          </p>
-          <p className="text-[10px] text-slate-500 mt-1">
-            {dynamicKPIs.bbkSalesCount} Sales BBK • {dynamicKPIs.thirdPartyCount} Rekanan Gudang
-          </p>
-        </div>
-
-        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden group hover:border-purple-500/40 transition-colors">
-          <div className="flex justify-between items-start">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Kecepatan Putar (Aging)</span>
-            <Clock className="w-4 h-4 text-purple-400" />
-          </div>
-          <p className="text-lg sm:text-2xl font-black text-purple-300 font-mono mt-1">
-            {dynamicKPIs.avgAging} <span className="text-xs text-slate-400 font-normal">Hari</span>
-          </p>
-          <p className="text-[10px] text-slate-500 mt-1">
-            Rata-rata durasi stok sejak masuk
-          </p>
-        </div>
-      </div>
-
-      {/* 6. CLOSING DEAL LEDGER TABLE */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-amber-500" />
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider">
-              Buku Rekap Closing Deal Ledger ({filteredDeals.length} Baris Transaksi)
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-emerald-400" />
+              <span>Buku Rekap Closing Deal Ledger ({filteredDeals.length} Transaksi)</span>
             </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Daftar transaksi closing riil. Klik ikon dokumen untuk menerbitkan Kuitansi Lunas, Invoice, atau Surat Jalan.
+            </p>
           </div>
 
+          {/* Search Box */}
           <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
             <input
               type="text"
-              placeholder="Cari SKU, nama mesin..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              placeholder="Cari SKU atau nama mesin..."
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left border-collapse">
+          <table className="w-full text-xs text-left">
             <thead>
               <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 font-bold uppercase text-[10px] tracking-wider">
                 <th className="py-3 px-3.5">SKU Unit</th>
-                <th className="py-3 px-3.5">Nama Mesin & Spesifikasi</th>
+                <th className="py-3 px-3.5">Nama Mesin & Deskripsi</th>
                 <th className="py-3 px-3.5">Tanggal Terjual</th>
                 <th className="py-3 px-3.5">Durasi (Aging)</th>
                 <th className="py-3 px-3.5">Lokasi Gudang</th>
@@ -884,14 +1443,14 @@ export function FinanceDashboard() {
               {isLoading ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-slate-500">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-amber-500 mb-2" />
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-500 mb-2" />
                     Memuat data closing ledger...
                   </td>
                 </tr>
               ) : filteredDeals.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-slate-500">
-                    Tidak ada transaksi closing deal pada jangka penanggalan yang dipilih.
+                    Tidak ada transaksi closing deal pada filter yang dipilih.
                   </td>
                 </tr>
               ) : (
@@ -912,36 +1471,31 @@ export function FinanceDashboard() {
                     </td>
                     <td className="py-3 px-3.5 text-slate-300">
                       <span className="inline-block px-2 py-0.5 bg-slate-950 border border-slate-800 rounded text-[10px] text-slate-300">
-                        {deal.lokasiGudang || 'Gudang Pusat'}
+                        {deal.lokasiGudang || 'Gudang Rekanan'}
                       </span>
                     </td>
                     <td className="py-3 px-3.5 text-right font-mono text-slate-400">
                       {deal.hargaModal > 0 ? formatIDR(deal.hargaModal) : '-'}
                     </td>
                     <td className="py-3 px-3.5 text-right font-mono font-bold text-amber-400">
-                      {deal.soldBy === 'SALES_BBK' && deal.hargaClosing > 0
-                        ? formatIDR(deal.hargaClosing)
-                        : 'Rekanan Gudang'}
+                      {deal.hargaClosing > 0 ? formatIDR(deal.hargaClosing) : 'Rekanan Gudang'}
                     </td>
                     <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-400">
-                      {deal.soldBy === 'SALES_BBK' && deal.realizedProfit > 0 ? (
-                        <div>
-                          <span>+{formatIDR(deal.realizedProfit)}</span>
-                          <span className="text-[10px] text-emerald-500/80 block font-normal">
-                            ({deal.marginPercent}%)
-                          </span>
-                        </div>
+                      {deal.realizedProfit > 0 ? (
+                        <span>
+                          +{formatIDR(deal.realizedProfit)} <span className="text-[10px] font-normal text-emerald-500/80">({deal.marginPercent}%)</span>
+                        </span>
                       ) : (
                         '-'
                       )}
                     </td>
                     <td className="py-3 px-3.5 text-center">
                       {deal.soldBy === 'SALES_BBK' ? (
-                        <span className="inline-block px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded text-[10px] font-bold">
+                        <span className="inline-flex items-center px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded text-[10px] font-bold">
                           Sales BBK
                         </span>
                       ) : (
-                        <span className="inline-block px-2 py-0.5 bg-slate-800 text-slate-400 border border-slate-700 rounded text-[10px]">
+                        <span className="inline-flex items-center px-2 py-0.5 bg-slate-950 text-slate-400 border border-slate-800 rounded text-[10px] font-bold">
                           Pihak Ketiga
                         </span>
                       )}
