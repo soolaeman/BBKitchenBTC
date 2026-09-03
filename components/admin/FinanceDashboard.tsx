@@ -187,7 +187,7 @@ export function FinanceDashboard() {
         deal.sku.toLowerCase().includes(q) ||
         deal.productTitle.toLowerCase().includes(q) ||
         deal.lokasiGudang.toLowerCase().includes(q) ||
-        deal.notes.toLowerCase().includes(q);
+        (deal.notes ? deal.notes.toLowerCase().includes(q) : false);
 
       // Channel filter
       const matchChannel =
