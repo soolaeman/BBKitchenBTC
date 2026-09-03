@@ -512,8 +512,8 @@ export function FinanceDashboard() {
       .slice(0, 5);
   }, [categoryEconomics]);
 
-  // Supply: Available Units by Partner Hub
-  const partnerHubSupply = useMemo(() => {
+  // Supply: Global Partner Hub Supply across all 13 Hubs
+  const allHubsSupply = useMemo(() => {
     const hubMap = new Map<string, { code: string; label: string; availableUnits: number; estPartnerCapital: number }>();
 
     const hubLabels: Record<string, string> = {
@@ -532,9 +532,27 @@ export function FinanceDashboard() {
       RK: 'RK - Rizki Kitchen',
     };
 
-    filteredInventory.forEach((item) => {
+    const { startFilter, endFilter } = dateBounds;
+    let totalReadyGlobal = 0;
+    let totalCapitalGlobal = 0;
+    let totalAllUnitsGlobal = 0;
+
+    inventoryItems.forEach((item) => {
+      if (categoryFilter !== 'ALL' && !matchCategory(item.category, categoryFilter)) return;
+      if (startFilter || endFilter) {
+        const itemDate = item.inDate || item.soldDate || '';
+        if (itemDate) {
+          if (startFilter && itemDate < startFilter) return;
+          if (endFilter && itemDate > endFilter) return;
+        }
+      }
+
+      totalAllUnitsGlobal++;
       const isReady = item.statusUnit === 'READY' || item.statusUnit === 'AVAILABLE';
       if (isReady) {
+        totalReadyGlobal++;
+        totalCapitalGlobal += item.modal || 0;
+
         const code = item.asalGudang || 'GK';
         if (!hubMap.has(code)) {
           hubMap.set(code, {
@@ -550,8 +568,41 @@ export function FinanceDashboard() {
       }
     });
 
-    return Array.from(hubMap.values()).sort((a, b) => b.availableUnits - a.availableUnits);
-  }, [filteredInventory]);
+    const list = Array.from(hubMap.values()).sort((a, b) => b.availableUnits - a.availableUnits);
+    return {
+      list,
+      totalReadyGlobal,
+      totalCapitalGlobal,
+      totalAllUnitsGlobal,
+    };
+  }, [inventoryItems, categoryFilter, dateBounds]);
+
+  // Selected Hub Details (When a specific Hub is chosen in filter)
+  const selectedHubOverview = useMemo(() => {
+    if (warehouseFilter === 'ALL') return null;
+
+    const hub = allHubsSupply.list.find((h) => h.code === warehouseFilter) || {
+      code: warehouseFilter,
+      label: `${warehouseFilter} Hub`,
+      availableUnits: 0,
+      estPartnerCapital: 0,
+    };
+
+    const hubDeals = filteredDeals.filter((d) => matchWarehouseHub(d.lokasiGudang, d.asalGudang, d.sku, warehouseFilter));
+    const hubSoldUnits = hubDeals.length;
+
+    const ratioPercent = allHubsSupply.totalReadyGlobal > 0
+      ? Math.round((hub.availableUnits / allHubsSupply.totalReadyGlobal) * 100)
+      : 0;
+
+    return {
+      ...hub,
+      hubSoldUnits,
+      ratioPercent,
+      totalReadyGlobal: allHubsSupply.totalReadyGlobal,
+      totalCapitalGlobal: allHubsSupply.totalCapitalGlobal,
+    };
+  }, [warehouseFilter, allHubsSupply, filteredDeals]);
 
   // 8. RISKS & OPPORTUNITIES (DATA-DRIVEN INSIGHTS)
   const businessInsights = useMemo(() => {
@@ -561,7 +612,7 @@ export function FinanceDashboard() {
 
     const mostProfitableCat = [...categoryEconomics].sort((a, b) => b.profitSum - a.profitSum)[0];
     const topVolumeCat = [...categoryEconomics].sort((a, b) => b.unitsSold - a.unitsSold)[0];
-    const topSupplyHub = partnerHubSupply[0];
+    const topSupplyHub = allHubsSupply.list[0];
 
     return {
       lowMarginCats,
@@ -569,7 +620,7 @@ export function FinanceDashboard() {
       topVolumeCat,
       topSupplyHub,
     };
-  }, [categoryEconomics, partnerHubSupply]);
+  }, [categoryEconomics, allHubsSupply]);
 
   // Handle Document Modal Trigger
   const handleOpenDocFromDeal = (deal: ClosingDealItem, type: DocumentType = 'INVOICE') => {
@@ -1260,43 +1311,123 @@ export function FinanceDashboard() {
             </p>
           </div>
 
-          {/* Panel SUPPLY: Available Units by Partner Hub */}
+          {/* Panel SUPPLY: Overview by Filter vs Full Ranked List */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-3 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <Building className="w-4 h-4 text-indigo-400" />
-                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    SUPPLY: Stok Siap Jual Rekanan Gudang
-                  </h3>
+            {selectedHubOverview ? (
+              /* FOCUSED OVERVIEW WHEN HUB FILTER IS SELECTED */
+              <div>
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Building className="w-4 h-4 text-indigo-400" />
+                    <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                      SUPPLY: OVERVIEW GUDANG {selectedHubOverview.code}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setWarehouseFilter('ALL')}
+                    className="text-[10px] text-indigo-400 hover:text-indigo-300 underline font-mono flex items-center gap-1"
+                    title="Kembali tampilkan semua hub rekanan"
+                  >
+                    <span>Semua Hub</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
                 </div>
-                <span className="text-[10px] text-slate-400 font-mono">Mitra Lokasi</span>
-              </div>
 
-              <div className="divide-y divide-slate-800/60 mt-2 max-h-56 overflow-y-auto pr-1">
-                {partnerHubSupply.length === 0 ? (
-                  <p className="text-xs text-slate-500 py-6 text-center">Tidak ada unit ready di hub rekanan.</p>
-                ) : (
-                  partnerHubSupply.map((hub) => (
-                    <div key={hub.code} className="py-2.5 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono font-bold text-[10px] text-indigo-300">
-                          {hub.code}
-                        </span>
-                        <div>
-                          <span className="font-semibold text-slate-200 block">{hub.label}</span>
-                          <span className="text-[10px] text-slate-400">Modal Rekanan: {formatIDR(hub.estPartnerCapital)}</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-mono font-bold text-indigo-400">{hub.availableUnits} Unit Ready</span>
-                        <span className="text-[10px] text-slate-500 block">Siap Dijualkan</span>
-                      </div>
+                <div className="pt-3 space-y-3">
+                  {/* Valuasi Pergudang */}
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                        Valuasi Modal Stok Ready {selectedHubOverview.code}
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-950 border border-indigo-800 text-indigo-300 font-mono font-bold">
+                        {selectedHubOverview.ratioPercent}% Total Pasokan
+                      </span>
                     </div>
-                  ))
-                )}
+                    <div className="text-xl font-black text-indigo-400 font-mono">
+                      {formatIDR(selectedHubOverview.estPartnerCapital)}
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium">{selectedHubOverview.label}</p>
+                  </div>
+
+                  {/* Rasio Unit (Unit Ready / Total Unit Ready) */}
+                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-300 font-semibold text-[11px]">Rasio Stok Siap Jual:</span>
+                      <span className="font-mono font-bold text-slate-200 text-[11px]">
+                        <strong className="text-indigo-400 text-xs">{selectedHubOverview.availableUnits} Unit Ready</strong> / {selectedHubOverview.totalReadyGlobal} Unit (Total)
+                      </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                      <div
+                        className="bg-indigo-500 h-full rounded-full transition-all"
+                        style={{ width: `${Math.min(100, Math.max(4, selectedHubOverview.ratioPercent))}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                      <span>Closing pada filter ini: <strong className="text-emerald-400 font-mono">{selectedHubOverview.hubSoldUnits} Unit Terjual</strong></span>
+                      <span>Porsi Pasokan: <strong className="text-indigo-300">{selectedHubOverview.ratioPercent}%</strong></span>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* FULL RANKED LIST WHEN FILTER IS ALL */
+              <div>
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Building className="w-4 h-4 text-indigo-400" />
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                        SUPPLY: STOK SIAP JUAL REKANAN GUDANG
+                      </h3>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">13 Hub Rekanan</span>
+                </div>
+
+                <div className="pt-2 pb-1 text-[11px] text-slate-400 flex items-center justify-between">
+                  <span>Total: <strong className="text-indigo-400 font-mono">{allHubsSupply.totalReadyGlobal} Unit Ready</strong></span>
+                  <span>Valuasi Modal: <strong className="text-slate-200 font-mono">{formatIDR(allHubsSupply.totalCapitalGlobal)}</strong></span>
+                </div>
+
+                <div className="divide-y divide-slate-800/60 mt-1 max-h-52 overflow-y-auto pr-1">
+                  {allHubsSupply.list.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-6 text-center">Tidak ada unit ready di hub rekanan.</p>
+                  ) : (
+                    allHubsSupply.list.map((hub) => (
+                      <button
+                        key={hub.code}
+                        type="button"
+                        onClick={() => setWarehouseFilter(hub.code)}
+                        className="w-full py-2.5 flex items-center justify-between text-xs hover:bg-slate-850/60 px-2 rounded-lg transition-colors text-left group"
+                        title={`Klik untuk zoom filter ${hub.label}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono font-bold text-[10px] text-indigo-300 group-hover:border-indigo-600 transition-colors">
+                            {hub.code}
+                          </span>
+                          <div>
+                            <span className="font-semibold text-slate-200 block group-hover:text-white">{hub.label}</span>
+                            <span className="text-[10px] text-slate-400">Modal: {formatIDR(hub.estPartnerCapital)}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-indigo-400 block">{hub.availableUnits} Unit Ready</span>
+                          <span className="text-[9px] text-slate-500">
+                            {allHubsSupply.totalReadyGlobal > 0 ? `${Math.round((hub.availableUnits / allHubsSupply.totalReadyGlobal) * 100)}% total` : '0%'}
+                          </span>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
 
             <p className="text-[10px] text-slate-500 border-t border-slate-800/60 pt-2">
               ℹ️ Stok di atas adalah unit siap jual di lokasi rekanan gudang mitra BBKitchen.
