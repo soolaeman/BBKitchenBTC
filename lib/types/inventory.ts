@@ -18,10 +18,13 @@ export type WarehouseCode =
   | 'BL'
   | 'ML'
   | 'RB'
+  | 'KG'
   | 'PY'
   | 'PE'
+  | 'SK'
   | 'WT'
-  | 'ON';
+  | 'ON'
+  | 'RK';
 
 export type WarehouseLocation =
   | 'PAMULANG 2, TANGSEL'
@@ -29,6 +32,7 @@ export type WarehouseLocation =
   | 'SETU, TANGSEL'
   | 'SAWANGAN, DEPOK'
   | 'KEDAUNG, TANGSEL'
+  | 'RAWAKALONG, BOGOR'
   | 'OTHER';
 
 export type GuardrailStatus = 'SAFE' | 'WARNING' | 'BREACHED';

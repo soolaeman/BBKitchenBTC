@@ -502,10 +502,13 @@ export function FinanceDashboard() {
               <option value="BL">BL - Pamulang 2</option>
               <option value="ML">ML - Pamulang Barat</option>
               <option value="RB">RB - Pamulang Barat</option>
+              <option value="KG">KG - Kitchen Gembel (Pamulang Barat)</option>
               <option value="PY">PY - Setu Tangsel</option>
               <option value="PE">PE - Sawangan Depok</option>
+              <option value="SK">SK - Sanjaya Kitchen (Sawangan Depok)</option>
               <option value="WT">WT - Kedaung Tangsel</option>
               <option value="ON">ON - Kedaung Tangsel</option>
+              <option value="RK">RK - Rizki Kitchen (Rawakalong Bogor)</option>
             </select>
           </div>
 
@@ -737,14 +740,20 @@ export function FinanceDashboard() {
                   ? 'ML - Pamulang Barat'
                   : warehouseFilter === 'RB'
                   ? 'RB - Pamulang Barat'
+                  : warehouseFilter === 'KG'
+                  ? 'KG - Kitchen Gembel'
                   : warehouseFilter === 'PY'
                   ? 'PY - Setu Tangsel'
                   : warehouseFilter === 'PE'
                   ? 'PE - Sawangan Depok'
+                  : warehouseFilter === 'SK'
+                  ? 'SK - Sanjaya Kitchen'
                   : warehouseFilter === 'WT'
                   ? 'WT - Kedaung Tangsel'
                   : warehouseFilter === 'ON'
                   ? 'ON - Kedaung Tangsel'
+                  : warehouseFilter === 'RK'
+                  ? 'RK - Rizki Kitchen'
                   : warehouseFilter}
               </span>
             </div>

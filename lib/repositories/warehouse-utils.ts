@@ -7,10 +7,13 @@ export const WAREHOUSE_LOCATION_MAP: Record<WarehouseCode, WarehouseLocation> = 
   BL: 'PAMULANG 2, TANGSEL',
   ML: 'PAMULANG BARAT, TANGSEL',
   RB: 'PAMULANG BARAT, TANGSEL',
+  KG: 'PAMULANG BARAT, TANGSEL',
   PY: 'SETU, TANGSEL',
   PE: 'SAWANGAN, DEPOK',
+  SK: 'SAWANGAN, DEPOK',
   WT: 'KEDAUNG, TANGSEL',
   ON: 'KEDAUNG, TANGSEL',
+  RK: 'RAWAKALONG, BOGOR',
 };
 
 export const WAREHOUSE_HUB_DETAILS = [
@@ -27,10 +30,10 @@ export const WAREHOUSE_HUB_DETAILS = [
     hubId: 'PAMULANG_BARAT',
     name: 'Hub Pamulang Barat',
     city: 'Tangerang Selatan',
-    codes: ['ML', 'RB'],
+    codes: ['ML', 'RB', 'KG'],
     address: 'Jl. Raya Pajajaran No. 18, Pamulang Barat, Tangerang Selatan',
-    capacityUnits: 650,
-    specialty: 'Refrigeration, Chiller, Freezer, Ice Machine',
+    capacityUnits: 800,
+    specialty: 'Refrigeration, Chiller, Freezer, Ice Machine, Kitchen Gembel',
   },
   {
     hubId: 'SETU',
@@ -45,10 +48,10 @@ export const WAREHOUSE_HUB_DETAILS = [
     hubId: 'SAWANGAN',
     name: 'Hub Sawangan',
     city: 'Depok',
-    codes: ['PE'],
-    address: 'Jl. Raya Muchtar No. 99, Sawangan, Depok',
-    capacityUnits: 500,
-    specialty: 'Coffee Machines, Grinders, Barista Setup, Countertop Equipment',
+    codes: ['PE', 'SK'],
+    address: 'Jl. Raya Muchtar / Perumahan Green Pratama Sawangan, Depok',
+    capacityUnits: 650,
+    specialty: 'Coffee Machines, Barista Setup, Countertop Equipment, Sanjaya Kitchen',
   },
   {
     hubId: 'KEDAUNG',
@@ -58,6 +61,15 @@ export const WAREHOUSE_HUB_DETAILS = [
     address: 'Jl. Aria Putra No. 55, Kedaung, Tangerang Selatan',
     capacityUnits: 450,
     specialty: 'Prep Machinery, Meat Slicers, Mixers, Dishwashers',
+  },
+  {
+    hubId: 'RAWAKALONG',
+    name: 'Hub Rawakalong',
+    city: 'Bogor',
+    codes: ['RK'],
+    address: 'JPM8+MC2 Rawakalong, Bogor Regency, Jawa Barat',
+    capacityUnits: 350,
+    specialty: 'Rizki Kitchen (Commercial Cookware & Specialized Stoves)',
   },
 ];
 

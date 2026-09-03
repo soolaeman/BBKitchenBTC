@@ -396,15 +396,18 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             >
               <option value="ALL">Semua Hub</option>
               <option value="GK">GK - Pamulang 2</option>
-              <option value="BB">BB - Pamulang</option>
+              <option value="BB">BB - Pamulang 2</option>
+              <option value="SM">SM - Pamulang 2</option>
+              <option value="BL">BL - Pamulang 2</option>
               <option value="ML">ML - Pamulang Barat</option>
-              <option value="WT">WT - Kedaung</option>
-              <option value="PE">PE - Sawangan</option>
-              <option value="PY">PY - Setu</option>
-              <option value="SM">SM - Ciputat</option>
-              <option value="BL">BL - Serpong</option>
-              <option value="RB">RB - Bintaro</option>
-              <option value="ON">ON - Online Hub</option>
+              <option value="RB">RB - Pamulang Barat</option>
+              <option value="KG">KG - Kitchen Gembel (Pamulang Barat)</option>
+              <option value="PY">PY - Setu Tangsel</option>
+              <option value="PE">PE - Sawangan Depok</option>
+              <option value="SK">SK - Sanjaya Kitchen (Sawangan Depok)</option>
+              <option value="WT">WT - Kedaung Tangsel</option>
+              <option value="ON">ON - Kedaung Tangsel</option>
+              <option value="RK">RK - Rizki Kitchen (Rawakalong Bogor)</option>
             </select>
           </div>
 

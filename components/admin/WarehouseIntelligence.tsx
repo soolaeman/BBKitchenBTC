@@ -29,6 +29,7 @@ export function WarehouseIntelligence() {
       sourcePerformance: [
         { code: 'SRC-ML-REFRIG', volume: 380, qualityScore: 95, avgTurnoverDays: 22 },
         { code: 'SRC-RB-FREEZE', volume: 240, qualityScore: 91, avgTurnoverDays: 27 },
+        { code: 'SRC-KG-GEMBEL', volume: 150, qualityScore: 93, avgTurnoverDays: 19 },
       ],
     },
     {
@@ -50,7 +51,8 @@ export function WarehouseIntelligence() {
       avgDaysToSell: 26,
       occupancyRate: 68,
       sourcePerformance: [
-        { code: 'SRC-PE-BARISTA', volume: 340, qualityScore: 90, avgTurnoverDays: 26 },
+        { code: 'SRC-PE-BARISTA', volume: 220, qualityScore: 90, avgTurnoverDays: 26 },
+        { code: 'SRC-SK-SANJAYA', volume: 120, qualityScore: 94, avgTurnoverDays: 20 },
       ],
     },
     {
@@ -63,6 +65,17 @@ export function WarehouseIntelligence() {
       sourcePerformance: [
         { code: 'SRC-WT-PREP', volume: 130, qualityScore: 88, avgTurnoverDays: 31 },
         { code: 'SRC-ON-WASH', volume: 90, qualityScore: 93, avgTurnoverDays: 25 },
+      ],
+    },
+    {
+      hub: WAREHOUSE_HUB_DETAILS[5], // Rawakalong (Rizki Kitchen)
+      totalUnits: 180,
+      availableUnits: 150,
+      soldUnits: 30,
+      avgDaysToSell: 21,
+      occupancyRate: 70,
+      sourcePerformance: [
+        { code: 'SRC-RK-RIZKI', volume: 180, qualityScore: 95, avgTurnoverDays: 21 },
       ],
     },
   ];
