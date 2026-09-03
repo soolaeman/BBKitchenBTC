@@ -102,6 +102,30 @@ function extractWarehouseCode(sku: string, lokasi: string, rawAsalGudang: string
   return "GK";
 }
 
+function parseRawDateString(raw: string): string {
+  if (!raw) return "";
+  const str = String(raw).trim();
+  const num = Number(str);
+  if (!isNaN(num) && num > 30000 && num < 60000) {
+    const jsDate = new Date(Math.round((num - 25569) * 86400 * 1000));
+    if (!isNaN(jsDate.getTime())) {
+      const datePart = jsDate.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        timeZone: "Asia/Jakarta",
+      });
+      const timePart = jsDate.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Jakarta",
+      }).replace(":", ".");
+      return `${datePart}, ${timePart}`;
+    }
+  }
+  return str;
+}
+
 function toItem(row: string[]): MasterInventoryItem {
   const photos = splitPhotos(value(row, 13));
   const status = value(row, 4) as MasterInventoryItem["STATUS_UNIT"];
@@ -127,8 +151,8 @@ function toItem(row: string[]): MasterInventoryItem {
     YOAST_DESCRIPTION: value(row, 11),
     FEATURED_IMAGE: normalizeImageUrl(value(row, 12)) || photos[0] || "",
     PHOTO_URLS: photos,
-    TANGGAL_MASUK: value(row, 14),
-    TANGGAL_TERJUAL: value(row, 15) || null,
+    TANGGAL_MASUK: parseRawDateString(value(row, 14)),
+    TANGGAL_TERJUAL: parseRawDateString(value(row, 15)) || null,
     DURASI_TERJUAL: numberOrNull(value(row, 16)),
     LINK_TELEGRAM: value(row, 17),
     PRODUCT_ID: value(row, 18),

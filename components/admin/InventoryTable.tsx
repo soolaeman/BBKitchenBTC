@@ -25,23 +25,50 @@ import {
   Copy,
 } from 'lucide-react';
 
-function formatTimestampWithYear(dateStr?: string | null): string {
-  if (!dateStr) return '';
+function formatTimestampWithYear(raw?: any): string {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  if (!str) return '';
+
   try {
-    const d = new Date(dateStr);
-    if (!isNaN(d.getTime())) {
-      const datePart = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-      const timePart = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(':', '.');
+    let d: Date | null = null;
+
+    // 1. Numeric Excel / Sheets serial date (e.g. 46267.61398148148)
+    const num = Number(str);
+    if (!isNaN(num) && num > 30000 && num < 60000) {
+      const ms = Math.round((num - 25569) * 86400 * 1000);
+      d = new Date(ms);
+    } else if (str.includes('-') || str.includes('/') || str.includes('T')) {
+      const parsed = new Date(str.replace(' ', 'T'));
+      if (!isNaN(parsed.getTime())) {
+        d = parsed;
+      }
+    }
+
+    if (d && !isNaN(d.getTime())) {
+      const datePart = d.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Jakarta',
+      });
+      const timePart = d.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Jakarta',
+      }).replace(':', '.');
       return `${datePart}, ${timePart}`;
     }
-    // If string is already like "03 Sep, 16.14" -> insert current year: "03 Sep 2026, 16.14"
-    if (dateStr.includes(',') && !dateStr.includes('202')) {
-      const parts = dateStr.split(',');
+
+    // 2. Formatted string like "03 Sep, 16.14" (missing year)
+    if (str.includes(',') && !str.match(/\d{4}/)) {
+      const parts = str.split(',');
       return `${parts[0].trim()} ${new Date().getFullYear()}, ${parts[1].trim()}`;
     }
-    return dateStr;
+
+    return str;
   } catch {
-    return dateStr || '';
+    return str;
   }
 }
 
@@ -678,16 +705,14 @@ export function InventoryTable() {
                                 className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
                                   isActive
                                     ? 'bg-amber-500 text-slate-950 font-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.6)] scale-105'
-                                    : isAudited
-                                    ? 'bg-amber-950/40 text-amber-300 border-amber-800/80 hover:bg-amber-900/60'
                                     : 'bg-blue-950/60 text-blue-400 hover:text-blue-300 border-blue-800/80 hover:bg-blue-900/60'
                                 }`}
                               >
                                 <Send className="w-3 h-3" />
-                                <span>{isActive ? 'Sedang Dibuka' : isAudited ? 'Sudah Dibuka' : 'Channel'}</span>
+                                <span>{isActive ? 'Sedang Dibuka' : 'Channel'}</span>
                               </a>
                               {displayTime && (
-                                <span className="text-[9px] font-mono text-slate-400 whitespace-nowrap" title={isAudited ? 'Waktu diperiksa/dibuka' : 'Waktu posting Telegram'}>
+                                <span className="text-[9px] font-mono text-slate-400 whitespace-nowrap" title="Waktu posting Telegram">
                                   🕒 {displayTime}
                                 </span>
                               )}
