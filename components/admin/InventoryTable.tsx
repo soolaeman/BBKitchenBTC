@@ -72,7 +72,7 @@ export function InventoryTable() {
   const [soldByOther, setSoldByOther] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState('');
 
-  // Active Clicked & Visited Telegram Tracker (Session-based, 0 reload)
+  // Active Row & Audit Timestamps Tracker (Persistent in localStorage, 0 reload)
   const [activeClickedSku, setActiveClickedSku] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return sessionStorage.getItem('bbk_last_active_sku') || null;
@@ -80,23 +80,26 @@ export function InventoryTable() {
     return null;
   });
 
-  const [visitedSkus, setVisitedSkus] = useState<Set<string>>(() => {
+  const [auditTimestamps, setAuditTimestamps] = useState<Record<string, string>>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const stored = sessionStorage.getItem('bbk_visited_skus');
-        if (stored) return new Set(JSON.parse(stored));
+        const stored = localStorage.getItem('bbk_audit_timestamps');
+        if (stored) return JSON.parse(stored);
       } catch {}
     }
-    return new Set();
+    return {};
   });
 
   const markSkuAsVisited = (sku: string) => {
     setActiveClickedSku(sku);
+    const now = new Date();
+    const timeStr = `${now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}, ${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('bbk_last_active_sku', sku);
-      setVisitedSkus((prev) => {
-        const next = new Set(prev).add(sku);
-        sessionStorage.setItem('bbk_visited_skus', JSON.stringify(Array.from(next)));
+      setAuditTimestamps((prev) => {
+        const next = { ...prev, [sku]: timeStr };
+        localStorage.setItem('bbk_audit_timestamps', JSON.stringify(next));
         return next;
       });
     }
@@ -480,7 +483,7 @@ export function InventoryTable() {
               ) : (
                 data.items.map((item) => {
                   const isActive = activeClickedSku === item.SKU;
-                  const isVisited = visitedSkus.has(item.SKU);
+                  const lastCheckedTime = auditTimestamps[item.SKU];
 
                   return (
                     <tr
@@ -488,8 +491,6 @@ export function InventoryTable() {
                       className={`transition-all duration-200 group ${
                         isActive
                           ? 'bg-amber-950/50 border-l-4 border-l-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)] ring-1 ring-amber-500/40'
-                          : isVisited
-                          ? 'bg-slate-900/40 hover:bg-slate-850/60'
                           : 'hover:bg-slate-800/40'
                       }`}
                     >
@@ -547,22 +548,27 @@ export function InventoryTable() {
                       {permissions?.canViewTelegramLink && (
                         <td className="py-3 px-3 text-center whitespace-nowrap">
                           {item.LINK_TELEGRAM ? (
-                            <a
-                              href={item.LINK_TELEGRAM}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={() => markSkuAsVisited(item.SKU)}
-                              className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
-                                isActive
-                                  ? 'bg-amber-500 text-slate-950 font-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.6)] scale-105'
-                                  : isVisited
-                                  ? 'bg-emerald-950/90 text-emerald-300 border-emerald-700/80 hover:bg-emerald-800 hover:text-white'
-                                  : 'bg-blue-950/60 text-blue-400 hover:text-blue-300 border-blue-800/80'
-                              }`}
-                            >
-                              <Send className="w-3 h-3" />
-                              <span>{isActive ? 'Sedang Dibuka' : isVisited ? '✓ Sudah Dicek' : 'Channel'}</span>
-                            </a>
+                            <div className="flex flex-col items-center gap-1">
+                              <a
+                                href={item.LINK_TELEGRAM}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => markSkuAsVisited(item.SKU)}
+                                className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                                  isActive
+                                    ? 'bg-amber-500 text-slate-950 font-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.6)] scale-105'
+                                    : 'bg-blue-950/60 text-blue-400 hover:text-blue-300 border-blue-800/80 hover:bg-blue-900/60'
+                                }`}
+                              >
+                                <Send className="w-3 h-3" />
+                                <span>{isActive ? 'Sedang Dibuka' : 'Channel'}</span>
+                              </a>
+                              {lastCheckedTime && (
+                                <span className="text-[9px] font-mono text-slate-400 whitespace-nowrap">
+                                  🕒 {lastCheckedTime}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-slate-600">-</span>
                           )}
