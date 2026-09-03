@@ -156,6 +156,7 @@ export async function getLiveClosingDealLedger(): Promise<{
         tanggalTerjual: cleanSoldDate || undefined,
         durasiTerjual: `${agingNum} hari`,
         lokasiGudang: item.LOKASI_UNIT,
+        asalGudang: item.asal_gudang || 'GK',
         hargaModal: modal,
         hargaClosing: closing,
         realizedProfit,
@@ -263,6 +264,7 @@ export async function getLiveClosingDealLedger(): Promise<{
       inDate: parseToISODate(it.TANGGAL_MASUK),
       soldDate: parseToISODate(it.TANGGAL_TERJUAL),
       warehouse: it.LOKASI_UNIT || 'Pamulang 2',
+      asalGudang: it.asal_gudang || 'GK',
     }));
 
     return {

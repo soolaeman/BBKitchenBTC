@@ -72,6 +72,7 @@ export interface ClosingDealItem {
   tanggalTerjual?: string;
   durasiTerjual?: string | number;
   lokasiGudang: string;
+  asalGudang?: string;
   hargaModal: number;
   hargaClosing: number;
   realizedProfit: number;

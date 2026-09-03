@@ -162,31 +162,30 @@ export function FinanceDashboard() {
         deal.productTitle.toLowerCase().includes(q) ||
         deal.lokasiGudang.toLowerCase().includes(q);
 
-  // Helper to match official Jabodetabek Hubs
-  const matchWarehouseHub = (itemLocation: string, hubFilter: string) => {
+  // Helper to match official 10 Warehouse Hub codes (GK, BB, SM, BL, ML, RB, PY, PE, WT, ON)
+  const matchWarehouseHub = (itemLocation: string, itemAsalGudang?: string, hubFilter: string = 'ALL') => {
     if (!hubFilter || hubFilter === 'ALL') return true;
+    const code = (itemAsalGudang || '').toUpperCase();
     const loc = (itemLocation || '').toUpperCase();
-    switch (hubFilter) {
-      case 'PAMULANG_2':
-        return (
-          loc.includes('PAMULANG 2') ||
-          loc.includes('GK') ||
-          loc.includes('BB') ||
-          loc.includes('SM') ||
-          loc.includes('BL') ||
-          (loc.includes('PAMULANG') && !loc.includes('PAMULANG BARAT'))
-        );
-      case 'PAMULANG_BARAT':
-        return loc.includes('PAMULANG BARAT') || loc.includes('ML') || loc.includes('RB');
-      case 'KEDAUNG':
-        return loc.includes('KEDAUNG') || loc.includes('WT') || loc.includes('ON');
-      case 'SAWANGAN':
-        return loc.includes('SAWANGAN') || loc.includes('PE');
-      case 'SETU':
-        return loc.includes('SETU') || loc.includes('PY');
-      default:
-        return loc.includes(hubFilter.toUpperCase());
+
+    if (code === hubFilter.toUpperCase()) return true;
+
+    if (hubFilter === 'GK' || hubFilter === 'BB' || hubFilter === 'SM' || hubFilter === 'BL') {
+      return loc.includes('PAMULANG 2') || (loc.includes('PAMULANG') && !loc.includes('PAMULANG BARAT')) || loc.includes(hubFilter);
     }
+    if (hubFilter === 'ML' || hubFilter === 'RB') {
+      return loc.includes('PAMULANG BARAT') || loc.includes(hubFilter);
+    }
+    if (hubFilter === 'PY') {
+      return loc.includes('SETU') || loc.includes('PY');
+    }
+    if (hubFilter === 'PE') {
+      return loc.includes('SAWANGAN') || loc.includes('PE');
+    }
+    if (hubFilter === 'WT' || hubFilter === 'ON') {
+      return loc.includes('KEDAUNG') || loc.includes(hubFilter);
+    }
+    return loc.includes(hubFilter.toUpperCase());
   };
 
   // 1. DYNAMIC DEALS FILTER (BY SEARCH, CHANNEL, WAREHOUSE & DATE RANGE)
@@ -207,8 +206,8 @@ export function FinanceDashboard() {
       const matchChannel =
         channelFilter === 'ALL' || deal.soldBy === channelFilter;
 
-      // Warehouse filter
-      const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, warehouseFilter);
+      // Warehouse filter (Matching exact 10 Hub codes: GK, BB, SM, BL, ML, RB, PY, PE, WT, ON)
+      const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, deal.asalGudang, warehouseFilter);
 
       // Date filtering comparison on clean ISO YYYY-MM-DD
       let matchDate = true;
@@ -267,7 +266,7 @@ export function FinanceDashboard() {
 
     return inventoryItems.filter((item) => {
       // Warehouse filter
-      if (!matchWarehouseHub(item.warehouse, warehouseFilter)) {
+      if (!matchWarehouseHub(item.warehouse, (item as any).asalGudang, warehouseFilter)) {
         return false;
       }
 
@@ -510,12 +509,17 @@ export function FinanceDashboard() {
               onChange={(e) => setWarehouseFilter(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
             >
-              <option value="ALL">Semua Hub Gudang (5 Hub Jabodetabek)</option>
-              <option value="PAMULANG_2">Hub Pamulang 2 (GK, BB, SM, BL - Tangsel)</option>
-              <option value="PAMULANG_BARAT">Hub Pamulang Barat (ML, RB - Tangsel)</option>
-              <option value="KEDAUNG">Hub Kedaung (WT, ON - Tangsel)</option>
-              <option value="SAWANGAN">Hub Sawangan (PE - Depok)</option>
-              <option value="SETU">Hub Setu (PY - Tangsel)</option>
+              <option value="ALL">Semua Hub</option>
+              <option value="GK">GK - Pamulang 2</option>
+              <option value="BB">BB - Pamulang 2</option>
+              <option value="SM">SM - Pamulang 2</option>
+              <option value="BL">BL - Pamulang 2</option>
+              <option value="ML">ML - Pamulang Barat</option>
+              <option value="RB">RB - Pamulang Barat</option>
+              <option value="PY">PY - Setu Tangsel</option>
+              <option value="PE">PE - Sawangan Depok</option>
+              <option value="WT">WT - Kedaung Tangsel</option>
+              <option value="ON">ON - Kedaung Tangsel</option>
             </select>
           </div>
 
@@ -734,17 +738,27 @@ export function FinanceDashboard() {
               </div>
               <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded font-mono">
                 {warehouseFilter === 'ALL'
-                  ? '5 Hub Gudang'
-                  : warehouseFilter === 'PAMULANG_2'
-                  ? 'Hub Pamulang 2'
-                  : warehouseFilter === 'PAMULANG_BARAT'
-                  ? 'Hub Pamulang Barat'
-                  : warehouseFilter === 'KEDAUNG'
-                  ? 'Hub Kedaung'
-                  : warehouseFilter === 'SAWANGAN'
-                  ? 'Hub Sawangan'
-                  : warehouseFilter === 'SETU'
-                  ? 'Hub Setu'
+                  ? 'Semua Hub'
+                  : warehouseFilter === 'GK'
+                  ? 'GK - Pamulang 2'
+                  : warehouseFilter === 'BB'
+                  ? 'BB - Pamulang 2'
+                  : warehouseFilter === 'SM'
+                  ? 'SM - Pamulang 2'
+                  : warehouseFilter === 'BL'
+                  ? 'BL - Pamulang 2'
+                  : warehouseFilter === 'ML'
+                  ? 'ML - Pamulang Barat'
+                  : warehouseFilter === 'RB'
+                  ? 'RB - Pamulang Barat'
+                  : warehouseFilter === 'PY'
+                  ? 'PY - Setu Tangsel'
+                  : warehouseFilter === 'PE'
+                  ? 'PE - Sawangan Depok'
+                  : warehouseFilter === 'WT'
+                  ? 'WT - Kedaung Tangsel'
+                  : warehouseFilter === 'ON'
+                  ? 'ON - Kedaung Tangsel'
                   : warehouseFilter}
               </span>
             </div>
