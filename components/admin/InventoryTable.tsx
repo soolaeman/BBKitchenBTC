@@ -72,6 +72,36 @@ export function InventoryTable() {
   const [soldByOther, setSoldByOther] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState('');
 
+  // Active Clicked & Visited Telegram Tracker (Session-based, 0 reload)
+  const [activeClickedSku, setActiveClickedSku] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('bbk_last_active_sku') || null;
+    }
+    return null;
+  });
+
+  const [visitedSkus, setVisitedSkus] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem('bbk_visited_skus');
+        if (stored) return new Set(JSON.parse(stored));
+      } catch {}
+    }
+    return new Set();
+  });
+
+  const markSkuAsVisited = (sku: string) => {
+    setActiveClickedSku(sku);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('bbk_last_active_sku', sku);
+      setVisitedSkus((prev) => {
+        const next = new Set(prev).add(sku);
+        sessionStorage.setItem('bbk_visited_skus', JSON.stringify(Array.from(next)));
+        return next;
+      });
+    }
+  };
+
   const fetchInventory = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -448,120 +478,152 @@ export function InventoryTable() {
                   </td>
                 </tr>
               ) : (
-                data.items.map((item) => (
-                  <tr
-                    key={item.SKU}
-                    className="hover:bg-slate-800/40 transition-colors group"
-                  >
-                    {/* SKU */}
-                    <td className="py-3 px-4 font-mono font-bold text-slate-200 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <span>{item.SKU}</span>
-                        {item.IS_DIRTY && (
-                          <span className="w-2 h-2 rounded-full bg-rose-500" title="Dirty Data" />
-                        )}
-                      </div>
-                    </td>
+                data.items.map((item) => {
+                  const isActive = activeClickedSku === item.SKU;
+                  const isVisited = visitedSkus.has(item.SKU);
 
-                    {/* Thumbnail */}
-                    <td className="py-3 px-3">
-                      <div className="relative w-12 h-12 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden shrink-0">
-                        {item.FEATURED_IMAGE ? (
-                          <Image
-                            src={item.FEATURED_IMAGE}
-                            alt={item.image_alt || item.PRODUCT_TITLE}
-                            fill
-                            className="object-cover"
-                            sizes="48px"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-500">
-                            No Pic
+                  return (
+                    <tr
+                      key={item.SKU}
+                      className={`transition-all duration-200 group ${
+                        isActive
+                          ? 'bg-amber-950/50 border-l-4 border-l-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)] ring-1 ring-amber-500/40'
+                          : isVisited
+                          ? 'bg-slate-900/40 hover:bg-slate-850/60'
+                          : 'hover:bg-slate-800/40'
+                      }`}
+                    >
+                      {/* SKU */}
+                      <td className="py-3 px-4 font-mono font-bold text-slate-200 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          {isActive && (
+                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" title="Sedang Aktif Dicek" />
+                          )}
+                          <span className={isActive ? 'text-amber-300 font-black' : ''}>{item.SKU}</span>
+                          {item.IS_DIRTY && (
+                            <span className="w-2 h-2 rounded-full bg-rose-500" title="Dirty Data" />
+                          )}
+                        </div>
+                        {isActive && (
+                          <div className="text-[9px] text-amber-400 font-bold uppercase tracking-wider mt-0.5 flex items-center gap-1">
+                            <span>📍 Terakhir Dicek</span>
                           </div>
                         )}
-                      </div>
-                    </td>
-
-                    {/* Product Title & Category */}
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-100 group-hover:text-amber-400 transition-colors line-clamp-1">
-                        {item.PRODUCT_TITLE}
-                      </div>
-                      <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
-                        <span className="text-amber-400/90">{item.CATEGORY_NAME}</span>
-                        <span>•</span>
-                        <span className="text-slate-400">{item.KONDISI_UNIT}</span>
-                      </div>
-                    </td>
-
-                    {/* Telegram Source (Protected) */}
-                    {permissions?.canViewTelegramLink && (
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        {item.LINK_TELEGRAM ? (
-                          <a
-                            href={item.LINK_TELEGRAM}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/80"
-                          >
-                            <Send className="w-3 h-3" />
-                            <span>Channel</span>
-                          </a>
-                        ) : (
-                          <span className="text-slate-600">-</span>
-                        )}
                       </td>
-                    )}
 
-                    {/* Actions (Moved right next to Product Title & Telegram) */}
-                    <td className="py-3 px-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedItem(item)}
-                          className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
-                          title="Quick View & Specs"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setWaModalItem(item)}
-                          className="p-1.5 rounded-lg bg-emerald-950/80 border border-emerald-800/80 text-emerald-300 hover:bg-emerald-800 hover:text-white transition-colors"
-                          title="1-Klik Format Penawaran WhatsApp"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                        </button>
-
-                        {permissions?.canMarkAsSold && (
-                          item.STATUS_UNIT === 'SOLD' ? (
-                            <button
-                              type="button"
-                              onClick={() => handleMarkAsReady(item.SKU)}
-                              className="px-2 py-1 rounded-lg bg-blue-700/80 hover:bg-blue-600 text-white text-[11px] font-bold transition-colors flex items-center gap-1"
-                              title="Kembalikan status unit menjadi READY"
-                            >
-                              <RefreshCw className="w-3 h-3" />
-                              <span>Set Ready</span>
-                            </button>
+                      {/* Thumbnail */}
+                      <td className="py-3 px-3">
+                        <div className="relative w-12 h-12 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden shrink-0">
+                          {item.FEATURED_IMAGE ? (
+                            <Image
+                              src={item.FEATURED_IMAGE}
+                              alt={item.image_alt || item.PRODUCT_TITLE}
+                              fill
+                              className="object-cover"
+                              sizes="48px"
+                              referrerPolicy="no-referrer"
+                            />
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSoldModalItem(item);
-                                setDealPriceInput(String(item.HARGA_DEAL_WA || item.HARGA_BUKA_WA || ''));
-                              }}
-                              className="px-2 py-1 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white text-[11px] font-bold transition-colors"
-                              title="Tandai Sudah Terjual (Deal)"
+                            <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-500">
+                              No Pic
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Product Title & Category */}
+                      <td className="py-3 px-4">
+                        <div className={`font-semibold line-clamp-1 transition-colors ${isActive ? 'text-amber-300' : 'text-slate-100 group-hover:text-amber-400'}`}>
+                          {item.PRODUCT_TITLE}
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                          <span className="text-amber-400/90">{item.CATEGORY_NAME}</span>
+                          <span>•</span>
+                          <span className="text-slate-400">{item.KONDISI_UNIT}</span>
+                        </div>
+                      </td>
+
+                      {/* Telegram Source (Protected) */}
+                      {permissions?.canViewTelegramLink && (
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          {item.LINK_TELEGRAM ? (
+                            <a
+                              href={item.LINK_TELEGRAM}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => markSkuAsVisited(item.SKU)}
+                              className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                                isActive
+                                  ? 'bg-amber-500 text-slate-950 font-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.6)] scale-105'
+                                  : isVisited
+                                  ? 'bg-emerald-950/90 text-emerald-300 border-emerald-700/80 hover:bg-emerald-800 hover:text-white'
+                                  : 'bg-blue-950/60 text-blue-400 hover:text-blue-300 border-blue-800/80'
+                              }`}
                             >
-                              Mark Sold
-                            </button>
-                          )
-                        )}
-                      </div>
-                    </td>
+                              <Send className="w-3 h-3" />
+                              <span>{isActive ? 'Sedang Dibuka' : isVisited ? '✓ Sudah Dicek' : 'Channel'}</span>
+                            </a>
+                          ) : (
+                            <span className="text-slate-600">-</span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* Actions (Moved right next to Product Title & Telegram) */}
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              markSkuAsVisited(item.SKU);
+                              setSelectedItem(item);
+                            }}
+                            className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+                            title="Quick View & Specs"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              markSkuAsVisited(item.SKU);
+                              setWaModalItem(item);
+                            }}
+                            className="p-1.5 rounded-lg bg-emerald-950/80 border border-emerald-800/80 text-emerald-300 hover:bg-emerald-800 hover:text-white transition-colors"
+                            title="1-Klik Format Penawaran WhatsApp"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                          </button>
+
+                          {permissions?.canMarkAsSold && (
+                            item.STATUS_UNIT === 'SOLD' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleMarkAsReady(item.SKU)}
+                                className="px-2 py-1 rounded-lg bg-blue-700/80 hover:bg-blue-600 text-white text-[11px] font-bold transition-colors flex items-center gap-1"
+                                title="Kembalikan status unit menjadi READY"
+                              >
+                                <RefreshCw className="w-3 h-3" />
+                                <span>Set Ready</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  markSkuAsVisited(item.SKU);
+                                  setSoldModalItem(item);
+                                  setDealPriceInput(String(item.HARGA_DEAL_WA || item.HARGA_BUKA_WA || ''));
+                                }}
+                                className="px-2 py-1 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white text-[11px] font-bold transition-colors"
+                                title="Tandai Sudah Terjual (Deal)"
+                              >
+                                Mark Sold
+                              </button>
+                            )
+                          )}
+                        </div>
+                      </td>
 
                     {/* Location */}
                     <td className="py-3 px-3 whitespace-nowrap text-slate-300">
