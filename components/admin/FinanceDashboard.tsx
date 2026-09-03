@@ -162,13 +162,53 @@ export function FinanceDashboard() {
         deal.productTitle.toLowerCase().includes(q) ||
         deal.lokasiGudang.toLowerCase().includes(q);
 
+  // Helper to match official Jabodetabek Hubs
+  const matchWarehouseHub = (itemLocation: string, hubFilter: string) => {
+    if (!hubFilter || hubFilter === 'ALL') return true;
+    const loc = (itemLocation || '').toUpperCase();
+    switch (hubFilter) {
+      case 'PAMULANG_2':
+        return (
+          loc.includes('PAMULANG 2') ||
+          loc.includes('GK') ||
+          loc.includes('BB') ||
+          loc.includes('SM') ||
+          loc.includes('BL') ||
+          (loc.includes('PAMULANG') && !loc.includes('PAMULANG BARAT'))
+        );
+      case 'PAMULANG_BARAT':
+        return loc.includes('PAMULANG BARAT') || loc.includes('ML') || loc.includes('RB');
+      case 'KEDAUNG':
+        return loc.includes('KEDAUNG') || loc.includes('WT') || loc.includes('ON');
+      case 'SAWANGAN':
+        return loc.includes('SAWANGAN') || loc.includes('PE');
+      case 'SETU':
+        return loc.includes('SETU') || loc.includes('PY');
+      default:
+        return loc.includes(hubFilter.toUpperCase());
+    }
+  };
+
+  // 1. DYNAMIC DEALS FILTER (BY SEARCH, CHANNEL, WAREHOUSE & DATE RANGE)
+  const filteredDeals = useMemo(() => {
+    const { startFilter, endFilter } = dateBounds;
+
+    return deals.filter((deal) => {
+      // Keyword search
+      const q = searchQuery.toLowerCase().trim();
+      const matchQ =
+        !q ||
+        deal.sku.toLowerCase().includes(q) ||
+        deal.productTitle.toLowerCase().includes(q) ||
+        deal.lokasiGudang.toLowerCase().includes(q) ||
+        deal.notes.toLowerCase().includes(q);
+
       // Channel filter
       const matchChannel =
         channelFilter === 'ALL' || deal.soldBy === channelFilter;
 
       // Warehouse filter
-      const matchWarehouse =
-        warehouseFilter === 'ALL' || deal.lokasiGudang.toLowerCase().includes(warehouseFilter.toLowerCase());
+      const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, warehouseFilter);
 
       // Date filtering comparison on clean ISO YYYY-MM-DD
       let matchDate = true;
@@ -227,7 +267,7 @@ export function FinanceDashboard() {
 
     return inventoryItems.filter((item) => {
       // Warehouse filter
-      if (warehouseFilter !== 'ALL' && !item.warehouse.toLowerCase().includes(warehouseFilter.toLowerCase())) {
+      if (!matchWarehouseHub(item.warehouse, warehouseFilter)) {
         return false;
       }
 
@@ -470,16 +510,12 @@ export function FinanceDashboard() {
               onChange={(e) => setWarehouseFilter(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
             >
-              <option value="ALL">Semua Hub Gudang (10 Gudang)</option>
-              <option value="Pamulang 2">Pamulang 2 (GK)</option>
-              <option value="Pamulang Barat">Pamulang Barat (ML)</option>
-              <option value="Pamulang">Pamulang (BB)</option>
-              <option value="Sawangan">Sawangan (PE)</option>
-              <option value="Setu">Setu (PY)</option>
-              <option value="Kedaung">Kedaung (WT)</option>
-              <option value="Ciputat">Ciputat (SM)</option>
-              <option value="Serpong">Serpong (BL)</option>
-              <option value="Bintaro">Bintaro (RB)</option>
+              <option value="ALL">Semua Hub Gudang (5 Hub Jabodetabek)</option>
+              <option value="PAMULANG_2">Hub Pamulang 2 (GK, BB, SM, BL - Tangsel)</option>
+              <option value="PAMULANG_BARAT">Hub Pamulang Barat (ML, RB - Tangsel)</option>
+              <option value="KEDAUNG">Hub Kedaung (WT, ON - Tangsel)</option>
+              <option value="SAWANGAN">Hub Sawangan (PE - Depok)</option>
+              <option value="SETU">Hub Setu (PY - Tangsel)</option>
             </select>
           </div>
 
@@ -697,7 +733,19 @@ export function FinanceDashboard() {
                 </h3>
               </div>
               <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded font-mono">
-                {warehouseFilter === 'ALL' ? '10 Hub Gudang' : warehouseFilter}
+                {warehouseFilter === 'ALL'
+                  ? '5 Hub Gudang'
+                  : warehouseFilter === 'PAMULANG_2'
+                  ? 'Hub Pamulang 2'
+                  : warehouseFilter === 'PAMULANG_BARAT'
+                  ? 'Hub Pamulang Barat'
+                  : warehouseFilter === 'KEDAUNG'
+                  ? 'Hub Kedaung'
+                  : warehouseFilter === 'SAWANGAN'
+                  ? 'Hub Sawangan'
+                  : warehouseFilter === 'SETU'
+                  ? 'Hub Setu'
+                  : warehouseFilter}
               </span>
             </div>
 
