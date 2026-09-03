@@ -150,29 +150,36 @@ export function FinanceDashboard() {
   }, [datePreset, startDate, endDate, now]);
 
   // Helper to match official 10 Warehouse Hub codes (GK, BB, SM, BL, ML, RB, PY, PE, WT, ON)
-  const matchWarehouseHub = (itemLocation: string, itemAsalGudang?: string, hubFilter: string = 'ALL') => {
+  const matchWarehouseHub = (itemLocation: string, itemAsalGudang?: string, skuStr?: string, hubFilter: string = 'ALL') => {
     if (!hubFilter || hubFilter === 'ALL') return true;
-    const code = (itemAsalGudang || '').toUpperCase();
-    const loc = (itemLocation || '').toUpperCase();
+    const wh = hubFilter.toUpperCase().trim();
+    const code = (itemAsalGudang || '').toUpperCase().trim();
+    const sku = (skuStr || '').toUpperCase().trim();
+    const loc = (itemLocation || '').toUpperCase().trim();
 
-    if (code === hubFilter.toUpperCase()) return true;
+    // 1. Direct match on asal_gudang code
+    if (code && code === wh) return true;
 
-    if (hubFilter === 'GK' || hubFilter === 'BB' || hubFilter === 'SM' || hubFilter === 'BL') {
-      return loc.includes('PAMULANG 2') || (loc.includes('PAMULANG') && !loc.includes('PAMULANG BARAT')) || loc.includes(hubFilter);
+    // 2. Direct match on SKU prefix / pattern (e.g. BBK-GK-..., GK-..., BBKGK...)
+    if (
+      sku.startsWith(wh) ||
+      sku.startsWith(`BBK-${wh}`) ||
+      sku.startsWith(`BBK${wh}`) ||
+      sku.includes(`-${wh}-`)
+    ) {
+      return true;
     }
-    if (hubFilter === 'ML' || hubFilter === 'RB') {
-      return loc.includes('PAMULANG BARAT') || loc.includes(hubFilter);
+
+    // 3. Fallback only if item has no valid code and matches unique location
+    if (!code) {
+      if (wh === 'PE' && loc.includes('SAWANGAN')) return true;
+      if (wh === 'PY' && loc.includes('SETU')) return true;
+      if (wh === 'WT' && loc.includes('KEDAUNG')) return true;
+      if (wh === 'ML' && loc.includes('PAMULANG BARAT')) return true;
+      if (wh === 'GK' && loc.includes('PAMULANG 2')) return true;
     }
-    if (hubFilter === 'PY') {
-      return loc.includes('SETU') || loc.includes('PY');
-    }
-    if (hubFilter === 'PE') {
-      return loc.includes('SAWANGAN') || loc.includes('PE');
-    }
-    if (hubFilter === 'WT' || hubFilter === 'ON') {
-      return loc.includes('KEDAUNG') || loc.includes(hubFilter);
-    }
-    return loc.includes(hubFilter.toUpperCase());
+
+    return false;
   };
 
   // 1. DYNAMIC DEALS FILTER (BY SEARCH, CHANNEL, WAREHOUSE & DATE RANGE)
@@ -194,7 +201,7 @@ export function FinanceDashboard() {
         channelFilter === 'ALL' || deal.soldBy === channelFilter;
 
       // Warehouse filter (Matching exact 10 Hub codes: GK, BB, SM, BL, ML, RB, PY, PE, WT, ON)
-      const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, deal.asalGudang, warehouseFilter);
+      const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, deal.asalGudang, deal.sku, warehouseFilter);
 
       // Date filtering comparison on clean ISO YYYY-MM-DD
       let matchDate = true;
@@ -253,7 +260,7 @@ export function FinanceDashboard() {
 
     return inventoryItems.filter((item) => {
       // Warehouse filter
-      if (!matchWarehouseHub(item.warehouse, (item as any).asalGudang, warehouseFilter)) {
+      if (!matchWarehouseHub(item.warehouse, item.asalGudang, item.sku, warehouseFilter)) {
         return false;
       }
 

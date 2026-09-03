@@ -92,6 +92,7 @@ export interface InventorySummaryItem {
   inDate?: string;
   soldDate?: string;
   warehouse: string;
+  asalGudang?: string;
 }
 
 export async function getLiveClosingDealLedger(): Promise<{
