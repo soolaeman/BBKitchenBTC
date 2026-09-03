@@ -60,6 +60,7 @@ interface InventorySummaryItem {
   inDate?: string;
   soldDate?: string;
   warehouse: string;
+  asalGudang?: string;
 }
 
 export function FinanceDashboard() {
