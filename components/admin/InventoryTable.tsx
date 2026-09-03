@@ -693,8 +693,8 @@ export function InventoryTable() {
                       })()}
                     </td>
                   </tr>
-                ))
-              )}
+                );
+              })}
             </tbody>
           </table>
         </div>
