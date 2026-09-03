@@ -25,6 +25,26 @@ import {
   Copy,
 } from 'lucide-react';
 
+function formatTimestampWithYear(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const datePart = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+      const timePart = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(':', '.');
+      return `${datePart}, ${timePart}`;
+    }
+    // If string is already like "03 Sep, 16.14" -> insert current year: "03 Sep 2026, 16.14"
+    if (dateStr.includes(',') && !dateStr.includes('202')) {
+      const parts = dateStr.split(',');
+      return `${parts[0].trim()} ${new Date().getFullYear()}, ${parts[1].trim()}`;
+    }
+    return dateStr;
+  } catch {
+    return dateStr || '';
+  }
+}
+
 export function InventoryTable() {
   const { role, permissions } = useAuth();
 
@@ -582,7 +602,9 @@ export function InventoryTable() {
               ) : (
                 data.items.map((item) => {
                   const isActive = activeClickedSku === item.SKU;
-                  const lastCheckedTime = auditTimestamps[item.SKU];
+                  const isAudited = Boolean(auditTimestamps[item.SKU]);
+                  const rawTime = auditTimestamps[item.SKU] || item.TANGGAL_MASUK;
+                  const displayTime = rawTime ? formatTimestampWithYear(rawTime) : null;
 
                   return (
                     <tr
@@ -656,15 +678,17 @@ export function InventoryTable() {
                                 className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
                                   isActive
                                     ? 'bg-amber-500 text-slate-950 font-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.6)] scale-105'
+                                    : isAudited
+                                    ? 'bg-amber-950/40 text-amber-300 border-amber-800/80 hover:bg-amber-900/60'
                                     : 'bg-blue-950/60 text-blue-400 hover:text-blue-300 border-blue-800/80 hover:bg-blue-900/60'
                                 }`}
                               >
                                 <Send className="w-3 h-3" />
-                                <span>{isActive ? 'Sedang Dibuka' : 'Channel'}</span>
+                                <span>{isActive ? 'Sedang Dibuka' : isAudited ? 'Sudah Dibuka' : 'Channel'}</span>
                               </a>
-                              {lastCheckedTime && (
-                                <span className="text-[9px] font-mono text-slate-400 whitespace-nowrap">
-                                  🕒 {lastCheckedTime}
+                              {displayTime && (
+                                <span className="text-[9px] font-mono text-slate-400 whitespace-nowrap" title={isAudited ? 'Waktu diperiksa/dibuka' : 'Waktu posting Telegram'}>
+                                  🕒 {displayTime}
                                 </span>
                               )}
                             </div>
