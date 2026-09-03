@@ -68,6 +68,7 @@ export interface Invoice {
 export interface ClosingDealItem {
   sku: string;
   productTitle: string;
+  category?: string;
   tanggalMasuk?: string;
   tanggalTerjual?: string;
   durasiTerjual?: string | number;

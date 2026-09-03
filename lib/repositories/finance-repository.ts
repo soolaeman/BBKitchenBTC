@@ -153,6 +153,7 @@ export async function getLiveClosingDealLedger(): Promise<{
       return {
         sku: item.SKU,
         productTitle: item.PRODUCT_TITLE,
+        category: item.CATEGORY_NAME || item.CATEGORY_SLUG || '',
         tanggalMasuk: cleanInDate || item.TANGGAL_MASUK,
         tanggalTerjual: cleanSoldDate || undefined,
         durasiTerjual: `${agingNum} hari`,

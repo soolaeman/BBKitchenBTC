@@ -137,12 +137,57 @@ export function FinanceDashboard() {
     return false;
   };
 
-  // Helper to match Category
-  const matchCategory = (categoryNameOrSlug: string, filter: string) => {
+  // Helper to match Category across Parent Groups, Children Slugs & Aliases
+  const matchCategory = (itemTitle: string = '', itemCatSlugOrName: string = '', filter: string = 'ALL') => {
     if (!filter || filter === 'ALL') return true;
-    const cleanTarget = (categoryNameOrSlug || '').toLowerCase();
-    const cleanFilter = filter.toLowerCase();
-    return cleanTarget.includes(cleanFilter) || cleanFilter.includes(cleanTarget);
+
+    const cleanFilter = filter.toLowerCase().trim();
+    const cleanTitle = (itemTitle || '').toLowerCase();
+    const cleanCat = (itemCatSlugOrName || '').toLowerCase();
+
+    // Direct match check
+    if (cleanCat && (cleanCat === cleanFilter || cleanCat.includes(cleanFilter) || cleanFilter.includes(cleanCat))) {
+      return true;
+    }
+
+    // Find in OFFICIAL_CATEGORIES
+    const group = OFFICIAL_CATEGORIES.find(
+      (g) => g.name.toLowerCase() === cleanFilter || g.slug.toLowerCase() === cleanFilter
+    );
+
+    if (group) {
+      const validTokens = [
+        group.name.toLowerCase(),
+        group.slug.toLowerCase(),
+        group.slug.split('-')[0].toLowerCase(), // e.g. 'meja', 'sink', 'kompor', 'chiller', 'freezer', 'rak', 'hood', 'showcase'
+        ...group.children.map((c) => c.slug.toLowerCase()),
+        ...group.children.map((c) => c.name.toLowerCase()),
+      ];
+
+      // Add specific domain aliases
+      if (group.slug === 'kompor') {
+        validTokens.push('fryer', 'deep fryer', 'boiler', 'oven', 'kwali', 'wok', 'stove', 'grill', 'teppanyaki');
+      } else if (group.slug === 'hood-stainless') {
+        validTokens.push('exhaust', 'blower', 'ducting', 'hood');
+      } else if (group.slug === 'ice-system') {
+        validTokens.push('ice maker', 'ice bin', 'ice machine', 'es batu', 'es kristal');
+      } else if (group.slug === 'rak-stainless') {
+        validTokens.push('wallshelf', 'troli', 'trolley', 'shelf');
+      }
+
+      return validTokens.some((token) => {
+        if (!token) return false;
+        return cleanCat.includes(token) || token.includes(cleanCat) || cleanTitle.includes(token);
+      });
+    }
+
+    // Fallback: word token matching
+    const words = cleanFilter.split(/\s+/).filter((w) => w.length > 2 && w !== 'stainless' && w !== 'dan' && w !== '&');
+    if (words.length > 0) {
+      return words.some((w) => cleanCat.includes(w) || cleanTitle.includes(w));
+    }
+
+    return cleanTitle.includes(cleanFilter) || cleanCat.includes(cleanFilter);
   };
 
   // Dynamic Date Bounds for Active Period & Previous Period (For Growth Calculation)
@@ -228,8 +273,8 @@ export function FinanceDashboard() {
       // Warehouse filter
       const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, deal.asalGudang, deal.sku, warehouseFilter);
 
-      // Category filter (match on title / SKU notes)
-      const matchCat = categoryFilter === 'ALL' || matchCategory(deal.productTitle, categoryFilter);
+      // Category filter (match on title and category field)
+      const matchCat = categoryFilter === 'ALL' || matchCategory(deal.productTitle, deal.category, categoryFilter);
 
       // Date filtering comparison on clean ISO YYYY-MM-DD
       let matchDate = true;
@@ -255,7 +300,7 @@ export function FinanceDashboard() {
     return deals.filter((deal) => {
       const matchChannel = channelFilter === 'ALL' || deal.soldBy === channelFilter;
       const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, deal.asalGudang, deal.sku, warehouseFilter);
-      const matchCat = categoryFilter === 'ALL' || matchCategory(deal.productTitle, categoryFilter);
+      const matchCat = categoryFilter === 'ALL' || matchCategory(deal.productTitle, deal.category, categoryFilter);
 
       const dealDateStr = deal.tanggalTerjual ? deal.tanggalTerjual.split('T')[0] : '';
       if (!dealDateStr) return false;
@@ -272,7 +317,7 @@ export function FinanceDashboard() {
 
     return inventoryItems.filter((item) => {
       const matchWarehouse = matchWarehouseHub(item.warehouse, item.asalGudang, item.sku, warehouseFilter);
-      const matchCat = categoryFilter === 'ALL' || matchCategory(item.category, categoryFilter);
+      const matchCat = categoryFilter === 'ALL' || matchCategory(item.category, item.category, categoryFilter);
 
       if (!matchWarehouse || !matchCat) return false;
 
