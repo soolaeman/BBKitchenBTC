@@ -69,7 +69,7 @@ export function SalesHelperView() {
   const [docModalInvoice, setDocModalInvoice] = useState<Invoice | null>(null);
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
 
-  // Shared Audit Timestamps Tracker (Synced with Master Inventory via localStorage)
+  // Shared Audit Timestamps Tracker (Synced across Desktop <-> Mobile)
   const [auditTimestamps, setAuditTimestamps] = useState<Record<string, string>>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -80,9 +80,40 @@ export function SalesHelperView() {
     return {};
   });
 
+  // Cross-device synchronization for audit timestamps (Desktop <-> Mobile)
+  useEffect(() => {
+    async function syncTimestamps() {
+      try {
+        const res = await fetch('/api/audit-timestamps');
+        const data = await res.json();
+        if (data.timestamps && typeof data.timestamps === 'object') {
+          setAuditTimestamps((prev) => {
+            const merged = { ...data.timestamps, ...prev };
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('bbk_audit_timestamps', JSON.stringify(merged));
+            }
+            return merged;
+          });
+
+          // Push any local timestamps to server if missing
+          const localStored = localStorage.getItem('bbk_audit_timestamps');
+          if (localStored) {
+            const parsed = JSON.parse(localStored);
+            fetch('/api/audit-timestamps', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ batch: parsed }),
+            }).catch(() => {});
+          }
+        }
+      } catch {}
+    }
+    syncTimestamps();
+  }, []);
+
   const markSkuAsVisited = (sku: string) => {
     const now = new Date();
-    const timeStr = `${now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}, ${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+    const timeStr = `${now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}, ${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
 
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('bbk_last_active_sku', sku);
@@ -92,6 +123,13 @@ export function SalesHelperView() {
         return next;
       });
     }
+
+    // Sync to shared backend in background
+    fetch('/api/audit-timestamps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sku, timestamp: timeStr }),
+    }).catch(() => {});
   };
 
   // Set responsive pageSize on mount
