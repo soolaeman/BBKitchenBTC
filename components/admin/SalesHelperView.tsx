@@ -137,18 +137,30 @@ export function SalesHelperView() {
     fetchItems();
   };
 
-  // Mark as Sold Handler
+  // Mark as Sold Handler (Optimistic & Blazing Fast)
   const handleMarkAsSoldSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchedItem) return;
 
+    const targetSku = searchedItem.SKU;
+    const finalNotes = soldByOther
+      ? (soldNotesInput.trim() ? `[Terjual Pihak Ketiga/Gudang] ${soldNotesInput.trim()}` : 'Terjual Pihak Ketiga / Rekanan Gudang')
+      : (soldNotesInput.trim() || 'Deal via WhatsApp Sales');
+
+    const finalPrice = soldByOther ? 0 : (dealPriceInput ? Number(dealPriceInput) : (searchedItem.HARGA_DEAL_WA || searchedItem.HARGA_BUKA_WA || 0));
+
+    // 1. Optimistic Instant UI Feedback (0.05s)
+    setSoldSuccessMsg(`⚡ Unit ${targetSku} berhasil ditandai SOLD! Menyinkronkan ke Web & Google Sheets...`);
+    setShowSoldModal(false);
+    setDealPriceInput('');
+    setSoldNotesInput('');
+    setSoldByOther(false);
+
+    // Remove from local list immediately
+    setItems((prev) => prev.filter((i) => i.SKU !== targetSku));
+    setTotalItems((prev) => Math.max(0, prev - 1));
+
     try {
-      const finalNotes = soldByOther
-        ? (soldNotesInput.trim() ? `[Terjual Pihak Ketiga/Gudang] ${soldNotesInput.trim()}` : 'Terjual Pihak Ketiga / Rekanan Gudang (Harga Deal Tidak Diketahui)')
-        : (soldNotesInput.trim() || 'Deal via WhatsApp Sales');
-
-      const finalPrice = soldByOther ? 0 : (dealPriceInput ? Number(dealPriceInput) : (searchedItem.HARGA_DEAL_WA || searchedItem.HARGA_BUKA_WA || 0));
-
       const res = await fetch('/api/inventory', {
         method: 'POST',
         headers: {
@@ -157,7 +169,7 @@ export function SalesHelperView() {
         },
         body: JSON.stringify({
           action: 'MARK_AS_SOLD',
-          sku: searchedItem.SKU,
+          sku: targetSku,
           dealPrice: finalPrice,
           notes: finalNotes,
         }),
@@ -165,18 +177,16 @@ export function SalesHelperView() {
 
       const resJson = await res.json();
       if (res.ok) {
-        setSoldSuccessMsg(`Unit ${searchedItem.SKU} berhasil ditandai TERJUAL (SOLD).`);
-        setShowSoldModal(false);
-        setDealPriceInput('');
-        setSoldNotesInput('');
-        setSoldByOther(false);
+        setSoldSuccessMsg(`✓ Unit ${targetSku} 100% Selesai Ditandai Terjual (SOLD) di Web & Database.`);
         fetchItems();
         setTimeout(() => setSoldSuccessMsg(''), 4000);
       } else {
-        alert(resJson.error || 'Gagal menandai unit sebagai terjual');
+        alert(resJson.error || 'Gagal menyinkronkan status terjual');
+        fetchItems();
       }
     } catch (err) {
       console.error('Error marking as sold in SalesHelper', err);
+      fetchItems();
     }
   };
 

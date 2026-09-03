@@ -126,13 +126,29 @@ export function InventoryTable() {
     e.preventDefault();
     if (!soldModalItem) return;
 
+    const targetSku = soldModalItem.SKU;
+    const finalNotes = soldByOther
+      ? (soldNotesInput.trim() ? `[Terjual Pihak Ketiga/Orang Lain] ${soldNotesInput.trim()}` : 'Terjual Pihak Ketiga / Rekanan Gudang')
+      : soldNotesInput.trim();
+
+    const finalPrice = soldByOther ? 0 : (dealPriceInput ? Number(dealPriceInput) : soldModalItem.HARGA_BUKA_WA);
+
+    // 1. Optimistic Instant UI Feedback (0.05s)
+    setActionSuccessMsg(`⚡ Unit ${targetSku} berhasil ditandai SOLD! Menyinkronkan ke Web & Google Sheets...`);
+    setSoldModalItem(null);
+    setDealPriceInput('');
+    setSoldNotesInput('');
+    setSoldByOther(false);
+
+    // Update local table state immediately
+    if (data?.items) {
+      setData((prev) => prev ? {
+        ...prev,
+        items: prev.items.map((i) => i.SKU === targetSku ? { ...i, STATUS_UNIT: 'SOLD' as const } : i),
+      } : null);
+    }
+
     try {
-      const finalNotes = soldByOther
-        ? (soldNotesInput.trim() ? `[Terjual Pihak Ketiga/Orang Lain] ${soldNotesInput.trim()}` : 'Terjual Pihak Ketiga / Rekanan Gudang (Harga Deal Tidak Diketahui)')
-        : soldNotesInput.trim();
-
-      const finalPrice = soldByOther ? 0 : (dealPriceInput ? Number(dealPriceInput) : soldModalItem.HARGA_BUKA_WA);
-
       const res = await fetch('/api/inventory', {
         method: 'POST',
         headers: {
@@ -141,7 +157,7 @@ export function InventoryTable() {
         },
         body: JSON.stringify({
           action: 'MARK_AS_SOLD',
-          sku: soldModalItem.SKU,
+          sku: targetSku,
           dealPrice: finalPrice,
           notes: finalNotes,
         }),
@@ -149,18 +165,16 @@ export function InventoryTable() {
 
       const resJson = await res.json();
       if (res.ok) {
-        setActionSuccessMsg(`Unit ${soldModalItem.SKU} berhasil ditandai SOLD.`);
-        setSoldModalItem(null);
-        setDealPriceInput('');
-        setSoldNotesInput('');
-        setSoldByOther(false);
+        setActionSuccessMsg(`✓ Unit ${targetSku} 100% Selesai Ditandai SOLD di Web & Database.`);
         fetchInventory();
         setTimeout(() => setActionSuccessMsg(''), 4000);
       } else {
         alert(resJson.error || 'Failed to mark unit as sold');
+        fetchInventory();
       }
     } catch (err) {
       console.error('Error marking as sold', err);
+      fetchInventory();
     }
   };
 
