@@ -63,6 +63,31 @@ export function SalesHelperView() {
   const [docModalInvoice, setDocModalInvoice] = useState<Invoice | null>(null);
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
 
+  // Shared Audit Timestamps Tracker (Synced with Master Inventory via localStorage)
+  const [auditTimestamps, setAuditTimestamps] = useState<Record<string, string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('bbk_audit_timestamps');
+        if (stored) return JSON.parse(stored);
+      } catch {}
+    }
+    return {};
+  });
+
+  const markSkuAsVisited = (sku: string) => {
+    const now = new Date();
+    const timeStr = `${now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}, ${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('bbk_last_active_sku', sku);
+      setAuditTimestamps((prev) => {
+        const next = { ...prev, [sku]: timeStr };
+        localStorage.setItem('bbk_audit_timestamps', JSON.stringify(next));
+        return next;
+      });
+    }
+  };
+
   // Set responsive pageSize on mount
   useEffect(() => {
     const handleResize = () => {
@@ -497,6 +522,12 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                   <MapPin className="w-3 h-3 text-slate-500" />
                   <span>{searchedItem.LOKASI_UNIT}</span>
                 </div>
+                {auditTimestamps[searchedItem.SKU] && (
+                  <div className="text-[10px] font-mono text-emerald-400/90 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-lg inline-flex items-center gap-1 mt-1">
+                    <span>🕒 Terakhir Dicek:</span>
+                    <strong>{auditTimestamps[searchedItem.SKU]}</strong>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -507,6 +538,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                   href={searchedItem.LINK_TELEGRAM}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => markSkuAsVisited(searchedItem.SKU)}
                   className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-blue-950/80 hover:bg-blue-900 text-blue-300 border border-blue-800 text-xs font-bold transition-colors text-center"
                   title="Verifikasi langsung di grup Telegram gudang"
                 >
