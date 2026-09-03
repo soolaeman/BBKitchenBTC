@@ -123,10 +123,10 @@ export async function getLiveClosingDealLedger(): Promise<{
     const deals: ClosingDealItem[] = soldItems.map((item) => {
       const modal = item.HARGA_MODAL || 0;
       
-      // Strict rule: BBKitchen closing ONLY if HARGA_CLOSING (Column AG) is explicitly populated > 0
+      // BBKitchen closing if HARGA_CLOSING (Column AG) is explicitly populated > 0, otherwise third party uses modal as closing value
       const hasExplicitClosing = typeof item.HARGA_CLOSING === 'number' && item.HARGA_CLOSING > 0;
       const isThirdParty = !hasExplicitClosing;
-      const closing = hasExplicitClosing ? item.HARGA_CLOSING! : 0;
+      const closing = hasExplicitClosing ? item.HARGA_CLOSING! : modal;
       const realizedProfit = hasExplicitClosing ? Math.max(0, closing - modal) : 0;
       const marginPercent = (hasExplicitClosing && closing > 0 && modal > 0)
         ? Math.round(((closing - modal) / closing) * 100)
@@ -136,9 +136,9 @@ export async function getLiveClosingDealLedger(): Promise<{
         thirdPartyCount++;
       } else {
         bbkSalesCount++;
-        totalRevenue += closing;
-        totalProfit += realizedProfit;
       }
+      totalRevenue += closing;
+      totalProfit += realizedProfit;
 
       // Convert serial date or raw string to ISO YYYY-MM-DD
       const cleanSoldDate = parseToISODate(item.TANGGAL_TERJUAL);

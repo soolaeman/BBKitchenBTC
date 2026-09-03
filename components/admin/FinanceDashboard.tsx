@@ -297,11 +297,13 @@ export function FinanceDashboard() {
     let totalCogs = 0;
 
     filteredDeals.forEach((d) => {
+      const closingVal = d.hargaClosing > 0 ? d.hargaClosing : (d.hargaModal || 0);
+      revenue += closingVal;
+      totalCogs += d.hargaModal || (d.hargaClosing - d.realizedProfit);
+      profit += d.realizedProfit || 0;
+
       if (d.soldBy === 'SALES_BBK') {
         bbkSalesCount++;
-        revenue += d.hargaClosing;
-        profit += d.realizedProfit;
-        totalCogs += d.hargaModal || (d.hargaClosing - d.realizedProfit);
       } else {
         thirdPartyCount++;
       }
@@ -330,10 +332,9 @@ export function FinanceDashboard() {
     let prevDealsCount = 0;
 
     previousDeals.forEach((d) => {
-      if (d.soldBy === 'SALES_BBK') {
-        prevRevenue += d.hargaClosing;
-        prevProfit += d.realizedProfit;
-      }
+      const closingVal = d.hargaClosing > 0 ? d.hargaClosing : (d.hargaModal || 0);
+      prevRevenue += closingVal;
+      prevProfit += d.realizedProfit || 0;
       prevDealsCount++;
     });
 
@@ -383,10 +384,9 @@ export function FinanceDashboard() {
       const bucket = timelineMap.get(dateStr)!;
       bucket.closing++;
       bucket.units++;
-      if (deal.soldBy === 'SALES_BBK') {
-        bucket.revenue += deal.hargaClosing;
-        bucket.profit += deal.realizedProfit;
-      }
+      const closingVal = deal.hargaClosing > 0 ? deal.hargaClosing : (deal.hargaModal || 0);
+      bucket.revenue += closingVal;
+      bucket.profit += deal.realizedProfit || 0;
     });
 
     return Array.from(timelineMap.values()).sort((a, b) => a.date.localeCompare(b.date));
@@ -420,11 +420,10 @@ export function FinanceDashboard() {
       }
       const entry = map.get(cat)!;
       entry.unitsSold++;
-      if (deal.soldBy === 'SALES_BBK') {
-        entry.revenueSum += deal.hargaClosing;
-        entry.cogsSum += deal.hargaModal;
-        entry.profitSum += deal.realizedProfit;
-      }
+      const closingVal = deal.hargaClosing > 0 ? deal.hargaClosing : (deal.hargaModal || 0);
+      entry.revenueSum += closingVal;
+      entry.cogsSum += deal.hargaModal || 0;
+      entry.profitSum += deal.realizedProfit || 0;
     });
 
     // Aggregate ready supply from inventory
@@ -1478,7 +1477,7 @@ export function FinanceDashboard() {
                       {deal.hargaModal > 0 ? formatIDR(deal.hargaModal) : '-'}
                     </td>
                     <td className="py-3 px-3.5 text-right font-mono font-bold text-amber-400">
-                      {deal.hargaClosing > 0 ? formatIDR(deal.hargaClosing) : 'Rekanan Gudang'}
+                      {deal.hargaClosing > 0 ? formatIDR(deal.hargaClosing) : (deal.hargaModal > 0 ? formatIDR(deal.hargaModal) : '-')}
                     </td>
                     <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-400">
                       {deal.realizedProfit > 0 ? (
