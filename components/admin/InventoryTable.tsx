@@ -287,20 +287,48 @@ export function InventoryTable() {
       {/* Filter Bar */}
       <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
+          {/* Search Input with Enter key and Clear support */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setPage(1);
+              fetchInventory();
+            }}
+            className="relative flex items-center"
+          >
+            <Search className="w-4 h-4 absolute left-3 text-slate-500 pointer-events-none" />
             <input
               type="text"
-              placeholder="Cari SKU, merk, atau nama mesin..."
+              placeholder="Cari SKU, merk, nama mesin... (Tekan Enter)"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="w-full pl-9 pr-16 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
-          </div>
+            <div className="absolute right-1.5 flex items-center gap-1">
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('');
+                    setPage(1);
+                  }}
+                  className="p-1 text-slate-500 hover:text-slate-200 text-xs rounded"
+                  title="Hapus Pencarian"
+                >
+                  ✕
+                </button>
+              )}
+              <button
+                type="submit"
+                className="px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-[10px] font-bold transition-colors"
+              >
+                Cari
+              </button>
+            </div>
+          </form>
 
           {/* Category Filter */}
           <div>

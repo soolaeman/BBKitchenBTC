@@ -133,10 +133,15 @@ export function SalesHelperView() {
         setTotalItems(data.total || 0);
         setTotalPages(data.totalPages || 1);
 
-        // Keep current selected item if still in list, else pick first
+        // If searching, prioritize exact SKU or title match
         if (data.items.length > 0) {
+          const q = searchQuery.trim().toLowerCase();
+          const exactMatch = q ? data.items.find((i) => i.SKU.toLowerCase() === q || i.SKU.toLowerCase().replace(/\D/g, '') === q.replace(/\D/g, '')) : null;
           const found = data.items.find((i) => i.SKU === searchedItem?.SKU);
-          if (found) {
+
+          if (exactMatch) {
+            selectItem(exactMatch);
+          } else if (found) {
             selectItem(found);
           } else {
             selectItem(data.items[0]);
@@ -321,15 +326,28 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
       <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-xl space-y-3">
         <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-3">
           {/* Keyword Search */}
-          <div className="md:col-span-6 relative">
-            <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-500" />
+          <div className="md:col-span-6 relative flex items-center">
+            <Search className="w-4 h-4 absolute left-3 text-slate-500 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama alat dapur (contoh: kwali range, deep fryer, meja, chiller, SKU)..."
-              className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              placeholder="Cari SKU atau nama alat... (Contoh: BBK2731, Chiller, Kwali) - Tekan Enter"
+              className="w-full pl-9 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setPage(1);
+                }}
+                className="absolute right-3 p-1 text-slate-500 hover:text-slate-200 text-xs rounded"
+                title="Hapus Pencarian"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {/* Category Filter */}
@@ -380,12 +398,12 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             </select>
           </div>
 
-          {/* Submit Search */}
+          {/* Search Button */}
           <div className="md:col-span-1">
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-600/20 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+              className="w-full h-full min-h-[38px] px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-1 disabled:opacity-50"
             >
               <Search className="w-3.5 h-3.5" />
               <span>{isLoading ? '...' : 'Cari'}</span>
