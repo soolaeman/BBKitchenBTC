@@ -57,6 +57,8 @@ export interface Invoice {
   driverPhone?: string;
   deliveryVehiclePlate?: string;
   deliveryExpedition?: string;
+  shippingFeeType?: 'INCLUDED' | 'BUYER_COD' | 'FREE_PROMO';
+  shippingFee?: number;
   
   salesPic?: string;
   pdfUrl?: string;

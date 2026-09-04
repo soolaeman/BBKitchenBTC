@@ -82,6 +82,8 @@ export function InvoiceManager() {
   const [discount, setDiscount] = useState<string>('0');
   const [dpAmount, setDpAmount] = useState<string>('0');
   const [paymentMethod, setPaymentMethod] = useState<'TRANSFER_BCA' | 'TRANSFER_MANDIRI' | 'CASH_PICKUP'>('TRANSFER_BCA');
+  const [shippingFeeType, setShippingFeeType] = useState<'BUYER_COD' | 'INCLUDED' | 'FREE_PROMO'>('BUYER_COD');
+  const [shippingFee, setShippingFee] = useState<string>('0');
 
   // Logistics / Driver States
   const [expeditionChoice, setExpeditionChoice] = useState<string>('LALAMOVE');
@@ -112,11 +114,11 @@ export function InvoiceManager() {
   }, [loadInvoices]);
 
   // Handle Multi-Item Operations
-  const addItemRow = () => {
+  const addItemRow = (customSku: string = '', customTitle: string = '') => {
     const newId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
     setItemRows((prev) => [
       ...prev,
-      { id: newId, sku: '', description: '', quantity: 1, unitPrice: 0 },
+      { id: newId, sku: customSku, description: customTitle, quantity: 1, unitPrice: 0 },
     ]);
   };
 
@@ -191,7 +193,8 @@ export function InvoiceManager() {
   }, [itemRows]);
 
   const discNum = Number(discount.replace(/\D/g, '')) || 0;
-  const calculatedTotal = Math.max(0, calculatedSubtotal - discNum);
+  const shippingNum = shippingFeeType === 'INCLUDED' ? (Number(shippingFee.replace(/\D/g, '')) || 0) : 0;
+  const calculatedTotal = Math.max(0, calculatedSubtotal + shippingNum - discNum);
   const dpNum = Number(dpAmount.replace(/\D/g, '')) || 0;
   const calculatedSisa = Math.max(0, calculatedTotal - dpNum);
 
@@ -252,6 +255,8 @@ export function InvoiceManager() {
       driverPhone: driverPhone.trim() || undefined,
       deliveryVehiclePlate: vehiclePlate.trim() || undefined,
       deliveryExpedition: resolvedExpedition,
+      shippingFeeType,
+      shippingFee: shippingNum,
       notes: notes.trim(),
       createdBy: 'Sales / Finance Desk',
     };
@@ -625,18 +630,29 @@ export function InvoiceManager() {
 
               {/* 3. MULTI-UNIT ITEMS BUILDER WITH AUTO-SEARCH */}
               <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-bold text-slate-300 uppercase tracking-wider text-[10px]">
-                    📦 Daftar Unit Barang ({itemRows.length} Unit)
+                    📦 Daftar Unit Barang & Jasa ({itemRows.length} Baris)
                   </span>
-                  <button
-                    type="button"
-                    onClick={addItemRow}
-                    className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg font-bold text-[11px] border border-amber-500/30 flex items-center gap-1 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Tambah Baris Unit</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => addItemRow('', '')}
+                      className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg font-bold text-[11px] border border-amber-500/30 flex items-center gap-1 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Tambah Unit Mesin (SKU)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addItemRow('BIAYA-JASA', 'Ongkos Kirim Armada / Jasa Testing Pemasangan')}
+                      className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg font-bold text-[11px] border border-cyan-500/30 flex items-center gap-1 transition-colors"
+                      title="Tambah Biaya Ongkir, Packing Kayu, atau Jasa Teknisi"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Tambah Jasa / Custom</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -646,7 +662,9 @@ export function InvoiceManager() {
                       className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-2 relative"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-400">Unit #{index + 1}</span>
+                        <span className="text-[11px] font-bold text-slate-400">
+                          {row.sku === 'BIAYA-JASA' ? '🛠️ Biaya / Jasa #' : 'Unit Mesin #'}{index + 1}
+                        </span>
                         {itemRows.length > 1 && (
                           <button
                             type="button"
@@ -663,12 +681,12 @@ export function InvoiceManager() {
                         {/* SKU Search Input */}
                         <div className="sm:col-span-3 relative">
                           <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
-                            Kode SKU (Auto Search) *
+                            Kode SKU / Tag *
                           </label>
                           <input
                             type="text"
                             required
-                            placeholder="Ketik BBK..."
+                            placeholder="Ketik BBK / JASA..."
                             value={row.sku}
                             onChange={(e) => handleSearchSku(row.id, e.target.value.toUpperCase())}
                             onFocus={() => {
@@ -707,12 +725,12 @@ export function InvoiceManager() {
                         {/* Product Title Input */}
                         <div className={`${formDocType === 'DELIVERY_NOTE' ? 'sm:col-span-7' : 'sm:col-span-5'}`}>
                           <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
-                            Nama Produk & Spesifikasi *
+                            Nama Produk & Spesifikasi / Uraian Biaya *
                           </label>
                           <input
                             type="text"
                             required
-                            placeholder="Deskripsi nama produk..."
+                            placeholder="Deskripsi nama produk / uraian jasa..."
                             value={row.description}
                             onChange={(e) => updateItemRow(row.id, 'description', e.target.value)}
                             className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 text-xs focus:ring-1 focus:ring-amber-500"
@@ -756,37 +774,109 @@ export function InvoiceManager() {
                 </div>
               </div>
 
-              {/* 4. FINANCIAL TOTALS (HIDDEN FOR SURAT JALAN!) */}
+              {/* 4. FINANCIAL TOTALS & ONGKIR (HIDDEN FOR SURAT JALAN!) */}
               {formDocType !== 'DELIVERY_NOTE' ? (
-                <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-3">
+                <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-4">
                   <span className="font-bold text-slate-300 uppercase tracking-wider text-[10px] block">
-                    💰 Rincian Nilai Finansial
+                    💰 Rincian Nilai Finansial & Opsi Ongkir
                   </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+                  {/* Skema Ongkos Kirim Selector */}
+                  <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-2">
+                    <label className="block text-slate-300 font-bold text-xs">
+                      🚚 Ketentuan Ongkos Kirim (Shipping Fee):
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShippingFeeType('BUYER_COD')}
+                        className={`p-2.5 rounded-xl text-left border text-xs transition-all ${
+                          shippingFeeType === 'BUYER_COD'
+                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <div className="font-bold">🚚 Bayar Sendiri / COD</div>
+                        <div className="text-[10px] opacity-80 mt-0.5">Ditanggung pembeli bayar ke kurir (Tidak masuk tagihan)</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShippingFeeType('INCLUDED')}
+                        className={`p-2.5 rounded-xl text-left border text-xs transition-all ${
+                          shippingFeeType === 'INCLUDED'
+                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <div className="font-bold">🧾 Include di Tagihan</div>
+                        <div className="text-[10px] opacity-80 mt-0.5">Ditambahkan langsung ke total Invoice</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShippingFeeType('FREE_PROMO')}
+                        className={`p-2.5 rounded-xl text-left border text-xs transition-all ${
+                          shippingFeeType === 'FREE_PROMO'
+                            ? 'bg-blue-500/20 border-blue-500 text-blue-300 font-bold'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <div className="font-bold">🎁 Free Ongkir Promo</div>
+                        <div className="text-[10px] opacity-80 mt-0.5">Gratis subsidi ongkir dari BBKitchen</div>
+                      </button>
+                    </div>
+
+                    {shippingFeeType === 'INCLUDED' && (
+                      <div className="pt-2">
+                        <label className="block text-[11px] text-emerald-400 font-semibold mb-1">
+                          Nominal Ongkir yang Ditagihkan ke Pembeli (Rp):
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="Contoh: 250000"
+                          value={shippingFee}
+                          onChange={(e) => setShippingFee(e.target.value)}
+                          className="w-full sm:w-1/2 px-3 py-2 bg-slate-950 border border-emerald-500/50 rounded-xl text-emerald-400 font-mono font-bold text-xs focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-slate-400 font-semibold mb-1">
-                        Subtotal Unit (Otomatis):
+                      <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
+                        Subtotal Unit:
                       </label>
-                      <div className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 font-mono font-bold">
+                      <div className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 font-mono font-bold text-xs">
                         {formatIDR(calculatedSubtotal)}
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-slate-400 font-semibold mb-1">
-                        Diskon Kesepakatan (Rp):
+                      <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
+                        Ongkos Kirim (Include):
+                      </label>
+                      <div className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-xs">
+                        {shippingFeeType === 'INCLUDED' ? `+ ${formatIDR(shippingNum)}` : 'Rp 0'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
+                        Diskon Kesepakatan:
                       </label>
                       <input
                         type="number"
                         placeholder="0"
                         value={discount}
                         onChange={(e) => setDiscount(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-rose-400 font-mono font-bold focus:ring-1 focus:ring-amber-500"
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-rose-400 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-400 font-semibold mb-1">
+                      <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
                         Total Tagihan Akhir:
                       </label>
                       <div className="px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-xl text-amber-400 font-mono font-black text-sm">
@@ -797,7 +887,7 @@ export function InvoiceManager() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
                     <div>
-                      <label className="block text-slate-400 font-semibold mb-1">
+                      <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
                         DP Diterima (Rp) <span className="text-[10px] text-slate-500 font-normal">(Kosongkan jika belum DP / Isi full jika Lunas)</span>:
                       </label>
                       <input
@@ -806,18 +896,18 @@ export function InvoiceManager() {
                         value={formDocType === 'RECEIPT' ? calculatedTotal : dpAmount}
                         disabled={formDocType === 'RECEIPT'}
                         onChange={(e) => setDpAmount(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold focus:ring-1 focus:ring-amber-500"
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-400 font-semibold mb-1">
+                      <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
                         Metode Pembayaran Rekening:
                       </label>
                       <select
                         value={paymentMethod}
                         onChange={(e) => setPaymentMethod(e.target.value as any)}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-semibold"
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-semibold text-xs"
                       >
                         <option value="TRANSFER_BCA">BCA (883-129-4821 - Soolaeman)</option>
                         <option value="TRANSFER_MANDIRI">Mandiri (164-00-049281-2 - BBKitchen)</option>

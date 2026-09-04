@@ -132,6 +132,15 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
     else if (activeType === 'RECEIPT') titleText = `🧾 *KUITANSI PEMBAYARAN LUNAS*\nNo: *${docNumber}*`;
     else titleText = `📋 *SURAT PENAWARAN HARGA (QUOTATION)*\nNo: *${docNumber}*`;
 
+    let shippingTextWA = '';
+    if (invoice.shippingFeeType === 'INCLUDED' && (invoice.shippingFee || 0) > 0) {
+      shippingTextWA = `\n🚚 *Ongkos Kirim (Include):* ${formatIDR(invoice.shippingFee || 0)}`;
+    } else if (invoice.shippingFeeType === 'BUYER_COD') {
+      shippingTextWA = `\n🚚 *Ongkos Kirim:* Ditanggung Pembeli (Bayar COD ke Driver saat tiba)`;
+    } else if (invoice.shippingFeeType === 'FREE_PROMO') {
+      shippingTextWA = `\n🚚 *Ongkos Kirim:* Free Ongkir Promo BBKitchen (Gratis)`;
+    }
+
     return `Halo Kak *${invoice.customerName}*! 🙏
 Berikut kami lampirkan dokumen transaksi resmi dari *Bukan Baru Kitchen (BBKitchen)*:
 
@@ -140,7 +149,8 @@ Tanggal: ${todayFormatted}
 
 📌 *Rincian Unit:*
 ${itemsList}
-
+${shippingTextWA}
+${discount > 0 ? `🏷️ *Diskon:* -${formatIDR(discount)}\n` : ''}
 💰 *Total Transaksi:* ${formatIDR(total)}
 ${dp > 0 && dp < total ? `• DP Dibayarkan: ${formatIDR(dp)}\n• Sisa Pelunasan: *${formatIDR(sisa)}*` : ''}
 ${activeType === 'RECEIPT' ? `✅ *STATUS: LUNAS BERSIH*` : ''}
@@ -477,9 +487,27 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
               {/* Numbers Summary */}
               <div className="space-y-1.5 text-xs text-slate-700">
                 <div className="flex justify-between py-1 border-b border-slate-200">
-                  <span>Subtotal Produk:</span>
+                  <span>Subtotal Unit / Produk:</span>
                   <span className="font-mono font-bold">{formatIDR(subtotal)}</span>
                 </div>
+                {invoice.shippingFeeType === 'INCLUDED' && (invoice.shippingFee || 0) > 0 && (
+                  <div className="flex justify-between py-1 border-b border-slate-200 text-emerald-700">
+                    <span>Ongkos Kirim (Include Tagihan):</span>
+                    <span className="font-mono font-bold">+ {formatIDR(invoice.shippingFee || 0)}</span>
+                  </div>
+                )}
+                {invoice.shippingFeeType === 'BUYER_COD' && (
+                  <div className="flex justify-between py-1 border-b border-slate-200 text-[11px] text-amber-700 bg-amber-50/50 px-1 rounded">
+                    <span>Ongkir (COD ke Kurir):</span>
+                    <span className="italic font-medium">Ditanggung Pembeli</span>
+                  </div>
+                )}
+                {invoice.shippingFeeType === 'FREE_PROMO' && (
+                  <div className="flex justify-between py-1 border-b border-slate-200 text-[11px] text-blue-700 bg-blue-50/50 px-1 rounded">
+                    <span>Ongkir BBKitchen:</span>
+                    <span className="font-bold uppercase">Free Ongkir Promo</span>
+                  </div>
+                )}
                 {discount > 0 && (
                   <div className="flex justify-between py-1 border-b border-slate-200 text-emerald-600">
                     <span>Diskon Kesepakatan:</span>
