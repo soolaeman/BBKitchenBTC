@@ -29,6 +29,53 @@ import {
 import { OfficialDocumentModal } from './OfficialDocumentModal';
 import { Invoice } from '@/lib/types/finance';
 
+function formatTimestampWithYear(raw?: any): string {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  if (!str) return '';
+
+  try {
+    let d: Date | null = null;
+
+    // 1. Numeric Excel / Sheets serial date (e.g. 46267.61398148148)
+    const num = Number(str);
+    if (!isNaN(num) && num > 30000 && num < 60000) {
+      const ms = Math.round((num - 25569) * 86400 * 1000);
+      d = new Date(ms);
+    } else if (str.includes('-') || str.includes('/') || str.includes('T')) {
+      const parsed = new Date(str.replace(' ', 'T'));
+      if (!isNaN(parsed.getTime())) {
+        d = parsed;
+      }
+    }
+
+    if (d && !isNaN(d.getTime())) {
+      const datePart = d.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Jakarta',
+      });
+      const timePart = d.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Jakarta',
+      }).replace(':', '.');
+      return `${datePart}, ${timePart}`;
+    }
+
+    // 2. Formatted string like "03 Sep, 16.14" (missing year)
+    if (str.includes(',') && !str.match(/\d{4}/)) {
+      const parts = str.split(',');
+      return `${parts[0].trim()} ${new Date().getFullYear()}, ${parts[1].trim()}`;
+    }
+
+    return str;
+  } catch {
+    return str;
+  }
+}
+
 export function SalesHelperView() {
   const { role, permissions } = useAuth();
   
@@ -80,6 +127,14 @@ export function SalesHelperView() {
     return {};
   });
 
+  const selectItem = useCallback((item: MasterInventoryItem, syncGlobal: boolean = true) => {
+    setSearchedItem(item);
+    setQuotePrice(item.HARGA_BUKA_WA || item.HARGA_ESTIMASI_PUBLIK || '');
+    if (syncGlobal) {
+      markSkuAsVisited(item.SKU);
+    }
+  }, []);
+
   // Cross-device synchronization for audit timestamps & active row (Desktop <-> Mobile)
   useEffect(() => {
     async function syncTimestamps() {
@@ -95,6 +150,33 @@ export function SalesHelperView() {
             return merged;
           });
         }
+        if (data.activeSku) {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('bbk_last_active_sku', data.activeSku);
+          }
+          // If searchedItem is not set yet or different from activeSku, auto-load it
+          setSearchedItem((current) => {
+            if (current?.SKU === data.activeSku) return current;
+            // Try finding in current items
+            const found = items.find((i) => i.SKU === data.activeSku);
+            if (found) {
+              setQuotePrice(found.HARGA_BUKA_WA || found.HARGA_ESTIMASI_PUBLIK || '');
+              return found;
+            }
+            // Otherwise fetch the specific item
+            fetch(`/api/inventory?search=${data.activeSku}&pageSize=1`)
+              .then((r) => r.json())
+              .then((resData) => {
+                if (resData.items && resData.items.length > 0) {
+                  const it = resData.items[0];
+                  setSearchedItem(it);
+                  setQuotePrice(it.HARGA_BUKA_WA || it.HARGA_ESTIMASI_PUBLIK || '');
+                }
+              })
+              .catch(() => {});
+            return current;
+          });
+        }
       } catch {}
     }
 
@@ -105,7 +187,7 @@ export function SalesHelperView() {
       clearInterval(interval);
       window.removeEventListener('focus', syncTimestamps);
     };
-  }, []);
+  }, [items]);
 
   const markSkuAsVisited = (sku: string) => {
     const now = new Date();
@@ -143,11 +225,6 @@ export function SalesHelperView() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  const selectItem = (item: MasterInventoryItem) => {
-    setSearchedItem(item);
-    setQuotePrice(item.HARGA_BUKA_WA || item.HARGA_ESTIMASI_PUBLIK || '');
-  };
 
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
 
@@ -546,42 +623,54 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
-              {items.map((item) => (
-                <button
-                  key={item.SKU}
-                  type="button"
-                  onClick={() => selectItem(item)}
-                  className={`p-2 rounded-xl border text-left transition-all relative group ${
-                    searchedItem?.SKU === item.SKU
-                      ? 'bg-emerald-950/90 border-emerald-500 ring-2 ring-emerald-500/40 shadow-xl'
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="relative aspect-square w-full rounded-lg bg-slate-900 overflow-hidden mb-1.5">
-                    {item.FEATURED_IMAGE ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={item.FEATURED_IMAGE}
-                        alt={item.PRODUCT_TITLE}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-600">
-                        No Pic
+              {items.map((item) => {
+                const isSelected = searchedItem?.SKU === item.SKU;
+                const rawTime = auditTimestamps[item.SKU] || item.TANGGAL_MASUK;
+                const displayTime = rawTime ? formatTimestampWithYear(rawTime) : null;
+
+                return (
+                  <button
+                    key={item.SKU}
+                    type="button"
+                    onClick={() => selectItem(item)}
+                    className={`p-2 rounded-xl border text-left transition-all relative group ${
+                      isSelected
+                        ? 'bg-emerald-950/90 border-emerald-500 ring-2 ring-emerald-500/40 shadow-xl'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="relative aspect-square w-full rounded-lg bg-slate-900 overflow-hidden mb-1.5">
+                      {item.FEATURED_IMAGE ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={item.FEATURED_IMAGE}
+                          alt={item.PRODUCT_TITLE}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-600">
+                          No Pic
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono font-bold text-amber-400 truncate">{item.SKU}</span>
+                      <span className="text-[9px] font-mono text-slate-400 px-1 py-0.2 bg-slate-900 rounded">{item.asal_gudang}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-300 truncate leading-tight mt-0.5">{item.PRODUCT_TITLE}</div>
+                    <div className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">
+                      {item.HARGA_BUKA_WA ? formatIDR(item.HARGA_BUKA_WA) : 'Tanya Harga'}
+                    </div>
+                    {displayTime && (
+                      <div className="text-[9px] text-slate-400 font-mono mt-0.5 truncate" title="Waktu posting / audit">
+                        🕒 {displayTime}
                       </div>
                     )}
-                  </div>
-                  <div className="text-[11px] font-mono font-bold text-amber-400 truncate">{item.SKU}</div>
-                  <div className="text-[10px] text-slate-300 truncate leading-tight mt-0.5">{item.PRODUCT_TITLE}</div>
-                  <div className="text-[10px] text-emerald-400 font-mono mt-1">
-                    {item.HARGA_BUKA_WA ? formatIDR(item.HARGA_BUKA_WA) : 'Tanya Harga'}
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                );
+              })}
 
             {/* Pagination Controls (Bottom) */}
             {totalPages > 1 && (
