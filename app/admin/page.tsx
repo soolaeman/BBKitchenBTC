@@ -10,6 +10,7 @@ import { InventoryTable } from '@/components/admin/InventoryTable';
 import { PipelineMonitor } from '@/components/admin/PipelineMonitor';
 import { InvoiceManager } from '@/components/admin/InvoiceManager';
 import { FinanceDashboard } from '@/components/admin/FinanceDashboard';
+import { CashflowFinanceView } from '@/components/admin/CashflowFinanceView';
 import { WarehouseIntelligence } from '@/components/admin/WarehouseIntelligence';
 import { SEOQualityControl } from '@/components/admin/SEOQualityControl';
 import { SocialMediaCenter } from '@/components/admin/SocialMediaCenter';
@@ -33,6 +34,7 @@ import {
   CheckCircle2,
   Sparkles,
   ChevronDown,
+  Wallet,
 } from 'lucide-react';
 
 type AdminTab =
@@ -82,8 +84,9 @@ export default function AdminPage() {
   }[] = [
     {
       id: 'OVERVIEW',
-      label: 'Executive Overview',
-      icon: <LayoutDashboard className="w-4 h-4" />,
+      label: '👑 Executive Overview',
+      icon: <TrendingUp className="w-4 h-4 text-emerald-400" />,
+      badge: 'CEO & Investor',
       allowed: true,
     },
     {
@@ -116,9 +119,9 @@ export default function AdminPage() {
     },
     {
       id: 'FINANCE',
-      label: '💰 Financials & Deal Ledger',
-      icon: <TrendingUp className="w-4 h-4 text-emerald-400" />,
-      badge: 'Ledger & Margins',
+      label: '💰 Financials & Cashflow',
+      icon: <Wallet className="w-4 h-4 text-emerald-400" />,
+      badge: 'Buku Kas Live',
       allowed: true,
     },
     {
@@ -316,11 +319,11 @@ export default function AdminPage() {
 
           {/* Body Content Scrollable Container */}
           <div className="flex-1 p-6 sm:p-10 space-y-6 overflow-y-auto">
-            {activeTab === 'OVERVIEW' && <OverviewDashboard />}
+            {activeTab === 'OVERVIEW' && <FinanceDashboard />}
             {activeTab === 'INVENTORY' && <InventoryTable />}
             {activeTab === 'PIPELINE' && <PipelineMonitor />}
             {activeTab === 'INVOICES' && <InvoiceManager />}
-            {activeTab === 'FINANCE' && <FinanceDashboard />}
+            {activeTab === 'FINANCE' && <CashflowFinanceView />}
             {activeTab === 'WAREHOUSES' && <WarehouseIntelligence />}
             {activeTab === 'SEO' && <SEOQualityControl />}
             {activeTab === 'SOCIAL' && <SocialMediaCenter />}
