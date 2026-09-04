@@ -272,11 +272,19 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
             </div>
 
             <div className="text-right space-y-1">
-              <span className="inline-block px-3 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-black tracking-widest text-slate-900 uppercase">
-                {activeType === 'INVOICE' && 'FAKTUR TAGIHAN (INVOICE)'}
-                {activeType === 'RECEIPT' && 'KUITANSI PEMBAYARAN'}
-                {activeType === 'QUOTATION' && 'SURAT PENAWARAN HARGA'}
-                {activeType === 'DELIVERY_NOTE' && 'SURAT JALAN & DELIVERY ORDER'}
+              <span className={`inline-block px-3 py-1 border rounded text-xs font-black tracking-widest uppercase ${
+                activeType === 'INVOICE'
+                  ? 'bg-amber-100 border-amber-300 text-amber-950'
+                  : activeType === 'RECEIPT'
+                  ? 'bg-emerald-100 border-emerald-300 text-emerald-950'
+                  : activeType === 'QUOTATION'
+                  ? 'bg-blue-100 border-blue-300 text-blue-950'
+                  : 'bg-orange-100 border-orange-300 text-orange-950'
+              }`}>
+                {activeType === 'INVOICE' && 'FAKTUR TAGIHAN RESMI (INVOICE)'}
+                {activeType === 'RECEIPT' && (dp >= total ? 'KUITANSI PEMBAYARAN LUNAS' : 'KUITANSI PEMBAYARAN BERKALA (DP)')}
+                {activeType === 'QUOTATION' && 'SURAT PENAWARAN HARGA (QUOTATION)'}
+                {activeType === 'DELIVERY_NOTE' && 'SURAT JALAN PENGIRIMAN UNIT'}
               </span>
               <p className="text-sm font-black font-mono text-slate-900 pt-1">
                 {docNumber}
@@ -287,6 +295,11 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
               {activeType === 'INVOICE' && (
                 <p className="text-xs text-slate-600">
                   Jatuh Tempo: <strong className="text-red-600">{invoice.dueDate || '3 Hari Kerja'}</strong>
+                </p>
+              )}
+              {activeType === 'QUOTATION' && (
+                <p className="text-xs text-blue-700 font-semibold">
+                  Masa Berlaku: <strong>7 Hari Kerja</strong>
                 </p>
               )}
             </div>
@@ -329,13 +342,25 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
 
               {/* Status Badge in Header */}
               <div>
-                {activeType === 'RECEIPT' || invoice.status === 'PAID' ? (
+                {activeType === 'QUOTATION' ? (
+                  <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 border border-blue-300 rounded font-black text-xs uppercase tracking-widest">
+                    PENAWARAN HARGA AWAL
+                  </span>
+                ) : activeType === 'DELIVERY_NOTE' ? (
+                  <span className="inline-block px-3 py-1 bg-orange-100 text-orange-800 border border-orange-300 rounded font-black text-xs uppercase tracking-widest">
+                    SIAP KIRIM • LOLOS QC
+                  </span>
+                ) : activeType === 'RECEIPT' || invoice.status === 'PAID' || dp >= total ? (
                   <span className="inline-block px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded font-black text-xs uppercase tracking-widest">
-                    ✓ LUNAS / PAID
+                    ✓ LUNAS / PAID IN FULL
+                  </span>
+                ) : dp > 0 ? (
+                  <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 border border-blue-300 rounded font-black text-xs uppercase tracking-widest">
+                    DP DITERIMA ({Math.round((dp / total) * 100)}%)
                   </span>
                 ) : (
                   <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 border border-amber-300 rounded font-black text-xs uppercase tracking-widest">
-                    {invoice.status || 'UNPAID'}
+                    MENUNGGU DP (&gt;50%)
                   </span>
                 )}
               </div>
@@ -347,15 +372,15 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3.5 mb-6 grid grid-cols-3 gap-3 text-xs">
               <div>
                 <span className="text-[10px] uppercase font-bold text-orange-800 block">Jasa Ekspedisi:</span>
-                <span className="font-black text-slate-900">{expedition}</span>
+                <span className="font-black text-slate-900">{expedition || 'Ekspedisi Rekanan'}</span>
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-orange-800 block">Nama Driver / Kurir:</span>
-                <span className="font-bold text-slate-900">{driverName} ({driverPhone})</span>
+                <span className="font-bold text-slate-900">{driverName || '-'} {driverPhone ? `(${driverPhone})` : ''}</span>
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-orange-800 block">No. Polisi / Kendaraan:</span>
-                <span className="font-bold font-mono text-slate-900">{plateNumber}</span>
+                <span className="font-bold font-mono text-slate-900">{plateNumber || '-'}</span>
               </div>
             </div>
           )}
@@ -417,9 +442,11 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
               {/* Terbilang & Payment Info */}
               <div className="space-y-3">
                 <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-                  <span className="font-bold text-slate-500 uppercase text-[10px] block mb-0.5">Terbilang:</span>
+                  <span className="font-bold text-slate-500 uppercase text-[10px] block mb-0.5">
+                    {activeType === 'RECEIPT' && dp < total ? 'Terbilang Pembayaran DP:' : 'Terbilang Total Transaksi:'}
+                  </span>
                   <p className="italic font-bold text-slate-900 leading-snug">
-                    "{terbilangRupiah(total)} Rupiah"
+                    "{terbilangRupiah(activeType === 'RECEIPT' && dp > 0 ? dp : total)} Rupiah"
                   </p>
                 </div>
 
@@ -434,6 +461,15 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                       <span>• Mandiri: <strong>164-00-049281-2</strong></span>
                       <span className="text-[10px] text-slate-500">a.n. BBKitchen Official</span>
                     </div>
+                    <p className="text-[10px] text-blue-800 pt-1 border-t border-blue-200">
+                      * Harap transfer DP min. 50% untuk penguncian unit & konfirmasi jadwal pengiriman.
+                    </p>
+                  </div>
+                )}
+
+                {activeType === 'QUOTATION' && (
+                  <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-[11px] text-slate-600">
+                    ℹ️ <strong>Ketentuan Penawaran:</strong> Harga di atas adalah penawaran awal sebelum negosiasi final. Ketersediaan unit dapat berubah sewaktu-waktu sebelum pembayaran DP sah.
                   </div>
                 )}
               </div>
@@ -451,19 +487,39 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                   </div>
                 )}
                 <div className="flex justify-between py-2 border-b-2 border-slate-900 text-sm font-black text-slate-950">
-                  <span>TOTAL AKHIR:</span>
+                  <span>TOTAL KESEPAKATAN:</span>
                   <span className="font-mono">{formatIDR(total)}</span>
                 </div>
-                {dp > 0 && dp < total && (
+
+                {activeType === 'RECEIPT' && (
+                  <>
+                    <div className="flex justify-between py-1 text-emerald-700 font-bold bg-emerald-50 px-2 rounded">
+                      <span>Pembayaran Diterima (DP/Lunas):</span>
+                      <span className="font-mono">{formatIDR(dp > 0 ? dp : total)}</span>
+                    </div>
+                    {dp > 0 && dp < total && (
+                      <div className="flex justify-between py-1 font-bold text-red-600 px-2">
+                        <span>Sisa Tagihan Invoice:</span>
+                        <span className="font-mono">{formatIDR(sisa)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {activeType === 'INVOICE' && (
                   <>
                     <div className="flex justify-between py-1 text-slate-600">
-                      <span>DP Diterima:</span>
-                      <span className="font-mono font-bold text-emerald-600">{formatIDR(dp)}</span>
+                      <span>Kewajiban DP (&gt;50%):</span>
+                      <span className="font-mono font-bold text-emerald-600">
+                        {dp > 0 ? formatIDR(dp) : formatIDR(Math.round(total * 0.5))}
+                      </span>
                     </div>
-                    <div className="flex justify-between py-1 font-bold text-red-600">
-                      <span>Sisa Pelunasan:</span>
-                      <span className="font-mono">{formatIDR(sisa)}</span>
-                    </div>
+                    {dp > 0 && dp < total ? (
+                      <div className="flex justify-between py-1 font-bold text-red-600">
+                        <span>Sisa Pelunasan:</span>
+                        <span className="font-mono">{formatIDR(sisa)}</span>
+                      </div>
+                    ) : null}
                   </>
                 )}
               </div>

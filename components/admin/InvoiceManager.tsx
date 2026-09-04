@@ -835,71 +835,73 @@ export function InvoiceManager() {
                 </div>
               )}
 
-              {/* 5. LOGISTICS & DELIVERY DETAILS */}
-              <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-3">
-                <span className="font-bold text-amber-400 uppercase tracking-wider text-[10px] block">
-                  🚚 Detail Ekspedisi & Driver Pengiriman
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">
-                      Pilihan Ekspedisi:
-                    </label>
-                    <select
-                      value={expeditionChoice}
-                      onChange={(e) => setExpeditionChoice(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200"
-                    >
-                      {EXPEDITION_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+              {/* 5. LOGISTICS & DELIVERY DETAILS (ONLY FOR DELIVERY_NOTE!) */}
+              {formDocType === 'DELIVERY_NOTE' && (
+                <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-3">
+                  <span className="font-bold text-amber-400 uppercase tracking-wider text-[10px] block">
+                    🚚 Detail Ekspedisi & Driver Pengiriman
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1">
+                        Pilihan Ekspedisi:
+                      </label>
+                      <select
+                        value={expeditionChoice}
+                        onChange={(e) => setExpeditionChoice(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200"
+                      >
+                        {EXPEDITION_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1">
+                        Nama Driver / Kurir:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Pak Ujang"
+                        value={deliveryDriver}
+                        onChange={(e) => setDeliveryDriver(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1">
+                        No. Polisi Kendaraan:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: B 9482 SXZ"
+                        value={vehiclePlate}
+                        onChange={(e) => setVehiclePlate(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-mono"
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">
-                      Nama Driver / Kurir:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: Pak Ujang"
-                      value={deliveryDriver}
-                      onChange={(e) => setDeliveryDriver(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">
-                      No. Polisi Kendaraan:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: B 9482 SXZ"
-                      value={vehiclePlate}
-                      onChange={(e) => setVehiclePlate(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-mono"
-                    />
-                  </div>
+                  {expeditionChoice === 'CUSTOM' && (
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1">
+                        Nama Ekspedisi Kustom:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Mobil Pick-up Mas Joko / Baraka Sarana Tama"
+                        value={customExpeditionText}
+                        onChange={(e) => setCustomExpeditionText(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200"
+                      />
+                    </div>
+                  )}
                 </div>
-
-                {expeditionChoice === 'CUSTOM' && (
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1">
-                      Nama Ekspedisi Kustom:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: Mobil Pick-up Mas Joko / Baraka Sarana Tama"
-                      value={customExpeditionText}
-                      onChange={(e) => setCustomExpeditionText(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200"
-                    />
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* ACTION BUTTONS */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
