@@ -253,6 +253,18 @@ export function FinanceDashboard() {
     };
   }, [datePreset, startDate, endDate, now]);
 
+  const extractISODate = (raw?: string): string => {
+    if (!raw) return '';
+    const str = String(raw).trim();
+    const iso = str.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    const dmy = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+    const d = new Date(str.replace(/\./g, ':'));
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+    return str;
+  };
+
   // 1. FILTERED DEALS (ACTIVE PERIOD)
   const filteredDeals = useMemo(() => {
     const { startFilter, endFilter } = dateBounds;
@@ -279,7 +291,7 @@ export function FinanceDashboard() {
       // Date filtering comparison on clean ISO YYYY-MM-DD
       let matchDate = true;
       if (startFilter || endFilter) {
-        const dealDateStr = deal.tanggalTerjual ? deal.tanggalTerjual.split('T')[0] : '';
+        const dealDateStr = extractISODate(deal.tanggalTerjual || deal.tanggalMasuk);
         if (!dealDateStr) {
           matchDate = false;
         } else {
@@ -302,7 +314,7 @@ export function FinanceDashboard() {
       const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, deal.asalGudang, deal.sku, warehouseFilter);
       const matchCat = categoryFilter === 'ALL' || matchCategory(deal.productTitle, deal.category, categoryFilter);
 
-      const dealDateStr = deal.tanggalTerjual ? deal.tanggalTerjual.split('T')[0] : '';
+      const dealDateStr = extractISODate(deal.tanggalTerjual || deal.tanggalMasuk);
       if (!dealDateStr) return false;
       if (startFilter && dealDateStr < startFilter) return false;
       if (endFilter && dealDateStr > endFilter) return false;

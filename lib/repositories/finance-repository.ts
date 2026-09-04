@@ -62,8 +62,32 @@ export function parseToISODate(raw: any): string | undefined {
     return `${y}-${m}-${d}`;
   }
 
-  // 4. Try native Date constructor
-  const d = new Date(str);
+  // 4. Handle localized Indonesian dates like "03 Sep 2026", "03 September 2026"
+  const indoMonths: Record<string, string> = {
+    jan: '01', januari: '01',
+    feb: '02', februari: '02',
+    mar: '03', maret: '03',
+    apr: '04', april: '04',
+    mei: '05', may: '05',
+    jun: '06', juni: '06',
+    jul: '07', juli: '07',
+    agu: '08', agt: '08', agustus: '08', aug: '08',
+    sep: '09', september: '09',
+    okt: '10', oktober: '10', oct: '10',
+    nov: '11', november: '11',
+    des: '12', desember: '12', dec: '12',
+  };
+  const indoMatch = str.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/);
+  if (indoMatch) {
+    const day = indoMatch[1].padStart(2, '0');
+    const monStr = indoMatch[2].toLowerCase().substring(0, 3);
+    const mon = indoMonths[monStr] || '01';
+    const year = indoMatch[3];
+    return `${year}-${mon}-${day}`;
+  }
+
+  // 5. Try native Date constructor
+  const d = new Date(str.replace(/\./g, ':'));
   if (!isNaN(d.getTime())) {
     return d.toISOString().split('T')[0];
   }
@@ -101,11 +125,11 @@ export async function getLiveClosingDealLedger(): Promise<{
   totalAssetValuation: number;
   inventorySummary: InventorySummaryItem[];
   kpis: {
+    totalRevenue: number;
+    totalProfit: number;
     totalDeals: number;
     bbkSalesDeals: number;
     thirdPartyDeals: number;
-    totalRevenue: number;
-    totalProfit: number;
     avgMarginPercent: number;
     avgAgingDays: number;
   };
@@ -141,8 +165,8 @@ export async function getLiveClosingDealLedger(): Promise<{
       totalProfit += realizedProfit;
 
       // Convert serial date or raw string to ISO YYYY-MM-DD
-      const cleanSoldDate = parseToISODate(item.TANGGAL_TERJUAL);
       const cleanInDate = parseToISODate(item.TANGGAL_MASUK);
+      const cleanSoldDate = parseToISODate(item.TANGGAL_TERJUAL) || cleanInDate;
 
       const agingNum = typeof item.DURASI_TERJUAL === 'number' 
         ? Math.round(item.DURASI_TERJUAL) 
@@ -155,7 +179,7 @@ export async function getLiveClosingDealLedger(): Promise<{
         productTitle: item.PRODUCT_TITLE,
         category: item.CATEGORY_NAME || item.CATEGORY_SLUG || '',
         tanggalMasuk: cleanInDate || item.TANGGAL_MASUK,
-        tanggalTerjual: cleanSoldDate || undefined,
+        tanggalTerjual: cleanSoldDate || cleanInDate || undefined,
         durasiTerjual: `${agingNum} hari`,
         lokasiGudang: item.LOKASI_UNIT,
         asalGudang: item.asal_gudang || 'GK',

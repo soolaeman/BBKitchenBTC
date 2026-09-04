@@ -109,18 +109,7 @@ function parseRawDateString(raw: string): string {
   if (!isNaN(num) && num > 30000 && num < 60000) {
     const jsDate = new Date(Math.round((num - 25569) * 86400 * 1000));
     if (!isNaN(jsDate.getTime())) {
-      const datePart = jsDate.toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        timeZone: "Asia/Jakarta",
-      });
-      const timePart = jsDate.toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "Asia/Jakarta",
-      }).replace(":", ".");
-      return `${datePart}, ${timePart}`;
+      return jsDate.toISOString().replace('T', ' ').substring(0, 19);
     }
   }
   return str;
