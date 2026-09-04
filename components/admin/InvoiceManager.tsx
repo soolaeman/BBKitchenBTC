@@ -175,7 +175,7 @@ export function InvoiceManager() {
             description: item.PRODUCT_TITLE,
             unitPrice: item.HARGA_BUKA_WA || item.HARGA_ESTIMASI_PUBLIK || 0,
             warehouseLocation: item.LOKASI_UNIT || item.asal_gudang,
-            condition: item.KONDISI_FISIK || 'Bekas Siap Pakai (Lolos QC)',
+            condition: item.KONDISI_UNIT || 'Bekas Siap Pakai (Lolos QC)',
           };
         }
         return r;
