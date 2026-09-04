@@ -56,7 +56,7 @@ export interface Invoice {
   deliveryDriver?: string;
   driverPhone?: string;
   deliveryVehiclePlate?: string;
-  deliveryExpedition?: 'LALAMOVE' | 'DELIVEREE' | 'INTERNAL_FLEET' | 'CARGO_EKSPEDISI' | 'PICKUP_SENDIRI';
+  deliveryExpedition?: string;
   
   salesPic?: string;
   pdfUrl?: string;
