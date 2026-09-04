@@ -8,7 +8,7 @@ import {
   CashflowType,
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
-} from '@/lib/repositories/cashflow-repository';
+} from '@/lib/types/cashflow';
 import {
   Plus,
   RefreshCw,
