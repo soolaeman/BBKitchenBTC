@@ -37,11 +37,11 @@ export function OfficialDocumentModal({
   const [activeType, setActiveType] = useState<DocumentType>(initialType);
   const [copied, setCopied] = useState(false);
 
-  // Editable fields for Surat Jalan / Driver
-  const [driverName, setDriverName] = useState(invoice.deliveryDriver || 'Pak Ujang (Lalamove)');
-  const [driverPhone, setDriverPhone] = useState(invoice.driverPhone || '0812-9876-5432');
-  const [plateNumber, setPlateNumber] = useState(invoice.deliveryVehiclePlate || 'B 9482 SXZ');
-  const [expedition, setExpedition] = useState(invoice.deliveryExpedition || 'LALAMOVE');
+  // Editable fields for Surat Jalan / Driver (no fake defaults)
+  const [driverName, setDriverName] = useState(invoice.deliveryDriver || '');
+  const [driverPhone, setDriverPhone] = useState(invoice.driverPhone || '');
+  const [plateNumber, setPlateNumber] = useState(invoice.deliveryVehiclePlate || '');
+  const [expedition, setExpedition] = useState(invoice.deliveryExpedition || '');
 
   if (!isOpen) return null;
 
@@ -94,6 +94,35 @@ export function OfficialDocumentModal({
 
   // Generate WA share summary
   const generateWhatsAppShare = () => {
+    if (activeType === 'DELIVERY_NOTE') {
+      const itemsListSJ = invoice.items
+        .map((it, idx) => `${idx + 1}. *${it.description}* (${it.sku}) • ${it.quantity} Unit`)
+        .join('\n');
+
+      return `Halo Kak *${invoice.customerName}*! 🙏
+Berikut kami lampirkan dokumen surat jalan pengiriman unit dari *Bukan Baru Kitchen (BBKitchen)*:
+
+🚚 *SURAT JALAN PENGIRIMAN UNIT*
+No: *${docNumber}*
+Tanggal: ${todayFormatted}
+
+📌 *Daftar Fisik Unit yang Dikirim:*
+${itemsListSJ}
+
+📍 *Alamat Pengiriman:*
+${invoice.customerAddress || 'Alamat Penerima'}
+
+${expedition ? `🚚 Ekspedisi: *${expedition}*` : ''}
+${driverName ? `👤 Driver/Kurir: *${driverName}* ${driverPhone ? `(${driverPhone})` : ''}` : ''}
+${plateNumber ? `🚗 No. Polisi: *${plateNumber}*` : ''}
+
+Mohon diperiksa kelengkapan dan kondisi fisik unit saat diterima. Terima kasih!
+
+🏢 *Bukan Baru Kitchen*
+Pusat Peralatan Dapur Komersial & Resto Second Terpercaya
+Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
+    }
+
     const itemsList = invoice.items
       .map((it, idx) => `${idx + 1}. *${it.description}* (${it.sku})\n   ${it.quantity} unit x ${formatIDR(it.unitPrice)} = *${formatIDR(it.total)}*`)
       .join('\n');
@@ -101,8 +130,7 @@ export function OfficialDocumentModal({
     let titleText = '';
     if (activeType === 'INVOICE') titleText = `📄 *FAKTUR TAGIHAN RESMI (INVOICE)*\nNo: *${docNumber}*`;
     else if (activeType === 'RECEIPT') titleText = `🧾 *KUITANSI PEMBAYARAN LUNAS*\nNo: *${docNumber}*`;
-    else if (activeType === 'QUOTATION') titleText = `📋 *SURAT PENAWARAN HARGA (QUOTATION)*\nNo: *${docNumber}*`;
-    else titleText = `🚚 *SURAT JALAN PENGIRIMAN UNIT*\nNo: *${docNumber}*`;
+    else titleText = `📋 *SURAT PENAWARAN HARGA (QUOTATION)*\nNo: *${docNumber}*`;
 
     return `Halo Kak *${invoice.customerName}*! 🙏
 Berikut kami lampirkan dokumen transaksi resmi dari *Bukan Baru Kitchen (BBKitchen)*:
