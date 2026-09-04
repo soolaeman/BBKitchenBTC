@@ -623,6 +623,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
           </div>
         ) : (
           <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
               {items.map((item) => {
                 const isSelected = searchedItem?.SKU === item.SKU;
                 const rawTime = auditTimestamps[item.SKU] || item.TANGGAL_MASUK;
@@ -671,6 +672,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                   </button>
                 );
               })}
+            </div>
 
             {/* Pagination Controls (Bottom) */}
             {totalPages > 1 && (

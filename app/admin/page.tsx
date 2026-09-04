@@ -24,7 +24,6 @@ import {
   Warehouse,
   SearchCheck,
   Share2,
-  Calculator,
   MessageSquare,
   Shield,
   ChefHat,
@@ -46,7 +45,6 @@ type AdminTab =
   | 'WAREHOUSES'
   | 'SEO'
   | 'SOCIAL'
-  | 'SALES_QUOTE'
   | 'SALES_HELPER';
 
 export default function AdminPage() {
@@ -143,12 +141,6 @@ export default function AdminPage() {
       icon: <Share2 className="w-4 h-4" />,
       allowed: permissions.canManageSocialMedia,
     },
-    {
-      id: 'SALES_QUOTE',
-      label: 'Sales Quote',
-      icon: <Calculator className="w-4 h-4" />,
-      allowed: true,
-    },
   ];
 
   return (
@@ -194,14 +186,7 @@ export default function AdminPage() {
           <div className="relative">
             <select
               value={activeTab}
-              onChange={(e) => {
-                const val = e.target.value as AdminTab;
-                if (val === 'SALES_QUOTE') {
-                  router.push('/admin/sales');
-                } else {
-                  setActiveTab(val);
-                }
-              }}
+              onChange={(e) => setActiveTab(e.target.value as AdminTab)}
               className="w-full pl-3 pr-9 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none shadow-md"
             >
               {navItems.map((item) => {
@@ -243,7 +228,7 @@ export default function AdminPage() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => item.id === 'SALES_QUOTE' ? router.push('/admin/sales') : setActiveTab(item.id)}
+                    onClick={() => setActiveTab(item.id)}
                     className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium transition-all rounded-sm ${
                       isActive
                         ? 'text-[#3b82f6] font-semibold bg-white/[0.04]'
