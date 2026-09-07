@@ -140,27 +140,43 @@ export function InventoryTable() {
 
   // Cross-device synchronization for audit timestamps & active row (Desktop <-> Mobile)
   useEffect(() => {
+    // 1. Initial push of existing desktop timestamps to backend if present
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('bbk_audit_timestamps');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            fetch('/api/audit-timestamps', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ batch: parsed }),
+            }).catch(() => {});
+          }
+        }
+      } catch {}
+    }
+
     async function syncTimestamps() {
       try {
         const res = await fetch('/api/audit-timestamps');
         const data = await res.json();
         if (data.timestamps && typeof data.timestamps === 'object') {
-          setAuditTimestamps(data.timestamps);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('bbk_audit_timestamps', JSON.stringify(data.timestamps));
-          }
+          setAuditTimestamps((prev) => {
+            const merged = { ...prev, ...data.timestamps };
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('bbk_audit_timestamps', JSON.stringify(merged));
+            }
+            return merged;
+          });
         }
         if (Array.isArray(data.soldNotices)) {
           setSoldNotices(data.soldNotices);
         }
-        if (data.activeSku !== undefined) {
+        if (data.activeSku) {
           setActiveClickedSku(data.activeSku);
           if (typeof window !== 'undefined') {
-            if (data.activeSku) {
-              sessionStorage.setItem('bbk_last_active_sku', data.activeSku);
-            } else {
-              sessionStorage.removeItem('bbk_last_active_sku');
-            }
+            sessionStorage.setItem('bbk_last_active_sku', data.activeSku);
           }
         }
       } catch {}
@@ -174,31 +190,6 @@ export function InventoryTable() {
       window.removeEventListener('focus', syncTimestamps);
     };
   }, []);
-
-  const handleResetAllAuditTimestamps = async () => {
-    if (!window.confirm('Reset seluruh riwayat audit Telegram dan baris aktif?\nData riwayat audit akan dibersihkan agar siap untuk audit ulang dari awal.')) {
-      return;
-    }
-    try {
-      const res = await fetch('/api/audit-timestamps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'RESET_ALL_AUDIT_TIMESTAMPS' }),
-      });
-      if (res.ok) {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('bbk_audit_timestamps');
-          sessionStorage.removeItem('bbk_last_active_sku');
-        }
-        setAuditTimestamps({});
-        setActiveClickedSku(null);
-        setActionSuccessMsg('✨ Seluruh riwayat audit berhasil di-reset ke status awal!');
-        setTimeout(() => setActionSuccessMsg(''), 5000);
-      }
-    } catch (err) {
-      console.error('Failed to reset audit timestamps:', err);
-    }
-  };
 
   const handleDismissSoldNotice = async (noticeId: string) => {
     setSoldNotices((prev) => prev.filter((n) => n.id !== noticeId));
@@ -653,16 +644,6 @@ export function InventoryTable() {
               />
               <span className="text-xs">Hanya Data Dirty (Error/Missing)</span>
             </label>
-
-            <button
-              type="button"
-              onClick={handleResetAllAuditTimestamps}
-              className="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/80 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
-              title="Reset seluruh timestamp cek Telegram dan baris aktif untuk mulai audit ulang"
-            >
-              <RefreshCw className="w-3 h-3" />
-              <span>Reset Riwayat Audit</span>
-            </button>
           </div>
 
           <div className="flex items-center gap-2">
@@ -859,13 +840,9 @@ export function InventoryTable() {
                                 <Send className="w-3 h-3" />
                                 <span>{isActive ? 'Sedang Dibuka' : 'Channel'}</span>
                               </a>
-                              {displayTime ? (
-                                <span className="text-[9px] font-mono text-emerald-400 whitespace-nowrap" title="Waktu cek Telegram">
+                              {displayTime && (
+                                <span className="text-[9px] font-mono text-slate-400 whitespace-nowrap" title="Waktu posting Telegram">
                                   🕒 {displayTime}
-                                </span>
-                              ) : (
-                                <span className="text-[9px] font-mono text-slate-500 whitespace-nowrap">
-                                  Belum Dicek
                                 </span>
                               )}
                             </div>

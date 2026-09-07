@@ -24,10 +24,7 @@ import {
   CheckCircle,
   Layers,
   ShoppingBag,
-  FileText,
 } from 'lucide-react';
-import { OfficialDocumentModal } from './OfficialDocumentModal';
-import { Invoice } from '@/lib/types/finance';
 
 function formatTimestampWithYear(raw?: any): string {
   if (!raw) return '';
@@ -112,10 +109,6 @@ export function SalesHelperView() {
   const [soldNotesInput, setSoldNotesInput] = useState('');
   const [soldSuccessMsg, setSoldSuccessMsg] = useState('');
 
-  // Official Document Modal state
-  const [docModalInvoice, setDocModalInvoice] = useState<Invoice | null>(null);
-  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
-
   // Shared Audit Timestamps Tracker (Synced across Desktop <-> Mobile)
   const [auditTimestamps, setAuditTimestamps] = useState<Record<string, string>>(() => {
     if (typeof window !== 'undefined') {
@@ -134,15 +127,35 @@ export function SalesHelperView() {
 
   // Cross-device synchronization for audit timestamps ONLY (Row control strictly in Master Inventory)
   useEffect(() => {
+    // 1. Initial push of existing desktop timestamps to backend if present
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('bbk_audit_timestamps');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            fetch('/api/audit-timestamps', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ batch: parsed }),
+            }).catch(() => {});
+          }
+        }
+      } catch {}
+    }
+
     async function syncTimestamps() {
       try {
         const res = await fetch('/api/audit-timestamps');
         const data = await res.json();
         if (data.timestamps && typeof data.timestamps === 'object') {
-          setAuditTimestamps(data.timestamps);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('bbk_audit_timestamps', JSON.stringify(data.timestamps));
-          }
+          setAuditTimestamps((prev) => {
+            const merged = { ...prev, ...data.timestamps };
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('bbk_audit_timestamps', JSON.stringify(merged));
+            }
+            return merged;
+          });
         }
       } catch {}
     }
@@ -617,13 +630,12 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                       <span className="text-[9px] font-mono text-slate-400 px-1 py-0.2 bg-slate-900 rounded">{item.asal_gudang}</span>
                     </div>
                     <div className="text-[10px] text-slate-300 truncate leading-tight mt-0.5">{item.PRODUCT_TITLE}</div>
-                    {displayTime ? (
-                      <div className="text-[9px] text-emerald-400 font-mono mt-0.5 truncate" title="Waktu audit Telegram">
+                    <div className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">
+                      {item.HARGA_BUKA_WA ? formatIDR(item.HARGA_BUKA_WA) : 'Tanya Harga'}
+                    </div>
+                    {displayTime && (
+                      <div className="text-[9px] text-slate-400 font-mono mt-0.5 truncate" title="Waktu posting / audit">
                         🕒 {displayTime}
-                      </div>
-                    ) : (
-                      <div className="text-[9px] text-slate-500 font-mono mt-0.5 truncate">
-                        Belum Dicek
                       </div>
                     )}
                   </button>
@@ -736,18 +748,12 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                   <MapPin className="w-3 h-3 text-slate-500" />
                   <span>{searchedItem.LOKASI_UNIT}</span>
                 </div>
-                <div className={`text-[10px] font-mono px-2 py-0.5 rounded-lg inline-flex items-center gap-1 mt-1 border ${
-                  (auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM)
-                    ? 'text-emerald-400/90 bg-emerald-950/60 border-emerald-800/60'
-                    : 'text-slate-400 bg-slate-900 border-slate-800'
-                }`}>
-                  <span>🕒 Terakhir Dicek:</span>
-                  <strong>
-                    {(auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM)
-                      ? formatTimestampWithYear(auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM)
-                      : 'Belum Dicek (Klik Telegram)'}
-                  </strong>
-                </div>
+                {(auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM) && (
+                  <div className="text-[10px] font-mono text-emerald-400/90 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-lg inline-flex items-center gap-1 mt-1">
+                    <span>🕒 Terakhir Dicek:</span>
+                    <strong>{formatTimestampWithYear(auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM)}</strong>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -783,55 +789,6 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
               >
                 {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
                 <span>{copiedLink ? 'Tersalin' : 'Link Web'}</span>
-              </button>
-
-              {/* Quick Official Document Generator */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!searchedItem) return;
-                  const now = new Date();
-                  const price = searchedItem.HARGA_DEAL_WA || searchedItem.HARGA_BUKA_WA || searchedItem.HARGA_ESTIMASI_PUBLIK || 0;
-                  setDocModalInvoice({
-                    id: `deal_${searchedItem.SKU}_${Date.now()}`,
-                    invoiceNumber: `INV-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${searchedItem.SKU.replace(/\D/g, '').slice(-4) || '1024'}`,
-                    kuitansiNumber: `KWT-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${searchedItem.SKU.replace(/\D/g, '').slice(-4) || '1024'}`,
-                    quotationNumber: `QUO-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${searchedItem.SKU.replace(/\D/g, '').slice(-4) || '1024'}`,
-                    suratJalanNumber: `SJ-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${searchedItem.SKU.replace(/\D/g, '').slice(-4) || '1024'}`,
-                    customerName: buyerPhone.trim() ? `Pelanggan (${buyerPhone})` : 'Bpk/Ibu Pembeli',
-                    customerPhone: buyerPhone.trim() || '0851 2200 1051',
-                    customerAddress: searchedItem.LOKASI_UNIT || 'Jabodetabek',
-                    orderReference: `ORD-WA-${searchedItem.SKU}`,
-                    items: [
-                      {
-                        id: `item_${searchedItem.SKU}`,
-                        sku: searchedItem.SKU,
-                        description: searchedItem.PRODUCT_TITLE,
-                        quantity: 1,
-                        unitPrice: price,
-                        total: price,
-                        warehouseLocation: searchedItem.LOKASI_UNIT,
-                        condition: searchedItem.KONDISI_UNIT || 'Bekas Terkurasi (Lolos QC)',
-                      },
-                    ],
-                    subtotal: price,
-                    discount: 0,
-                    tax: 0,
-                    totalAmount: price,
-                    dpAmount: price,
-                    remainingAmount: 0,
-                    issueDate: now.toISOString().split('T')[0],
-                    dueDate: now.toISOString().split('T')[0],
-                    status: 'PAID',
-                    createdBy: 'Sales Desk BBKitchen',
-                  });
-                  setIsDocModalOpen(true);
-                }}
-                className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-amber-300 border border-slate-800 text-xs font-bold transition-colors text-center"
-                title="Terbitkan Invoice, Kuitansi, Quotation atau Surat Jalan"
-              >
-                <FileText className="w-3.5 h-3.5 text-amber-400" />
-                <span>Dokumen</span>
               </button>
 
               {/* Report Sold Action (Notice to Master Inventory) */}
@@ -1102,15 +1059,6 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             </form>
           </div>
         </div>
-      )}
-
-      {/* 4-in-1 Official Document Modal */}
-      {docModalInvoice && (
-        <OfficialDocumentModal
-          invoice={docModalInvoice}
-          isOpen={isDocModalOpen}
-          onClose={() => setIsDocModalOpen(false)}
-        />
       )}
     </div>
   );

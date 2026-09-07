@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getPersistentAuditState,
   savePersistentAuditState,
-  resetAllAuditState,
   SoldNotice,
 } from '@/lib/repositories/audit-repository';
 import { updateGoogleSheetsTelegramAudit } from '@/lib/repositories/google-sheets-inventory';
@@ -22,18 +21,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { action, sku, timestamp, batch, activeSku, dealPrice, notes, reportedBy, noticeId } = body;
-
-    // 0. Hard Reset all audit timestamps & active states across system
-    if (action === 'RESET_ALL_AUDIT_TIMESTAMPS') {
-      const resetState = await resetAllAuditState();
-      return NextResponse.json({
-        success: true,
-        message: 'All audit timestamps and states successfully reset to clean slate.',
-        timestamps: resetState.timestamps,
-        activeSku: resetState.activeSku,
-        soldNotices: resetState.soldNotices,
-      });
-    }
 
     const currentState = await getPersistentAuditState();
 

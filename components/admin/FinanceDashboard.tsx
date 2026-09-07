@@ -91,6 +91,11 @@ export function FinanceDashboard() {
   const [documentModalType, setDocumentModalType] = useState<DocumentType>('INVOICE');
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
 
+  // Pagination for Closing Deal Ledger
+  const [dealPage, setDealPage] = useState(1);
+  const [dealPageSize, setDealPageSize] = useState(25);
+  const [dealPageInput, setDealPageInput] = useState('1');
+
   const now = useMemo(() => new Date(), []);
   const currentYear = now.getFullYear();
 
@@ -114,6 +119,45 @@ export function FinanceDashboard() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleOpenDocFromDeal = (deal: ClosingDealItem, docType: DocumentType) => {
+    const nowDate = new Date();
+    const price = deal.hargaClosing || deal.hargaModal || 0;
+    const inv: Invoice = {
+      id: `inv_${deal.sku}_${Date.now()}`,
+      invoiceNumber: `INV-BBK-${nowDate.getFullYear()}${String(nowDate.getMonth() + 1).padStart(2, '0')}-${deal.sku.replace(/\D/g, '').slice(-4) || '1024'}`,
+      documentType: docType,
+      customerName: deal.customerName || 'Bpk/Ibu Pembeli',
+      customerPhone: '0851 2200 1051',
+      customerAddress: deal.lokasiGudang || 'Jabodetabek',
+      items: [
+        {
+          id: `item_${deal.sku}`,
+          sku: deal.sku,
+          description: deal.productTitle,
+          quantity: 1,
+          unitPrice: price,
+          total: price,
+          warehouseLocation: deal.lokasiGudang,
+        },
+      ],
+      subtotal: price,
+      discount: 0,
+      tax: 0,
+      totalAmount: price,
+      dpAmount: price,
+      remainingAmount: 0,
+      issueDate: deal.tanggalTerjual || nowDate.toISOString().split('T')[0],
+      dueDate: deal.tanggalTerjual || nowDate.toISOString().split('T')[0],
+      status: 'PAID',
+      paidDate: deal.tanggalTerjual || nowDate.toISOString().split('T')[0],
+      paymentMethod: 'TRANSFER_JAGO_SYARIAH',
+      createdBy: 'Finance Closing Ledger',
+    };
+    setSelectedInvoice(inv);
+    setDocumentModalType(docType);
+    setIsDocModalOpen(true);
+  };
 
   // Helper to match official 13 Warehouse Hub codes (GK, BB, SM, BL, ML, RB, KG, PY, PE, SK, WT, ON, RK)
   const matchWarehouseHub = (itemLocation: string, itemAsalGudang?: string, skuStr?: string, hubFilter: string = 'ALL') => {
@@ -303,6 +347,12 @@ export function FinanceDashboard() {
       return matchQ && matchChannel && matchWarehouse && matchCat && matchDate;
     });
   }, [deals, searchQuery, channelFilter, warehouseFilter, categoryFilter, dateBounds]);
+
+  const dealTotalPages = Math.max(1, Math.ceil(filteredDeals.length / dealPageSize));
+  const paginatedDeals = useMemo(() => {
+    const start = (dealPage - 1) * dealPageSize;
+    return filteredDeals.slice(start, start + dealPageSize);
+  }, [filteredDeals, dealPage, dealPageSize]);
 
   // PREVIOUS PERIOD DEALS (FOR GROWTH COMPARISON)
   const previousDeals = useMemo(() => {
@@ -1624,27 +1674,85 @@ export function FinanceDashboard() {
       {/* 6. BUKU REKAP CLOSING DEAL LEDGER (TABLE & 4-IN-1 DOCUMENT PRINT) */}
       {/* ========================================================================= */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden space-y-0 shadow-xl">
-        <div className="p-4.5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900">
+        <div className="p-4.5 border-b border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-900">
           <div>
             <h2 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
               <Receipt className="w-4 h-4 text-emerald-400" />
               <span>Buku Rekap Closing Deal Ledger ({filteredDeals.length} Transaksi)</span>
             </h2>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Daftar transaksi closing riil. Klik ikon dokumen untuk menerbitkan Kuitansi Lunas, Invoice, atau Surat Jalan.
+              Daftar transaksi closing riil. Hanya transaksi Sales BBKitchen yang memiliki berkas dokumen resmi.
             </p>
           </div>
 
-          {/* Search Box */}
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari SKU atau nama mesin..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search Box */}
+            <div className="relative w-full sm:w-56">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari SKU / nama..."
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+
+            {/* Top Pagination Controls */}
+            <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-1.5 font-mono text-slate-300">
+                <span className="text-[11px] text-slate-400">Hal</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={dealTotalPages}
+                  value={dealPageInput}
+                  onChange={(e) => setDealPageInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const num = parseInt(dealPageInput, 10);
+                      if (!isNaN(num) && num >= 1 && num <= dealTotalPages) {
+                        setDealPage(num);
+                      } else {
+                        setDealPageInput(String(dealPage));
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    const num = parseInt(dealPageInput, 10);
+                    if (!isNaN(num) && num >= 1 && num <= dealTotalPages) {
+                      setDealPage(num);
+                    } else {
+                      setDealPageInput(String(dealPage));
+                    }
+                  }}
+                  className="w-12 px-1.5 py-0.5 text-center bg-slate-950 border border-slate-700 rounded-lg text-emerald-400 font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  title="Ketik nomor halaman & tekan Enter"
+                />
+                <span className="text-[11px] text-slate-400">dari {dealTotalPages}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={dealPage <= 1 || isLoading}
+                  onClick={() => setDealPage((p) => Math.max(1, p - 1))}
+                  className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Halaman Sebelumnya"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={dealPage >= dealTotalPages || isLoading}
+                  onClick={() => setDealPage((p) => Math.min(dealTotalPages, p + 1))}
+                  className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Halaman Selanjutnya"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1672,14 +1780,14 @@ export function FinanceDashboard() {
                     Memuat data closing ledger...
                   </td>
                 </tr>
-              ) : filteredDeals.length === 0 ? (
+              ) : paginatedDeals.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-slate-500">
                     Tidak ada transaksi closing deal pada filter yang dipilih.
                   </td>
                 </tr>
               ) : (
-                filteredDeals.map((deal) => (
+                paginatedDeals.map((deal) => (
                   <tr key={deal.sku} className="hover:bg-slate-850/50 transition-colors">
                     <td className="py-3 px-3.5 font-mono font-bold text-amber-400">
                       {deal.sku}
@@ -1731,24 +1839,28 @@ export function FinanceDashboard() {
                       )}
                     </td>
                     <td className="py-3 px-3.5 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenDocFromDeal(deal, 'INVOICE')}
-                          title="Cetak Faktur Tagihan (Invoice)"
-                          className="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-800 text-amber-300 border border-amber-800 transition-colors"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenDocFromDeal(deal, 'DELIVERY_NOTE')}
-                          title="Cetak Surat Jalan Pengiriman"
-                          className="p-1.5 rounded-lg bg-orange-950/80 hover:bg-orange-800 text-orange-300 border border-orange-800 transition-colors"
-                        >
-                          <Truck className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {deal.soldBy === 'SALES_BBK' ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDocFromDeal(deal, 'INVOICE')}
+                            title="Cetak Faktur Tagihan (Invoice)"
+                            className="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-800 text-amber-300 border border-amber-800 transition-colors"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDocFromDeal(deal, 'DELIVERY_NOTE')}
+                            title="Cetak Surat Jalan Pengiriman"
+                            className="p-1.5 rounded-lg bg-orange-950/80 hover:bg-orange-800 text-orange-300 border border-orange-800 transition-colors"
+                          >
+                            <Truck className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-slate-600 font-mono text-[11px]">-</span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -1756,6 +1868,69 @@ export function FinanceDashboard() {
             </tbody>
           </table>
         </div>
+
+        {/* Bottom Pagination Bar */}
+        {dealTotalPages > 1 && (
+          <div className="p-3 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400 bg-slate-900/60">
+            <span className="text-[11px]">
+              Menampilkan {((dealPage - 1) * dealPageSize) + 1} - {Math.min(dealPage * dealPageSize, filteredDeals.length)} dari {filteredDeals.length} Transaksi Closing
+            </span>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 font-mono text-slate-300">
+                <span className="text-[11px] text-slate-400">Hal</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={dealTotalPages}
+                  value={dealPageInput}
+                  onChange={(e) => setDealPageInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const num = parseInt(dealPageInput, 10);
+                      if (!isNaN(num) && num >= 1 && num <= dealTotalPages) {
+                        setDealPage(num);
+                      } else {
+                        setDealPageInput(String(dealPage));
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    const num = parseInt(dealPageInput, 10);
+                    if (!isNaN(num) && num >= 1 && num <= dealTotalPages) {
+                      setDealPage(num);
+                    } else {
+                      setDealPageInput(String(dealPage));
+                    }
+                  }}
+                  className="w-12 px-1.5 py-0.5 text-center bg-slate-950 border border-slate-700 rounded-lg text-emerald-400 font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="text-[11px] text-slate-400">dari {dealTotalPages}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={dealPage <= 1 || isLoading}
+                  onClick={() => setDealPage((p) => Math.max(1, p - 1))}
+                  className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Halaman Sebelumnya"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={dealPage >= dealTotalPages || isLoading}
+                  onClick={() => setDealPage((p) => Math.min(dealTotalPages, p + 1))}
+                  className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Halaman Selanjutnya"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 4-IN-1 OFFICIAL DOCUMENT PRINT & PREVIEW MODAL */}
