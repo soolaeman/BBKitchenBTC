@@ -634,43 +634,38 @@ export function InvoiceManager() {
                 <label className="block text-slate-400 font-bold mb-1.5 uppercase text-[10px] tracking-wider">
                   Pilih Format Dokumen:
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setFormDocType('QUOTATION')}
-                    className={`p-2.5 rounded-xl font-bold border text-center transition-all ${
+                    className={`p-3 rounded-xl font-bold border text-center transition-all ${
                       formDocType === 'QUOTATION'
                         ? 'bg-blue-500 text-white border-blue-400 shadow-md shadow-blue-500/20'
                         : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-850'
                     }`}
                   >
-                    📋 Quotation (Penawaran Awal)
+                    <span className="block text-sm">📋 Surat Penawaran (Quotation)</span>
+                    <span className="block text-[10px] font-normal text-blue-200 mt-0.5">
+                      Buka harga awal sebelum negosiasi & DP
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setFormDocType('INVOICE')}
-                    className={`p-2.5 rounded-xl font-bold border text-center transition-all ${
+                    className={`p-3 rounded-xl font-bold border text-center transition-all ${
                       formDocType === 'INVOICE'
                         ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20'
                         : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-850'
                     }`}
                   >
-                    📄 Invoice (Faktur Deal & DP)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormDocType('RECEIPT')}
-                    className={`p-2.5 rounded-xl font-bold border text-center transition-all ${
-                      formDocType === 'RECEIPT'
-                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md shadow-emerald-500/20'
-                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-850'
-                    }`}
-                  >
-                    🧾 Kuitansi (Bukti Pembayaran)
+                    <span className="block text-sm">📄 Faktur Tagihan Resmi (Invoice)</span>
+                    <span className="block text-[10px] font-normal text-amber-950 mt-0.5">
+                      Deal harga sah, DP &gt;50%, pengiriman &amp; rekening Jago
+                    </span>
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 italic">
-                  * Surat Jalan otomatis diterbitkan dari Invoice resmi (tanpa harga demi privasi logistik).
+                <p className="text-[10px] text-slate-400 mt-2 p-2 bg-slate-950 border border-slate-800 rounded-lg">
+                  💡 <strong>Catatan:</strong> <em>Kuitansi (Bukti Pembayaran DP/Lunas)</em> dan <em>Surat Jalan Pengiriman</em> adalah bagian resmi dari Faktur Invoice dan langsung dicetak dari baris Invoice.
                 </p>
               </div>
 

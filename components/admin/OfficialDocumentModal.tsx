@@ -180,57 +180,57 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
         {/* Top Control Bar (Hidden during Print) */}
         <div className="print:hidden bg-slate-950 p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-            <button
-              type="button"
-              onClick={() => setActiveType('INVOICE')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                activeType === 'INVOICE'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                  : 'bg-slate-850 text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>📄 Invoice</span>
-            </button>
+            {invoice.documentType === 'QUOTATION' ? (
+              <button
+                type="button"
+                onClick={() => setActiveType('QUOTATION')}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-blue-500 text-white shadow-md shadow-blue-500/20"
+              >
+                <FileCheck className="w-3.5 h-3.5" />
+                <span>📋 Surat Penawaran (Quotation)</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveType('INVOICE')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    activeType === 'INVOICE'
+                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                      : 'bg-slate-850 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>📄 Faktur Invoice</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveType('RECEIPT')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                activeType === 'RECEIPT'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'bg-slate-850 text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <Receipt className="w-3.5 h-3.5" />
-              <span>🧾 Kuitansi Lunas</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveType('RECEIPT')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    activeType === 'RECEIPT'
+                      ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                      : 'bg-slate-850 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Receipt className="w-3.5 h-3.5" />
+                  <span>🧾 Kuitansi {dp >= total ? 'Lunas' : 'DP'}</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveType('QUOTATION')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                activeType === 'QUOTATION'
-                  ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20'
-                  : 'bg-slate-850 text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <FileCheck className="w-3.5 h-3.5" />
-              <span>📋 Quotation</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveType('DELIVERY_NOTE')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                activeType === 'DELIVERY_NOTE'
-                  ? 'bg-orange-500 text-slate-950 shadow-md shadow-orange-500/20'
-                  : 'bg-slate-850 text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <Truck className="w-3.5 h-3.5" />
-              <span>🚚 Surat Jalan</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveType('DELIVERY_NOTE')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    activeType === 'DELIVERY_NOTE'
+                      ? 'bg-orange-500 text-slate-950 shadow-md shadow-orange-500/20'
+                      : 'bg-slate-850 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>🚚 Surat Jalan</span>
+                </button>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -311,6 +311,11 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
               {activeType === 'INVOICE' && (
                 <p className="text-xs text-slate-600">
                   Jatuh Tempo: <strong className="text-red-600">{invoice.dueDate || '3 Hari Kerja'}</strong>
+                </p>
+              )}
+              {activeType === 'RECEIPT' && (
+                <p className="text-xs text-emerald-800 font-bold">
+                  Ref. Faktur: <span>{invoice.invoiceNumber}</span>
                 </p>
               )}
               {activeType === 'QUOTATION' && (
@@ -476,6 +481,19 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                     <p className="text-[10px] text-blue-800 pt-1 border-t border-blue-200">
                       * Harap transfer DP min. 50% untuk penguncian unit & konfirmasi jadwal pengiriman.
                     </p>
+                  </div>
+                )}
+
+                {activeType === 'RECEIPT' && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-950 space-y-1">
+                    <p>
+                      🧾 <strong>Keterangan Pembayaran:</strong> Bukti pembayaran {dp >= total ? 'Pelunasan Penuh (LUNAS)' : 'Uang Muka (DP) Sah'} atas pesanan unit sesuai Faktur <strong>{invoice.invoiceNumber}</strong>.
+                    </p>
+                    {dp < total && (
+                      <p className="text-red-700 font-medium">
+                        * Sisa tagihan pelunasan sebesar <strong>{formatIDR(sisa)}</strong> wajib diselesaikan saat serah-terima unit / sesuai jadwal pengiriman.
+                      </p>
+                    )}
                   </div>
                 )}
 
