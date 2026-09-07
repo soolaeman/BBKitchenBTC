@@ -474,24 +474,39 @@ export function FinanceDashboard() {
     return Array.from(timelineMap.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [filteredDeals, warehouseFilter, categoryFilter, getDealFilteredMetrics]);
 
-  // Helper to categorize individual equipment description
-  const detectCategoryFromText = (text: string = ''): string => {
-    const clean = text.toLowerCase();
-    if (/showcase/i.test(clean)) return 'Showcase';
-    if (/chiller/i.test(clean)) return 'Chiller';
-    if (/freezer/i.test(clean)) return 'Freezer';
-    if (/deep fryer|fryer/i.test(clean)) return 'Deep Fryer';
-    if (/wok|kwali|kompor|stove|burner|noodle|grill|griddle|oven/i.test(clean)) return 'Kompor & Cooking';
-    if (/meja/i.test(clean)) return 'Meja Stainless';
-    if (/sink|wastafel|bak cuci/i.test(clean)) return 'Sink Stainless';
-    if (/rak|wallshelf|troli|trolley/i.test(clean)) return 'Rak Stainless';
-    if (/hood|exhaust|blower|axial|ducting/i.test(clean)) return 'Exhaust Hood & Blower';
-    if (/ice maker|ice bin|es batu/i.test(clean)) return 'Ice System';
-    if (/blender|mixer|sealer|slicer|cutter/i.test(clean)) return 'Food Processing';
-    
-    const firstWord = text.split(' ')[0] || 'Peralatan Dapur';
-    return firstWord.charAt(0).toUpperCase() + firstWord.slice(1);
-  };
+  // Helper to dynamically resolve the category bucket based on active categoryFilter and OFFICIAL_CATEGORIES
+  const resolveCategoryBucket = React.useCallback((itemTitle: string = '', itemCat: string = ''): string => {
+    const filterClean = (categoryFilter || '').toLowerCase().trim().replace(' (semua)', '');
+
+    // 1. Check if active categoryFilter matches a Parent Category Group (e.g. MEJA STAINLESS, SINK STAINLESS, KOMPOR, etc.)
+    const activeParent = OFFICIAL_CATEGORIES.find(
+      (g) =>
+        filterClean === g.slug.toLowerCase() ||
+        filterClean === g.name.toLowerCase() ||
+        g.name.toLowerCase().includes(filterClean) ||
+        filterClean.includes(g.name.toLowerCase())
+    );
+
+    if (activeParent && activeParent.children.length > 0) {
+      // DRILL-DOWN MODE: Match item into one of the official child subcategories
+      for (const child of activeParent.children) {
+        if (matchCategory(itemTitle, itemCat, child.name)) {
+          return child.name;
+        }
+      }
+      return `${activeParent.name} (Lainnya)`;
+    }
+
+    // 2. If filter is ALL or not a parent group, match into official Parent Groups
+    for (const group of OFFICIAL_CATEGORIES) {
+      if (matchCategory(itemTitle, itemCat, group.name)) {
+        return group.name;
+      }
+    }
+
+    // Fallback: clean category or title
+    return itemCat || 'Peralatan Dapur Lainnya';
+  }, [categoryFilter]);
 
   // 6. UNIT ECONOMICS METRICS & TOP CATEGORIES BREAKDOWN (ITEMIZED)
   const categoryEconomics = useMemo(() => {
@@ -534,7 +549,7 @@ export function FinanceDashboard() {
 
           if (!whMatch || !catMatch) return;
 
-          const cat = detectCategoryFromText(it.description || it.sku);
+          const cat = resolveCategoryBucket(itemTitle, itemCat);
           const itemQty = it.quantity || 1;
           const itemRevenue = (it.unitPrice || 0) * itemQty;
           const itemCost = (it.unitCost || 0) * itemQty;
@@ -547,7 +562,7 @@ export function FinanceDashboard() {
           entry.profitSum += itemProfit;
         });
       } else {
-        const cat = detectCategoryFromText(deal.category || deal.productTitle);
+        const cat = resolveCategoryBucket(deal.productTitle, deal.category);
         const qty = deal.quantity || 1;
         const closingVal = deal.hargaClosing > 0 ? deal.hargaClosing : (deal.hargaModal || 0);
 
@@ -559,14 +574,16 @@ export function FinanceDashboard() {
       }
     });
 
-    // Aggregate ready supply from inventory
+    // Aggregate ready supply from inventory matching the active filter
     filteredInventory.forEach((item) => {
       const isReady = item.statusUnit === 'READY' || item.statusUnit === 'AVAILABLE';
       if (isReady) {
-        const cat = detectCategoryFromText(item.category || item.sku);
+        const itemCat = item.CATEGORY_NAME || item.CATEGORY_SLUG || item.category || '';
+        const itemTitle = item.PRODUCT_TITLE || item.SKU || '';
+        const cat = resolveCategoryBucket(itemTitle, itemCat);
         const entry = getEntry(cat);
         entry.readyUnits++;
-        entry.readyCostSum += item.modal || 0;
+        entry.readyCostSum += item.HARGA_MODAL || item.modal || 0;
       }
     });
 
@@ -584,7 +601,7 @@ export function FinanceDashboard() {
         marginPct,
       };
     });
-  }, [filteredDeals, filteredInventory, warehouseFilter, categoryFilter]);
+  }, [filteredDeals, filteredInventory, warehouseFilter, categoryFilter, resolveCategoryBucket]);
 
   // Overall Unit Economics averages (Based on REAL Physical Units Sold)
   const unitEconomicsAverages = useMemo(() => {
@@ -659,13 +676,12 @@ export function FinanceDashboard() {
     let totalAllUnitsGlobal = 0;
 
     inventoryItems.forEach((item) => {
-      if (categoryFilter !== 'ALL' && !matchCategory(item.category, categoryFilter)) return;
+      const itemTitle = item.sku || '';
+      const itemCat = item.category || '';
+      if (categoryFilter !== 'ALL' && !matchCategory(itemTitle, itemCat, categoryFilter)) return;
       if (startFilter || endFilter) {
         const itemDate = item.inDate || item.soldDate || '';
-        if (itemDate) {
-          if (startFilter && itemDate < startFilter) return;
-          if (endFilter && itemDate > endFilter) return;
-        }
+        if (itemDate && !isDateInRange(itemDate, startFilter, endFilter)) return;
       }
 
       totalAllUnitsGlobal++;
@@ -674,7 +690,7 @@ export function FinanceDashboard() {
         totalReadyGlobal++;
         totalCapitalGlobal += item.modal || 0;
 
-        const code = item.asalGudang || 'GK';
+        const code = resolveHubCode(item.asalGudang, item.warehouse, item.sku) || (item.asalGudang ? item.asalGudang.toUpperCase() : 'GK');
         if (!hubMap.has(code)) {
           hubMap.set(code, {
             code,
@@ -709,13 +725,18 @@ export function FinanceDashboard() {
       estPartnerCapital: 0,
     };
 
-    // Total items terdata di hub ini (Ready + Sold)
-    const allItemsInHub = inventoryItems.filter((it) =>
-      matchWarehouseHub(it.warehouse, it.asalGudang, it.sku, warehouseFilter)
-    );
+    // Total items terdata di hub ini (Ready + Sold) YANG COCOK DENGAN KATEGORI AKTIF
+    const allItemsInHub = inventoryItems.filter((it) => {
+      const whMatch = matchWarehouseHub(it.warehouse, it.asalGudang, it.sku, warehouseFilter);
+      const catMatch = matchCategory(it.sku, it.category, categoryFilter);
+      return whMatch && catMatch;
+    });
+
     const totalUnitsInHub = allItemsInHub.length;
-    const readyUnitsInHub = allItemsInHub.filter((it) => it.statusUnit === 'READY' || it.statusUnit === 'AVAILABLE').length;
+    const readyItemsInHub = allItemsInHub.filter((it) => it.statusUnit === 'READY' || it.statusUnit === 'AVAILABLE');
+    const readyUnitsInHub = readyItemsInHub.length;
     const soldUnitsInHub = allItemsInHub.filter((it) => it.statusUnit === 'SOLD').length;
+    const estPartnerCapital = readyItemsInHub.reduce((acc, it) => acc + (it.modal || 0), 0);
 
     // Filtered deals in active filter
     const hubDeals = filteredDeals.filter((d) => matchWarehouseHub(d.lokasiGudang, d.asalGudang, d.sku, warehouseFilter));
@@ -732,6 +753,7 @@ export function FinanceDashboard() {
     return {
       ...hub,
       availableUnits: readyUnitsInHub,
+      estPartnerCapital,
       totalUnitsInHub,
       soldUnitsInHub,
       hubDealsCount,
@@ -741,7 +763,7 @@ export function FinanceDashboard() {
       totalCapitalGlobal: allHubsSupply.totalCapitalGlobal,
       totalAllUnitsGlobal: allHubsSupply.totalAllUnitsGlobal,
     };
-  }, [warehouseFilter, allHubsSupply, inventoryItems, filteredDeals]);
+  }, [warehouseFilter, allHubsSupply, inventoryItems, filteredDeals, categoryFilter]);
 
   // 8. RISKS & OPPORTUNITIES (DATA-DRIVEN INSIGHTS)
   const businessInsights = useMemo(() => {
@@ -1400,7 +1422,7 @@ export function FinanceDashboard() {
                   <div className="flex items-center gap-2">
                     <Building className="w-4 h-4 text-indigo-400" />
                     <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                      SUPPLY: OVERVIEW GUDANG {selectedHubOverview.code}
+                      SUPPLY: OVERVIEW {categoryFilter !== 'ALL' ? `${categoryFilter.toUpperCase().replace(' (SEMUA)', '')} ` : ''}GUDANG {selectedHubOverview.code}
                     </h3>
                   </div>
                   <button
@@ -1419,7 +1441,7 @@ export function FinanceDashboard() {
                   <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                        Valuasi Modal Stok Ready {selectedHubOverview.code}
+                        Valuasi Modal Stok Ready {categoryFilter !== 'ALL' ? categoryFilter.replace(' (Semua)', '') : ''} ({selectedHubOverview.code})
                       </span>
                       <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-950 border border-indigo-800 text-indigo-300 font-mono font-bold">
                         {selectedHubOverview.ratioVsGlobalReady}% Pasokan Global
@@ -1436,7 +1458,7 @@ export function FinanceDashboard() {
                     {/* Rasio 1: vs Total Unit Ready Global */}
                     <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
                       <span className="text-[10px] text-slate-400 font-bold block">
-                        Pasokan vs Total Ready Global:
+                        Pasokan {categoryFilter !== 'ALL' ? categoryFilter.replace(' (Semua)', '') : ''} vs Total Ready Global:
                       </span>
                       <div className="font-mono text-xs font-bold text-slate-200">
                         <span className="text-indigo-400 font-black text-sm">{selectedHubOverview.availableUnits} Unit</span>
@@ -1456,7 +1478,7 @@ export function FinanceDashboard() {
                     {/* Rasio 2: vs Total Unit Terdata di Hub Ini */}
                     <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
                       <span className="text-[10px] text-slate-400 font-bold block">
-                        Ketersediaan di Hub {selectedHubOverview.code}:
+                        Ketersediaan {categoryFilter !== 'ALL' ? categoryFilter.replace(' (Semua)', '') : ''} di Hub {selectedHubOverview.code}:
                       </span>
                       <div className="font-mono text-xs font-bold text-slate-200">
                         <span className="text-emerald-400 font-black text-sm">{selectedHubOverview.availableUnits} Unit</span>
