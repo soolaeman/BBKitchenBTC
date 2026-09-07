@@ -15,6 +15,7 @@ import { WarehouseIntelligence } from '@/components/admin/WarehouseIntelligence'
 import { SEOQualityControl } from '@/components/admin/SEOQualityControl';
 import { SocialMediaCenter } from '@/components/admin/SocialMediaCenter';
 import { SalesHelperView } from '@/components/admin/SalesHelperView';
+import { RoleManagement } from '@/components/admin/RoleManagement';
 import {
   LayoutDashboard,
   Boxes,
@@ -50,7 +51,8 @@ type AdminTab =
   | 'WAREHOUSES'
   | 'SEO'
   | 'SOCIAL'
-  | 'SALES_HELPER';
+  | 'SALES_HELPER'
+  | 'ROLES';
 
 export default function AdminPage() {
   const { user, role, permissions } = useAuth();
@@ -104,6 +106,12 @@ export default function AdminPage() {
     icon: React.ReactNode;
     allowed: boolean;
   }[] = [
+    {
+      id: 'ROLES',
+      label: 'Roles',
+      icon: <Shield className="w-4 h-4 text-emerald-400" />,
+      allowed: role === 'ADMIN',
+    },
     {
       id: 'OVERVIEW',
       label: 'Executive Overview',
@@ -344,7 +352,8 @@ export default function AdminPage() {
 
           {/* Body Content Scrollable Container */}
           <div className="flex-1 p-6 sm:p-10 space-y-6 overflow-y-auto min-h-0">
-            {activeTab === 'OVERVIEW' && <FinanceDashboard />}
+            {activeTab === 'ROLES' && <RoleManagement />}
+            {activeTab === 'OVERVIEW' && <FinanceDashboard />
             {activeTab === 'INVENTORY' && <InventoryTable />}
             {activeTab === 'PIPELINE' && <PipelineMonitor />}
             {activeTab === 'INVOICES' && <InvoiceManager />}
