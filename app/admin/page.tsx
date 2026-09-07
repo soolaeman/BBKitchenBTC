@@ -353,7 +353,7 @@ export default function AdminPage() {
           {/* Body Content Scrollable Container */}
           <div className="flex-1 p-6 sm:p-10 space-y-6 overflow-y-auto min-h-0">
             {activeTab === 'ROLES' && <RoleManagement />}
-            {activeTab === 'OVERVIEW' && <FinanceDashboard />
+            {activeTab === 'OVERVIEW' && <FinanceDashboard />}
             {activeTab === 'INVENTORY' && <InventoryTable />}
             {activeTab === 'PIPELINE' && <PipelineMonitor />}
             {activeTab === 'INVOICES' && <InvoiceManager />}
