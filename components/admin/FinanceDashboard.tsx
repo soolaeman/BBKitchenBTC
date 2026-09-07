@@ -578,12 +578,12 @@ export function FinanceDashboard() {
     filteredInventory.forEach((item) => {
       const isReady = item.statusUnit === 'READY' || item.statusUnit === 'AVAILABLE';
       if (isReady) {
-        const itemCat = item.CATEGORY_NAME || item.CATEGORY_SLUG || item.category || '';
-        const itemTitle = item.PRODUCT_TITLE || item.SKU || '';
+        const itemCat = item.category || '';
+        const itemTitle = item.sku || '';
         const cat = resolveCategoryBucket(itemTitle, itemCat);
         const entry = getEntry(cat);
         entry.readyUnits++;
-        entry.readyCostSum += item.HARGA_MODAL || item.modal || 0;
+        entry.readyCostSum += item.modal || 0;
       }
     });
 
