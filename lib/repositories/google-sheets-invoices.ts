@@ -104,12 +104,14 @@ function rowToInvoice(row: any[]): Invoice {
   const items = parseItemsJson(v(8));
   const subtotal = num(9);
   const totalAmount = num(13) || subtotal;
+  const rawDate = v(3) || new Date().toISOString().split('T')[0];
 
   return {
     id: v(0),
     invoiceNumber: v(1),
-    docType: (v(2) || 'INVOICE') as DocumentType,
-    createdAt: v(3),
+    documentType: (v(2) || 'INVOICE') as DocumentType,
+    issueDate: rawDate,
+    dueDate: rawDate,
     customerName: v(4),
     customerPhone: v(5),
     customerAddress: v(6),
@@ -126,11 +128,12 @@ function rowToInvoice(row: any[]): Invoice {
     ],
     subtotal,
     discount: num(10),
+    tax: 0,
     shippingFee: num(11),
     shippingFeeType: (v(12) || 'INCLUDED') as any,
     totalAmount,
     dpAmount: num(14),
-    remainingBalance: num(15),
+    remainingAmount: num(15) || Math.max(0, totalAmount - num(14)),
     status: (v(16) || 'ISSUED') as InvoiceStatus,
     paidDate: v(17) || undefined,
     paymentMethod: (v(18) || 'TRANSFER_JAGO_SYARIAH') as any,
@@ -142,6 +145,7 @@ function rowToInvoice(row: any[]): Invoice {
     quotationNumber: v(24) || undefined,
     kuitansiNumber: v(25) || undefined,
     suratJalanNumber: v(26) || undefined,
+    createdBy: 'ADMIN',
   };
 }
 
@@ -149,8 +153,8 @@ function invoiceToRow(inv: Invoice): any[] {
   return [
     inv.id,
     inv.invoiceNumber,
-    inv.docType || 'INVOICE',
-    inv.createdAt || new Date().toISOString(),
+    inv.documentType || 'INVOICE',
+    inv.issueDate || new Date().toISOString().split('T')[0],
     inv.customerName || '',
     inv.customerPhone || '',
     inv.customerAddress || '',
@@ -162,7 +166,7 @@ function invoiceToRow(inv: Invoice): any[] {
     inv.shippingFeeType || 'INCLUDED',
     inv.totalAmount || 0,
     inv.dpAmount || 0,
-    inv.remainingBalance ?? Math.max(0, (inv.totalAmount || 0) - (inv.dpAmount || 0)),
+    inv.remainingAmount ?? Math.max(0, (inv.totalAmount || 0) - (inv.dpAmount || 0)),
     inv.status || 'ISSUED',
     inv.paidDate || '',
     inv.paymentMethod || 'TRANSFER_JAGO_SYARIAH',
