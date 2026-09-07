@@ -924,7 +924,7 @@ export function FinanceDashboard() {
               <option value="ALL">Semua Hub Rekanan (13 Hub)</option>
               {WAREHOUSE_13_HUBS.map((hub) => (
                 <option key={hub.code} value={hub.code}>
-                  {hub.code} - {hub.name} ({hub.hubLocation})
+                  {hub.code} - {hub.partnerName} ({hub.hubGroup})
                 </option>
               ))}
             </select>

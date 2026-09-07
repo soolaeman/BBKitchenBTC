@@ -496,10 +496,10 @@ export function ResolveNonSkuModal({
                   >
                     {WAREHOUSE_13_HUBS.map((hub) => (
                       <option key={hub.code} value={hub.code}>
-                        {hub.code} - {hub.name} ({hub.hubLocation})
+                        {hub.code} - {hub.partnerName} ({hub.hubGroup})
                       </option>
                     ))}
-                    <option value="BENGKEL_CUSTOM">BENGKEL EKSTERNAL / FABRIKASI KHUSUS</option>
+                    <option value="BENGKEL_CUSTOM">Bengkel Eksternal / Fabrikasi Khusus</option>
                   </select>
                 </div>
 

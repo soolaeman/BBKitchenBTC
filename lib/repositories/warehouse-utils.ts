@@ -17,19 +17,19 @@ export const WAREHOUSE_LOCATION_MAP: Record<WarehouseCode, WarehouseLocation> = 
 };
 
 export const WAREHOUSE_13_HUBS = [
-  { code: 'GK' as WarehouseCode, name: 'Hub GK - Griya Kitchen', partnerName: 'Griya Kitchen', hubLocation: 'PAMULANG 2, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang 2' },
-  { code: 'BB' as WarehouseCode, name: 'Hub BB - Barkas Bekas', partnerName: 'Barkas Bekas', hubLocation: 'PAMULANG 2, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang 2' },
-  { code: 'SM' as WarehouseCode, name: 'Hub SM - Sumber Makmur', partnerName: 'Sumber Makmur', hubLocation: 'PAMULANG 2, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang 2' },
-  { code: 'BL' as WarehouseCode, name: 'Hub BL - Berkah Logam', partnerName: 'Berkah Logam', hubLocation: 'PAMULANG 2, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang 2' },
-  { code: 'ML' as WarehouseCode, name: 'Hub ML - Mitra Logam', partnerName: 'Mitra Logam', hubLocation: 'PAMULANG BARAT, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang Barat' },
-  { code: 'RB' as WarehouseCode, name: 'Hub RB - Raja Barkas', partnerName: 'Raja Barkas', hubLocation: 'PAMULANG BARAT, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang Barat' },
-  { code: 'KG' as WarehouseCode, name: 'Hub KG - Kitchen Gembel', partnerName: 'Kitchen Gembel', hubLocation: 'PAMULANG BARAT, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang Barat' },
-  { code: 'PY' as WarehouseCode, name: 'Hub PY - Pak Yogi', partnerName: 'Pak Yogi', hubLocation: 'SETU, TANGSEL' as WarehouseLocation, hubGroup: 'Setu' },
-  { code: 'PE' as WarehouseCode, name: 'Hub PE - Pratama Equipment', partnerName: 'Pratama Equipment', hubLocation: 'SAWANGAN, DEPOK' as WarehouseLocation, hubGroup: 'Sawangan' },
-  { code: 'SK' as WarehouseCode, name: 'Hub SK - Sanjaya Kitchen', partnerName: 'Sanjaya Kitchen', hubLocation: 'SAWANGAN, DEPOK' as WarehouseLocation, hubGroup: 'Sawangan' },
-  { code: 'WT' as WarehouseCode, name: 'Hub WT - Wira Teknik', partnerName: 'Wira Teknik', hubLocation: 'KEDAUNG, TANGSEL' as WarehouseLocation, hubGroup: 'Kedaung' },
-  { code: 'ON' as WarehouseCode, name: 'Hub ON - One Kitchen', partnerName: 'One Kitchen', hubLocation: 'KEDAUNG, TANGSEL' as WarehouseLocation, hubGroup: 'Kedaung' },
-  { code: 'RK' as WarehouseCode, name: 'Hub RK - Rizki Kitchen', partnerName: 'Rizki Kitchen', hubLocation: 'RAWAKALONG, BOGOR' as WarehouseLocation, hubGroup: 'Rawakalong' },
+  { code: 'GK' as WarehouseCode, name: 'Griya Kitchen', partnerName: 'Griya Kitchen', hubLocation: 'PAMULANG 2, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang 2' },
+  { code: 'BB' as WarehouseCode, name: 'BB Equipment', partnerName: 'BB Equipment', hubLocation: 'PAMULANG 2, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang 2' },
+  { code: 'SM' as WarehouseCode, name: 'Suma Equipment', partnerName: 'Suma Equipment', hubLocation: 'PAMULANG 2, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang 2' },
+  { code: 'BL' as WarehouseCode, name: 'Blandongan', partnerName: 'Blandongan', hubLocation: 'PAMULANG 2, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang 2' },
+  { code: 'ML' as WarehouseCode, name: 'Mulia Logam', partnerName: 'Mulia Logam', hubLocation: 'PAMULANG BARAT, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang Barat' },
+  { code: 'RB' as WarehouseCode, name: 'Raja Barkas', partnerName: 'Raja Barkas', hubLocation: 'PAMULANG BARAT, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang Barat' },
+  { code: 'KG' as WarehouseCode, name: 'Kitchen Gembel', partnerName: 'Kitchen Gembel', hubLocation: 'PAMULANG BARAT, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang Barat' },
+  { code: 'PY' as WarehouseCode, name: 'Pak Yogi', partnerName: 'Pak Yogi', hubLocation: 'SETU, TANGSEL' as WarehouseLocation, hubGroup: 'Setu' },
+  { code: 'PE' as WarehouseCode, name: 'Pulung Elite', partnerName: 'Pulung Elite', hubLocation: 'SAWANGAN, DEPOK' as WarehouseLocation, hubGroup: 'Sawangan' },
+  { code: 'SK' as WarehouseCode, name: 'Sanjaya Kitchen', partnerName: 'Sanjaya Kitchen', hubLocation: 'SAWANGAN, DEPOK' as WarehouseLocation, hubGroup: 'Sawangan' },
+  { code: 'WT' as WarehouseCode, name: 'Warehouse Thaif', partnerName: 'Warehouse Thaif', hubLocation: 'KEDAUNG, TANGSEL' as WarehouseLocation, hubGroup: 'Kedaung' },
+  { code: 'ON' as WarehouseCode, name: 'Onibuja Warehouse', partnerName: 'Onibuja Warehouse', hubLocation: 'KEDAUNG, TANGSEL' as WarehouseLocation, hubGroup: 'Kedaung' },
+  { code: 'RK' as WarehouseCode, name: 'Rizkitchen', partnerName: 'Rizkitchen', hubLocation: 'RAWAKALONG, BOGOR' as WarehouseLocation, hubGroup: 'Rawakalong' },
 ];
 
 export const WAREHOUSE_HUB_DETAILS = [
