@@ -178,13 +178,32 @@ export function FinanceDashboard() {
   }, [dealPage]);
 
   // Helper to match official 13 Warehouse Hub codes (GK, BB, SM, BL, ML, RB, KG, PY, PE, SK, WT, ON, RK)
-  const matchWarehouseHub = (itemLocation: string, itemAsalGudang?: string, skuStr?: string, hubFilter: string = 'ALL') => {
+  const matchWarehouseHub = (itemLocation: string = '', itemAsalGudang: string = '', skuStr: string = '', hubFilter: string = 'ALL') => {
     if (!hubFilter || hubFilter === 'ALL') return true;
     const wh = hubFilter.toUpperCase().trim();
     const code = (itemAsalGudang || '').toUpperCase().trim();
+    const loc = (itemLocation || '').toUpperCase().trim();
     const sku = (skuStr || '').toUpperCase().trim();
 
-    if (code && code === wh) return true;
+    if (code && (code === wh || code.includes(wh))) return true;
+    if (loc && (loc === wh || loc.includes(wh))) return true;
+
+    const hubObj = WAREHOUSE_13_HUBS.find((h) => h.code === wh);
+    if (hubObj) {
+      const hubGroup = hubObj.hubGroup.toUpperCase();
+      const partner = hubObj.partnerName.toUpperCase();
+      const hubLoc = hubObj.hubLocation.toUpperCase();
+      if (
+        loc.includes(hubGroup) ||
+        loc.includes(partner) ||
+        loc.includes(hubLoc) ||
+        code.includes(hubGroup) ||
+        code.includes(partner) ||
+        code.includes(hubLoc)
+      ) {
+        return true;
+      }
+    }
 
     if (
       sku.startsWith(`${wh}-`) ||
@@ -339,6 +358,82 @@ export function FinanceDashboard() {
     return str;
   };
 
+  // Helper to isolate revenue, cogs, profit, and physical units for an individual deal based on active filters
+  const getDealFilteredMetrics = React.useCallback(
+    (
+      deal: ClosingDealItem,
+      whFilter: string = 'ALL',
+      catFilter: string = 'ALL'
+    ): { matches: boolean; revenue: number; cogs: number; profit: number; units: number } => {
+      // If no specific hub/category filter is active, return entire deal values
+      if ((!whFilter || whFilter === 'ALL') && (!catFilter || catFilter === 'ALL')) {
+        const revenue = deal.hargaClosing > 0 ? deal.hargaClosing : (deal.hargaModal || 0);
+        const cogs = deal.hargaModal || (deal.hargaClosing - (deal.realizedProfit || 0));
+        const profit = deal.realizedProfit || 0;
+        const units = deal.quantity || (deal.items && deal.items.length > 0 ? deal.items.reduce((s, it) => s + (it.quantity || 1), 0) : 1);
+        return { matches: true, revenue, cogs, profit, units };
+      }
+
+      // If deal has itemized list (e.g. unified multi-item invoice)
+      if (deal.items && deal.items.length > 0) {
+        let sumRev = 0;
+        let sumCost = 0;
+        let sumProf = 0;
+        let sumUnits = 0;
+        let matchedAny = false;
+
+        for (const it of deal.items) {
+          const itemWh = it.warehouseLocation || it.asalGudang || deal.lokasiGudang || deal.asalGudang || '';
+          const itemCat = it.condition || it.category || '';
+          const itemTitle = it.description || it.sku || '';
+
+          const whMatch = matchWarehouseHub(itemWh, it.asalGudang || deal.asalGudang, it.sku || deal.sku, whFilter);
+          const catMatch = matchCategory(itemTitle, itemCat, catFilter);
+
+          if (whMatch && catMatch) {
+            matchedAny = true;
+            const qty = it.quantity || 1;
+            const rev = (it.unitPrice || 0) * qty;
+            const cost = (it.unitCost || 0) * qty;
+            const prof = Math.max(0, rev - cost);
+
+            sumRev += rev;
+            sumCost += cost;
+            sumProf += prof;
+            sumUnits += qty;
+          }
+        }
+
+        if (matchedAny) {
+          return {
+            matches: true,
+            revenue: sumRev,
+            cogs: sumCost,
+            profit: sumProf,
+            units: sumUnits,
+          };
+        } else {
+          return { matches: false, revenue: 0, cogs: 0, profit: 0, units: 0 };
+        }
+      }
+
+      // Fallback for single-item deals / legacy deals without items array
+      const whMatch = matchWarehouseHub(deal.lokasiGudang, deal.asalGudang, deal.sku, whFilter);
+      const catMatch = matchCategory(deal.productTitle, deal.category, catFilter);
+
+      if (whMatch && catMatch) {
+        const revenue = deal.hargaClosing > 0 ? deal.hargaClosing : (deal.hargaModal || 0);
+        const cogs = deal.hargaModal || (deal.hargaClosing - (deal.realizedProfit || 0));
+        const profit = deal.realizedProfit || 0;
+        const units = deal.quantity || 1;
+        return { matches: true, revenue, cogs, profit, units };
+      }
+
+      return { matches: false, revenue: 0, cogs: 0, profit: 0, units: 0 };
+    },
+    []
+  );
+
   // 1. FILTERED DEALS (ACTIVE PERIOD)
   const filteredDeals = useMemo(() => {
     const { startFilter, endFilter } = dateBounds;
@@ -351,16 +446,15 @@ export function FinanceDashboard() {
         deal.sku.toLowerCase().includes(q) ||
         deal.productTitle.toLowerCase().includes(q) ||
         deal.lokasiGudang.toLowerCase().includes(q) ||
-        (deal.notes ? deal.notes.toLowerCase().includes(q) : false);
+        (deal.notes ? deal.notes.toLowerCase().includes(q) : false) ||
+        (deal.items && deal.items.some((it) => (it.description || '').toLowerCase().includes(q) || (it.sku || '').toLowerCase().includes(q)));
 
       // Channel filter
       const matchChannel = channelFilter === 'ALL' || deal.soldBy === channelFilter;
 
-      // Warehouse filter
-      const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, deal.asalGudang, deal.sku, warehouseFilter);
-
-      // Category filter (match on title and category field)
-      const matchCat = categoryFilter === 'ALL' || matchCategory(deal.productTitle, deal.category, categoryFilter);
+      // Item-level Warehouse & Category Matching
+      const itemMetrics = getDealFilteredMetrics(deal, warehouseFilter, categoryFilter);
+      if (!itemMetrics.matches) return false;
 
       // Date filtering comparison on clean ISO YYYY-MM-DD
       let matchDate = true;
@@ -374,9 +468,9 @@ export function FinanceDashboard() {
         }
       }
 
-      return matchQ && matchChannel && matchWarehouse && matchCat && matchDate;
+      return matchQ && matchChannel && matchDate;
     });
-  }, [deals, searchQuery, channelFilter, warehouseFilter, categoryFilter, dateBounds]);
+  }, [deals, searchQuery, channelFilter, warehouseFilter, categoryFilter, dateBounds, getDealFilteredMetrics]);
 
   const dealTotalPages = Math.max(1, Math.ceil(filteredDeals.length / dealPageSize));
   const paginatedDeals = useMemo(() => {
@@ -391,17 +485,17 @@ export function FinanceDashboard() {
 
     return deals.filter((deal) => {
       const matchChannel = channelFilter === 'ALL' || deal.soldBy === channelFilter;
-      const matchWarehouse = matchWarehouseHub(deal.lokasiGudang, deal.asalGudang, deal.sku, warehouseFilter);
-      const matchCat = categoryFilter === 'ALL' || matchCategory(deal.productTitle, deal.category, categoryFilter);
+      const itemMetrics = getDealFilteredMetrics(deal, warehouseFilter, categoryFilter);
+      if (!itemMetrics.matches) return false;
 
       const dealDateStr = extractISODate(deal.tanggalTerjual || deal.tanggalMasuk);
       if (!dealDateStr) return false;
       if (startFilter && dealDateStr < startFilter) return false;
       if (endFilter && dealDateStr > endFilter) return false;
 
-      return matchChannel && matchWarehouse && matchCat;
+      return matchChannel;
     });
-  }, [deals, channelFilter, warehouseFilter, categoryFilter, prevDateBounds]);
+  }, [deals, channelFilter, warehouseFilter, categoryFilter, prevDateBounds, getDealFilteredMetrics]);
 
   // 2. FILTERED INVENTORY (FOR SUPPLY & ASSET VALUATION)
   const filteredInventory = useMemo(() => {
@@ -432,12 +526,14 @@ export function FinanceDashboard() {
     let bbkSalesCount = 0;
     let thirdPartyCount = 0;
     let totalCogs = 0;
+    let unitsSold = 0;
 
     filteredDeals.forEach((d) => {
-      const closingVal = d.hargaClosing > 0 ? d.hargaClosing : (d.hargaModal || 0);
-      revenue += closingVal;
-      totalCogs += d.hargaModal || (d.hargaClosing - d.realizedProfit);
-      profit += d.realizedProfit || 0;
+      const m = getDealFilteredMetrics(d, warehouseFilter, categoryFilter);
+      revenue += m.revenue;
+      totalCogs += m.cogs;
+      profit += m.profit;
+      unitsSold += m.units;
 
       if (d.soldBy === 'SALES_BBK') {
         bbkSalesCount++;
@@ -447,7 +543,6 @@ export function FinanceDashboard() {
     });
 
     const totalDeals = filteredDeals.length;
-    const unitsSold = filteredDeals.reduce((sum, d) => sum + (d.quantity || 1), 0);
     const grossMarginPct = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
 
     return {
@@ -460,22 +555,22 @@ export function FinanceDashboard() {
       unitsSold,
       totalCogs,
     };
-  }, [filteredDeals]);
+  }, [filteredDeals, warehouseFilter, categoryFilter, getDealFilteredMetrics]);
 
   // 4. GROWTH CALCULATIONS (COMPARED TO PREVIOUS PERIOD)
   const growthKPIs = useMemo(() => {
     let prevRevenue = 0;
     let prevProfit = 0;
     let prevDealsCount = 0;
+    let prevUnitsSold = 0;
 
     previousDeals.forEach((d) => {
-      const closingVal = d.hargaClosing > 0 ? d.hargaClosing : (d.hargaModal || 0);
-      prevRevenue += closingVal;
-      prevProfit += d.realizedProfit || 0;
+      const m = getDealFilteredMetrics(d, warehouseFilter, categoryFilter);
+      prevRevenue += m.revenue;
+      prevProfit += m.profit;
+      prevUnitsSold += m.units;
       prevDealsCount++;
     });
-
-    const prevUnitsSold = previousDeals.reduce((sum, d) => sum + (d.quantity || 1), 0);
 
     const calcGrowth = (current: number, previous: number) => {
       if (previous === 0) return current > 0 ? 100 : 0;
@@ -498,7 +593,7 @@ export function FinanceDashboard() {
       unitsGrowth,
       hasPrevData: previousDeals.length > 0,
     };
-  }, [previousDeals, healthKPIs]);
+  }, [previousDeals, healthKPIs, warehouseFilter, categoryFilter, getDealFilteredMetrics]);
 
   // 5. TIME-SERIES TIMELINE CHART DATA
   const timelineChartData = useMemo(() => {
@@ -518,16 +613,16 @@ export function FinanceDashboard() {
         });
       }
 
+      const m = getDealFilteredMetrics(deal, warehouseFilter, categoryFilter);
       const bucket = timelineMap.get(dateStr)!;
       bucket.closing++;
-      bucket.units += deal.quantity || 1;
-      const closingVal = deal.hargaClosing > 0 ? deal.hargaClosing : (deal.hargaModal || 0);
-      bucket.revenue += closingVal;
-      bucket.profit += deal.realizedProfit || 0;
+      bucket.units += m.units;
+      bucket.revenue += m.revenue;
+      bucket.profit += m.profit;
     });
 
     return Array.from(timelineMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-  }, [filteredDeals]);
+  }, [filteredDeals, warehouseFilter, categoryFilter, getDealFilteredMetrics]);
 
   // Helper to categorize individual equipment description
   const detectCategoryFromText = (text: string = ''): string => {
@@ -579,6 +674,16 @@ export function FinanceDashboard() {
     filteredDeals.forEach((deal) => {
       if (deal.items && deal.items.length > 0) {
         deal.items.forEach((it) => {
+          const itemWh = it.warehouseLocation || it.asalGudang || deal.lokasiGudang || deal.asalGudang || '';
+          const itemCat = it.condition || it.category || '';
+          const itemTitle = it.description || it.sku || '';
+
+          // Only aggregate item if it matches the current warehouse and category filter
+          const whMatch = matchWarehouseHub(itemWh, it.asalGudang || deal.asalGudang, it.sku || deal.sku, warehouseFilter);
+          const catMatch = matchCategory(itemTitle, itemCat, categoryFilter);
+
+          if (!whMatch || !catMatch) return;
+
           const cat = detectCategoryFromText(it.description || it.sku);
           const itemQty = it.quantity || 1;
           const itemRevenue = (it.unitPrice || 0) * itemQty;
@@ -629,12 +734,11 @@ export function FinanceDashboard() {
         marginPct,
       };
     });
-  }, [filteredDeals, filteredInventory]);
+  }, [filteredDeals, filteredInventory, warehouseFilter, categoryFilter]);
 
   // Overall Unit Economics averages (Based on REAL Physical Units Sold)
   const unitEconomicsAverages = useMemo(() => {
-    const bbkDeals = filteredDeals.filter((d) => d.soldBy === 'SALES_BBK');
-    const totalPhysicalUnits = bbkDeals.reduce((sum, d) => sum + (d.quantity || 1), 0);
+    const totalPhysicalUnits = healthKPIs.unitsSold;
 
     const asp = totalPhysicalUnits > 0 ? Math.round(healthKPIs.revenue / totalPhysicalUnits) : 0;
     const avgHpp = totalPhysicalUnits > 0 ? Math.round(healthKPIs.totalCogs / totalPhysicalUnits) : 0;
@@ -642,7 +746,7 @@ export function FinanceDashboard() {
     const avgMargin = healthKPIs.grossMarginPct;
 
     return { asp, avgHpp, avgProfit, avgMargin };
-  }, [filteredDeals, healthKPIs]);
+  }, [healthKPIs]);
 
   // Top Products / Categories Chart Data
   const topCategoriesChartData = useMemo(() => {
@@ -1793,6 +1897,37 @@ export function FinanceDashboard() {
                 paginatedDeals.map((deal) => {
                   const isItemNonSku = deal.isNonSku || deal.sku.startsWith('BBK-CUSTOM') || deal.sku.startsWith('INV-');
                   const isMultiItem = (deal.itemsCount && deal.itemsCount > 1) || (deal.items && deal.items.length > 1);
+                  const isFilterActive = warehouseFilter !== 'ALL' || categoryFilter !== 'ALL';
+                  const rowMetrics = getDealFilteredMetrics(deal, warehouseFilter, categoryFilter);
+
+                  const displayRevenue = isFilterActive ? rowMetrics.revenue : (deal.hargaClosing > 0 ? deal.hargaClosing : (deal.hargaModal || 0));
+                  const displayModal = isFilterActive ? rowMetrics.cogs : deal.hargaModal;
+                  const displayProfit = isFilterActive ? rowMetrics.profit : deal.realizedProfit;
+                  const displayMargin = displayRevenue > 0 ? Math.round((displayProfit / displayRevenue) * 100) : 0;
+                  const displayUnits = isFilterActive ? rowMetrics.units : (deal.quantity || 1);
+
+                  // Find matching items in multi-item invoice
+                  const matchingItems = isMultiItem && deal.items
+                    ? deal.items.filter((it) => {
+                        const itemWh = it.warehouseLocation || it.asalGudang || deal.lokasiGudang || deal.asalGudang || '';
+                        const itemCat = it.condition || it.category || '';
+                        const itemTitle = it.description || it.sku || '';
+                        return (
+                          matchWarehouseHub(itemWh, it.asalGudang || deal.asalGudang, it.sku || deal.sku, warehouseFilter) &&
+                          matchCategory(itemTitle, itemCat, categoryFilter)
+                        );
+                      })
+                    : [];
+
+                  const firstMatch = matchingItems[0];
+                  const rowAsalGudang = (isFilterActive && firstMatch?.warehouseLocation)
+                    ? firstMatch.warehouseLocation
+                    : (deal.asalGudang || 'GK');
+
+                  const rowProductTitle = (isFilterActive && isMultiItem && matchingItems.length > 0)
+                    ? matchingItems.map((it) => `${(it.quantity || 1) > 1 ? `${it.quantity}x ` : ''}${it.description || it.sku}`).join(' • ')
+                    : deal.productTitle;
+
                   const rowKey = `${deal.sku}_${deal.invoiceNumber || ''}_${deal.tanggalTerjual || ''}`;
                   return (
                     <tr key={rowKey} className="hover:bg-slate-850/50 transition-colors">
@@ -1801,7 +1936,9 @@ export function FinanceDashboard() {
                           <span>{deal.sku}</span>
                           {isMultiItem && (
                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950/90 text-amber-300 border border-amber-800">
-                              {deal.itemsCount} Item ({deal.quantity || 1} Unit)
+                              {isFilterActive && matchingItems.length > 0
+                                ? `${displayUnits} Unit (Filtered)`
+                                : `${deal.itemsCount || deal.items?.length || 1} Item (${deal.quantity || 1} Unit)`}
                             </span>
                           )}
                           {isItemNonSku && !isMultiItem && (
@@ -1812,7 +1949,7 @@ export function FinanceDashboard() {
                         </div>
                       </td>
                       <td className="py-3 px-3.5 max-w-xs">
-                        <p className="font-bold text-slate-200 line-clamp-2">{deal.productTitle}</p>
+                        <p className="font-bold text-slate-200 line-clamp-2">{rowProductTitle}</p>
                         <p className="text-[10px] text-slate-500 line-clamp-1">{deal.notes}</p>
                       </td>
                       <td className="py-3 px-3.5 text-slate-300 font-mono text-[11px]">
@@ -1824,23 +1961,23 @@ export function FinanceDashboard() {
                       <td className="py-3 px-3.5 text-slate-300">
                         <div className="flex items-center gap-1.5">
                           <span className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono font-bold text-[10px] text-indigo-300">
-                            {deal.asalGudang || 'GK'}
+                            {rowAsalGudang}
                           </span>
                           <span className="text-[11px] text-slate-300">
-                            {resolveLocationFromCode((deal.asalGudang || 'GK') as any)}
+                            {resolveLocationFromCode(rowAsalGudang as any)}
                           </span>
                         </div>
                       </td>
                       <td className="py-3 px-3.5 text-right font-mono text-slate-400">
-                        {deal.hargaModal > 0 ? formatIDR(deal.hargaModal) : '-'}
+                        {displayModal > 0 ? formatIDR(displayModal) : '-'}
                       </td>
                       <td className="py-3 px-3.5 text-right font-mono font-bold text-amber-400">
-                        {deal.hargaClosing > 0 ? formatIDR(deal.hargaClosing) : (deal.hargaModal > 0 ? formatIDR(deal.hargaModal) : '-')}
+                        {displayRevenue > 0 ? formatIDR(displayRevenue) : (displayModal > 0 ? formatIDR(displayModal) : '-')}
                       </td>
                       <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-400">
-                        {deal.realizedProfit > 0 ? (
+                        {displayProfit > 0 ? (
                           <span>
-                            +{formatIDR(deal.realizedProfit)} <span className="text-[10px] font-normal text-emerald-500/80">({deal.marginPercent}%)</span>
+                            +{formatIDR(displayProfit)} <span className="text-[10px] font-normal text-emerald-500/80">({displayMargin}%)</span>
                           </span>
                         ) : (
                           '-'

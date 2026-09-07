@@ -168,24 +168,35 @@ export async function getLiveClosingDealLedger(): Promise<{
           }
 
           let itemUnitCost = it.unitCost || 0;
+          let itemWarehouse = it.warehouseLocation || '';
+          let itemCategory = it.condition || '';
 
           // Check if SKU exists in master inventory
           const rawMatch = !isCustomSku ? rawItems.find((r) => r.SKU.trim().toUpperCase() === itemSku) : undefined;
           if (rawMatch) {
             matchedSkusSet.add(itemSku);
             itemUnitCost = rawMatch.HARGA_MODAL || 0;
+            itemWarehouse = rawMatch.asal_gudang || resolveLocationFromCode(rawMatch.asal_gudang || 'GK');
+            itemCategory = rawMatch.CATEGORY_NAME || rawMatch.CATEGORY_SLUG || '';
             invoiceModal += itemUnitCost * qty;
           } else {
             // Check if resolved in TRANSAKSI_NON_SKU
             const resolvedNonSku = nonSkuRecords.find(
               (r) =>
                 r.invoiceNumber === inv.invoiceNumber &&
-                (r.skuTemp === itemSku || r.itemTitle.toLowerCase() === (it.description || '').toLowerCase())
+                (r.skuTemp === itemSku ||
+                  (Boolean(it.description) &&
+                    Boolean(r.itemTitle) &&
+                    (r.itemTitle.trim().toLowerCase() === it.description.trim().toLowerCase() ||
+                      it.description.toLowerCase().includes(r.itemTitle.toLowerCase()) ||
+                      r.itemTitle.toLowerCase().includes(it.description.toLowerCase()))))
             );
 
             if (resolvedNonSku) {
-              itemUnitCost = resolvedNonSku.hppModal / qty;
-              invoiceModal += resolvedNonSku.hppModal;
+              itemUnitCost = (resolvedNonSku.hppModal || 0) / qty;
+              itemWarehouse = resolvedNonSku.warehouseCode || resolvedNonSku.hubLocation || it.warehouseLocation || 'ML';
+              itemCategory = resolvedNonSku.category || it.condition || '';
+              invoiceModal += resolvedNonSku.hppModal || 0;
             } else {
               invoiceModal += (it.unitCost || 0) * qty;
             }
@@ -194,6 +205,8 @@ export async function getLiveClosingDealLedger(): Promise<{
           enrichedItems.push({
             ...it,
             unitCost: itemUnitCost,
+            warehouseLocation: itemWarehouse,
+            condition: itemCategory,
           });
         }
 

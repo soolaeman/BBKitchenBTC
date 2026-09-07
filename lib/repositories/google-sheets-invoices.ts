@@ -39,7 +39,7 @@ const INVOICE_HEADERS = [
 ];
 
 const NON_SKU_SHEET_NAME = 'TRANSAKSI_NON_SKU';
-const NON_SKU_RANGE = `${NON_SKU_SHEET_NAME}!A:N`;
+const NON_SKU_RANGE = `${NON_SKU_SHEET_NAME}!A:Q`;
 const NON_SKU_HEADERS = [
   'ID',
   'INVOICE_NUMBER',
@@ -55,6 +55,9 @@ const NON_SKU_HEADERS = [
   'NAMA_PEMBELI',
   'CATATAN',
   'RESOLVED_AT',
+  'HUB_LOCATION',
+  'WAREHOUSE_CODE',
+  'CATEGORY',
 ];
 
 let sheetEnsured = false;
@@ -139,7 +142,7 @@ async function ensureNonSkuSheetExists(spreadsheetId: string) {
       // Write Header Row
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${NON_SKU_SHEET_NAME}!A1:N1`,
+        range: `${NON_SKU_SHEET_NAME}!A1:Q1`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [NON_SKU_HEADERS],
@@ -645,7 +648,7 @@ export async function fetchGoogleSheetsNonSkuTransactions(): Promise<NonSkuTrans
     const sheets = getSheetsClient();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${NON_SKU_SHEET_NAME}!A2:N`,
+      range: `${NON_SKU_SHEET_NAME}!A2:Q`,
       valueRenderOption: 'UNFORMATTED_VALUE',
     });
 
@@ -689,7 +692,7 @@ export async function saveGoogleSheetsNonSkuTransaction(tx: NonSkuTransaction): 
       const sheetRowNumber = targetIdx + 1;
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${NON_SKU_SHEET_NAME}!A${sheetRowNumber}:N${sheetRowNumber}`,
+        range: `${NON_SKU_SHEET_NAME}!A${sheetRowNumber}:Q${sheetRowNumber}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: [row] },
       });
@@ -729,7 +732,7 @@ export async function deleteGoogleSheetsNonSkuTransaction(id: string): Promise<b
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${NON_SKU_SHEET_NAME}!A2:N`,
+      range: `${NON_SKU_SHEET_NAME}!A2:Q`,
       valueRenderOption: 'UNFORMATTED_VALUE',
     });
 
