@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 import type { MasterInventoryItem, InventoryFilterOptions, PaginatedInventoryResponse } from "@/lib/types/inventory";
 import { OFFICIAL_CATEGORIES } from "./categories";
-import { formatCleanProductUrl } from "./warehouse-utils";
+import { formatCleanProductUrl, matchCategory, matchWarehouseHub } from "./warehouse-utils";
 import type { UserRole } from "@/lib/types/auth";
 import { ROLE_PERMISSIONS } from "@/lib/types/auth";
 import { removePendingSoldReport } from "./sold-reports-repository";
@@ -275,41 +275,17 @@ export async function queryGoogleSheetsInventory(
   }
 
   if (options.category && options.category !== "ALL") {
-    const cat = options.category.toLowerCase().trim();
-    const parentGroup = OFFICIAL_CATEGORIES.find((g) => g.slug === cat);
-    const validSlugs = parentGroup
-      ? [cat, ...parentGroup.children.map((c) => c.slug)]
-      : [cat];
-
-    filtered = filtered.filter((item) => {
-      const slug = (item.CATEGORY_SLUG || "").toLowerCase().trim();
-      const name = (item.CATEGORY_NAME || "").toLowerCase().trim();
-      const title = (item.PRODUCT_TITLE || "").toLowerCase();
-
-      return (
-        validSlugs.some((s) => slug === s || slug.includes(s) || s.includes(slug)) ||
-        name.includes(cat) ||
-        title.includes(cat)
-      );
-    });
+    filtered = filtered.filter((item) =>
+      matchCategory(item.PRODUCT_TITLE, item.CATEGORY_SLUG || item.CATEGORY_NAME, options.category)
+    );
   }
   if (options.location && options.location !== "ALL") {
     filtered = filtered.filter((item) => item.LOKASI_UNIT.includes(options.location!));
   }
   if (options.warehouse && options.warehouse !== "ALL") {
-    const wh = options.warehouse.toUpperCase().trim();
-    filtered = filtered.filter((item) => {
-      const code = (item.asal_gudang || "").toUpperCase();
-      if (code === wh) return true;
-      const sku = (item.SKU || "").toUpperCase();
-      return (
-        sku.startsWith(`${wh}-`) ||
-        sku.startsWith(`${wh}_`) ||
-        sku.startsWith(`BBK-${wh}-`) ||
-        sku.startsWith(`BBK_${wh}_`) ||
-        sku.includes(`-${wh}-`)
-      );
-    });
+    filtered = filtered.filter((item) =>
+      matchWarehouseHub(item.LOKASI_UNIT, item.asal_gudang, item.SKU, options.warehouse)
+    );
   }
   if (options.statusUnit && options.statusUnit !== "ALL") {
     if (options.statusUnit === "READY") {
