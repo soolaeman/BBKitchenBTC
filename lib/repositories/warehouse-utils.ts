@@ -1,4 +1,5 @@
 import { WarehouseCode, WarehouseLocation } from '@/lib/types/inventory';
+import { OFFICIAL_CATEGORIES } from './categories';
 
 export const WAREHOUSE_LOCATION_MAP: Record<WarehouseCode, WarehouseLocation> = {
   GK: 'PAMULANG 2, TANGSEL',
@@ -197,4 +198,390 @@ export function parseToISODate(raw: any): string | undefined {
   }
 
   return undefined;
+}
+
+/**
+ * Resolves the canonical 2-letter Warehouse Code (GK, BB, SM, BL, ML, RB, KG, PY, PE, SK, WT, ON, RK)
+ */
+export function resolveHubCode(asalGudang?: string, loc?: string, sku?: string): WarehouseCode | '' {
+  const code = (asalGudang || '').trim().toUpperCase();
+  const validCodes: WarehouseCode[] = ['GK', 'BB', 'SM', 'BL', 'ML', 'RB', 'KG', 'PY', 'PE', 'SK', 'WT', 'ON', 'RK'];
+
+  if (validCodes.includes(code as WarehouseCode)) {
+    return code as WarehouseCode;
+  }
+
+  // Exact partner name match e.g. "GRIYA KITCHEN", "MULIA LOGAM", "BB EQUIPMENT"
+  for (const hub of WAREHOUSE_13_HUBS) {
+    if (
+      code &&
+      (code === hub.name.toUpperCase() ||
+        code === hub.partnerName.toUpperCase() ||
+        code.startsWith(`${hub.code} `) ||
+        code.startsWith(`${hub.code}-`) ||
+        code.startsWith(`${hub.code} -`))
+    ) {
+      return hub.code;
+    }
+  }
+
+  // Location string check for specific partner name
+  const locUpper = (loc || '').toUpperCase();
+  for (const hub of WAREHOUSE_13_HUBS) {
+    if (locUpper && (locUpper.includes(hub.partnerName.toUpperCase()) || locUpper.includes(hub.name.toUpperCase()))) {
+      return hub.code;
+    }
+  }
+
+  // SKU prefix match: e.g. "GK-1234", "BBK-GK-1234", "BB-1234", "ML-1234"
+  const skuUpper = (sku || '').toUpperCase();
+  for (const c of validCodes) {
+    if (
+      skuUpper.startsWith(`${c}-`) ||
+      skuUpper.startsWith(`${c}_`) ||
+      skuUpper.startsWith(`BBK-${c}-`) ||
+      skuUpper.startsWith(`BBK_${c}_`)
+    ) {
+      return c;
+    }
+  }
+
+  // Specific keyword cues (Distinct partners)
+  if (locUpper.includes('RAWAKALONG') || locUpper.includes('RIZKI') || locUpper.includes('RIZKITCHEN')) return 'RK';
+  if (locUpper.includes('SANJAYA')) return 'SK';
+  if (locUpper.includes('GEMBEL')) return 'KG';
+  if (locUpper.includes('PULUNG') || locUpper.includes('ELITE')) return 'PE';
+  if (locUpper.includes('YOGI')) return 'PY';
+  if (locUpper.includes('THAIF')) return 'WT';
+  if (locUpper.includes('ONIBUJA')) return 'ON';
+  if (locUpper.includes('MULIA') || locUpper.includes('LOGAM')) return 'ML';
+  if (locUpper.includes('BARKAS')) return 'RB';
+  if (locUpper.includes('BLANDONGAN')) return 'BL';
+  if (locUpper.includes('SUMA')) return 'SM';
+  if (locUpper.includes('BB EQUIPMENT')) return 'BB';
+  if (locUpper.includes('GRIYA')) return 'GK';
+
+  return '';
+}
+
+/**
+ * Exact matching for official 13 Warehouse Hubs (Prevents cross-hub false positives)
+ */
+export function matchWarehouseHub(
+  itemLocation: string = '',
+  itemAsalGudang: string = '',
+  skuStr: string = '',
+  hubFilter: string = 'ALL'
+): boolean {
+  if (!hubFilter || hubFilter === 'ALL') return true;
+  const targetCode = hubFilter.toUpperCase().trim() as WarehouseCode;
+
+  const resolved = resolveHubCode(itemAsalGudang, itemLocation, skuStr);
+  if (resolved) {
+    return resolved === targetCode;
+  }
+
+  // Fallback: direct exact comparison (no loose substring match)
+  const direct = (itemAsalGudang || '').toUpperCase().trim();
+  return direct === targetCode;
+}
+
+/**
+ * Robust Category Matching supporting Parent Category Groups and Subcategory Disambiguation
+ */
+export function matchCategory(itemTitle: string = '', itemCat: string = '', filter: string = 'ALL'): boolean {
+  if (!filter || filter === 'ALL') return true;
+
+  const cleanFilter = filter.toLowerCase().trim();
+  const cleanTitle = (itemTitle || '').toLowerCase().trim();
+  const cleanCat = (itemCat || '').toLowerCase().trim();
+
+  // 1. Direct exact match on category field
+  if (cleanCat && cleanCat === cleanFilter) {
+    return true;
+  }
+
+  // 2. Check if filter is a Parent Category Group
+  const parentGroup = OFFICIAL_CATEGORIES.find(
+    (g) => g.name.toLowerCase() === cleanFilter || g.slug.toLowerCase() === cleanFilter
+  );
+
+  if (parentGroup) {
+    // If filter is parent group (e.g. 'MEJA STAINLESS' or 'meja-stainless'):
+    const validSlugs = [parentGroup.slug.toLowerCase(), ...parentGroup.children.map((c) => c.slug.toLowerCase())];
+    const validNames = [parentGroup.name.toLowerCase(), ...parentGroup.children.map((c) => c.name.toLowerCase())];
+
+    if (validSlugs.includes(cleanCat) || validNames.includes(cleanCat)) return true;
+
+    // Check by root keyword in title
+    if (parentGroup.slug === 'meja-stainless' && cleanTitle.includes('meja')) return true;
+    if (
+      parentGroup.slug === 'sink-stainless' &&
+      (cleanTitle.includes('sink') || cleanTitle.includes('wastafel') || cleanTitle.includes('bak cuci'))
+    )
+      return true;
+    if (
+      parentGroup.slug === 'kompor' &&
+      (cleanTitle.includes('kompor') ||
+        cleanTitle.includes('kwali') ||
+        cleanTitle.includes('wok') ||
+        cleanTitle.includes('stove') ||
+        cleanTitle.includes('fryer') ||
+        cleanTitle.includes('boiler') ||
+        cleanTitle.includes('oven') ||
+        cleanTitle.includes('grill') ||
+        cleanTitle.includes('teppanyaki'))
+    )
+      return true;
+    if (parentGroup.slug === 'chiller' && cleanTitle.includes('chiller')) return true;
+    if (parentGroup.slug === 'freezer' && cleanTitle.includes('freezer')) return true;
+    if (parentGroup.slug === 'showcase' && cleanTitle.includes('showcase')) return true;
+    if (
+      parentGroup.slug === 'rak-stainless' &&
+      (cleanTitle.includes('rak') ||
+        cleanTitle.includes('wallshelf') ||
+        cleanTitle.includes('troli') ||
+        cleanTitle.includes('trolley'))
+    )
+      return true;
+    if (
+      parentGroup.slug === 'hood-stainless' &&
+      (cleanTitle.includes('hood') ||
+        cleanTitle.includes('exhaust') ||
+        cleanTitle.includes('blower') ||
+        cleanTitle.includes('ducting'))
+    )
+      return true;
+    if (
+      parentGroup.slug === 'ice-system' &&
+      (cleanTitle.includes('ice maker') ||
+        cleanTitle.includes('ice bin') ||
+        cleanTitle.includes('ice machine') ||
+        cleanTitle.includes('es batu'))
+    )
+      return true;
+    if (
+      parentGroup.slug === 'food-processing' &&
+      (cleanTitle.includes('blender') ||
+        cleanTitle.includes('mixer') ||
+        cleanTitle.includes('slicer') ||
+        cleanTitle.includes('sealer') ||
+        cleanTitle.includes('cutter'))
+    )
+      return true;
+
+    return false;
+  }
+
+  // 3. Filter is a SPECIFIC Subcategory (e.g. 'Meja 1 Susun', 'Meja 2 Susun', 'Single Sink', 'Double Sink', etc.)
+  let targetChild: { name: string; slug: string } | undefined;
+  for (const g of OFFICIAL_CATEGORIES) {
+    const found = g.children.find(
+      (c) => c.name.toLowerCase() === cleanFilter || c.slug.toLowerCase() === cleanFilter
+    );
+    if (found) {
+      targetChild = found;
+      break;
+    }
+  }
+
+  const childName = (targetChild ? targetChild.name : filter).toLowerCase();
+  const childSlug = (targetChild ? targetChild.slug : filter).toLowerCase();
+
+  // If item's category field matches the child name or slug exactly
+  if (cleanCat && (cleanCat === childName || cleanCat === childSlug)) {
+    return true;
+  }
+
+  // Specific Subcategory Disambiguation (e.g. Meja 1 Susun vs Meja 2 Susun vs Meja 3 Susun)
+  if (childName.includes('meja 1 susun') || childSlug.includes('meja-1-susun')) {
+    const is1 =
+      cleanCat.includes('1 susun') ||
+      cleanCat.includes('1-susun') ||
+      cleanTitle.includes('1 susun') ||
+      cleanTitle.includes('1-susun') ||
+      cleanTitle.includes('1susun');
+    const hasOther = cleanTitle.includes('2 susun') || cleanTitle.includes('3 susun') || cleanCat.includes('2 susun') || cleanCat.includes('3 susun');
+    return is1 && !hasOther;
+  }
+  if (childName.includes('meja 2 susun') || childSlug.includes('meja-2-susun')) {
+    const is2 =
+      cleanCat.includes('2 susun') ||
+      cleanCat.includes('2-susun') ||
+      cleanTitle.includes('2 susun') ||
+      cleanTitle.includes('2-susun') ||
+      cleanTitle.includes('2susun');
+    const hasOther = cleanTitle.includes('1 susun') || cleanTitle.includes('3 susun') || cleanCat.includes('1 susun') || cleanCat.includes('3 susun');
+    return is2 && !hasOther;
+  }
+  if (childName.includes('meja 3 susun') || childSlug.includes('meja-3-susun')) {
+    const is3 =
+      cleanCat.includes('3 susun') ||
+      cleanCat.includes('3-susun') ||
+      cleanTitle.includes('3 susun') ||
+      cleanTitle.includes('3-susun') ||
+      cleanTitle.includes('3susun');
+    const hasOther = cleanTitle.includes('1 susun') || cleanTitle.includes('2 susun') || cleanCat.includes('1 susun') || cleanCat.includes('2 susun');
+    return is3 && !hasOther;
+  }
+  if (childName.includes('meja bumbu') || childSlug.includes('meja-bumbu')) {
+    return cleanCat.includes('bumbu') || cleanTitle.includes('bumbu');
+  }
+  if (childName.includes('meja kabinet') || childSlug.includes('meja-kabinet')) {
+    return (
+      cleanCat.includes('kabinet') ||
+      cleanCat.includes('cabinet') ||
+      cleanTitle.includes('kabinet') ||
+      cleanTitle.includes('cabinet')
+    );
+  }
+  if (childName.includes('meja kompor') || childSlug.includes('meja-kompor')) {
+    return cleanCat.includes('meja kompor') || cleanTitle.includes('meja kompor');
+  }
+
+  // Sink Disambiguation
+  if (
+    childName.includes('single sink') ||
+    childSlug.includes('single-sink') ||
+    childName.includes('1 sink') ||
+    childName.includes('1 lubang') ||
+    childName.includes('1 bowl')
+  ) {
+    const isSingle =
+      cleanCat.includes('single') ||
+      cleanCat.includes('1 sink') ||
+      cleanCat.includes('1 lubang') ||
+      cleanCat.includes('1 bowl') ||
+      cleanTitle.includes('single sink') ||
+      cleanTitle.includes('1 sink') ||
+      cleanTitle.includes('1 lubang') ||
+      cleanTitle.includes('1 bowl');
+    const hasOther =
+      cleanTitle.includes('double') ||
+      cleanTitle.includes('triple') ||
+      cleanTitle.includes('2 sink') ||
+      cleanTitle.includes('2 lubang');
+    return isSingle && !hasOther;
+  }
+  if (
+    childName.includes('double sink') ||
+    childSlug.includes('double-sink') ||
+    childName.includes('2 sink') ||
+    childName.includes('2 lubang') ||
+    childName.includes('2 bowl')
+  ) {
+    const isDouble =
+      cleanCat.includes('double') ||
+      cleanCat.includes('2 sink') ||
+      cleanCat.includes('2 lubang') ||
+      cleanCat.includes('2 bowl') ||
+      cleanTitle.includes('double sink') ||
+      cleanTitle.includes('2 sink') ||
+      cleanTitle.includes('2 lubang') ||
+      cleanTitle.includes('2 bowl');
+    const hasOther =
+      cleanTitle.includes('single') ||
+      cleanTitle.includes('triple') ||
+      cleanTitle.includes('1 sink') ||
+      cleanTitle.includes('1 lubang');
+    return isDouble && !hasOther;
+  }
+  if (
+    childName.includes('triple sink') ||
+    childSlug.includes('triple-sink') ||
+    childName.includes('3 sink') ||
+    childName.includes('3 lubang') ||
+    childName.includes('3 bowl')
+  ) {
+    return (
+      cleanCat.includes('triple') ||
+      cleanCat.includes('3 sink') ||
+      cleanCat.includes('3 lubang') ||
+      cleanTitle.includes('triple sink') ||
+      cleanTitle.includes('3 sink') ||
+      cleanTitle.includes('3 lubang')
+    );
+  }
+
+  // Showcase Disambiguation
+  if (childName.includes('1 pintu') || childSlug.includes('1-pintu')) {
+    const is1 =
+      cleanCat.includes('1 pintu') ||
+      cleanTitle.includes('1 pintu') ||
+      cleanTitle.includes('1pintu') ||
+      cleanTitle.includes('1 door');
+    const hasOther =
+      cleanTitle.includes('2 pintu') ||
+      cleanTitle.includes('3 pintu') ||
+      cleanTitle.includes('2 door') ||
+      cleanTitle.includes('3 door');
+    return is1 && !hasOther;
+  }
+  if (childName.includes('2 pintu') || childSlug.includes('2-pintu')) {
+    const is2 =
+      cleanCat.includes('2 pintu') ||
+      cleanTitle.includes('2 pintu') ||
+      cleanTitle.includes('2pintu') ||
+      cleanTitle.includes('2 door');
+    const hasOther =
+      cleanTitle.includes('1 pintu') ||
+      cleanTitle.includes('3 pintu') ||
+      cleanTitle.includes('1 door') ||
+      cleanTitle.includes('3 door');
+    return is2 && !hasOther;
+  }
+
+  // Kompor Disambiguation
+  if (childName.includes('1 tungku') || childSlug.includes('1-tungku')) {
+    const is1 =
+      cleanCat.includes('1 tungku') ||
+      cleanTitle.includes('1 tungku') ||
+      cleanTitle.includes('1 burner') ||
+      cleanTitle.includes('stockpot');
+    const hasOther =
+      cleanTitle.includes('2 tungku') ||
+      cleanTitle.includes('3 tungku') ||
+      cleanTitle.includes('4 tungku') ||
+      cleanTitle.includes('6 tungku');
+    return is1 && !hasOther;
+  }
+  if (childName.includes('2 tungku') || childSlug.includes('2-tungku')) {
+    const is2 =
+      cleanCat.includes('2 tungku') ||
+      cleanTitle.includes('2 tungku') ||
+      cleanTitle.includes('2 burner');
+    const hasOther =
+      cleanTitle.includes('1 tungku') ||
+      cleanTitle.includes('3 tungku') ||
+      cleanTitle.includes('4 tungku') ||
+      cleanTitle.includes('6 tungku');
+    return is2 && !hasOther;
+  }
+  if (childName.includes('3 tungku') || childSlug.includes('3-tungku')) {
+    return cleanCat.includes('3 tungku') || cleanTitle.includes('3 tungku') || cleanTitle.includes('3 burner');
+  }
+  if (childName.includes('4 tungku') || childSlug.includes('4-tungku')) {
+    return cleanCat.includes('4 tungku') || cleanTitle.includes('4 tungku') || cleanTitle.includes('4 burner');
+  }
+  if (childName.includes('6 tungku') || childSlug.includes('6-tungku')) {
+    return cleanCat.includes('6 tungku') || cleanTitle.includes('6 tungku') || cleanTitle.includes('6 burner');
+  }
+  if (childName.includes('wok') || childName.includes('kwali') || childSlug.includes('kwali')) {
+    return cleanCat.includes('kwali') || cleanCat.includes('wok') || cleanTitle.includes('kwali') || cleanTitle.includes('wok');
+  }
+  if (childName.includes('deep fryer') || childSlug.includes('deep-fryer')) {
+    return cleanCat.includes('fryer') || cleanTitle.includes('fryer');
+  }
+  if (childName.includes('noodle boiler') || childSlug.includes('noodle-boiler')) {
+    return cleanCat.includes('noodle') || cleanCat.includes('boiler') || cleanTitle.includes('noodle') || cleanTitle.includes('boiler');
+  }
+  if (childName.includes('oven') || childSlug.includes('oven')) {
+    return cleanCat.includes('oven') || cleanTitle.includes('oven');
+  }
+
+  // Exact phrase fallback
+  if (cleanCat && (cleanCat.includes(childName) || cleanCat.includes(childSlug))) return true;
+  if (cleanTitle && cleanTitle.includes(childName)) return true;
+
+  return false;
 }

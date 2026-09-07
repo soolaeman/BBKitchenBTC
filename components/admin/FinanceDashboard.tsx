@@ -2,8 +2,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { ClosingDealItem, Invoice, DocumentType } from '@/lib/types/finance';
-import { formatIDR, resolveLocationFromCode, WAREHOUSE_13_HUBS } from '@/lib/repositories/warehouse-utils';
+import {
+  formatIDR,
+  resolveLocationFromCode,
+  WAREHOUSE_13_HUBS,
+  matchWarehouseHub,
+  matchCategory,
+} from '@/lib/repositories/warehouse-utils';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
 import { ResolveNonSkuModal, NonSkuResolveItem } from './ResolveNonSkuModal';
@@ -177,112 +182,6 @@ export function FinanceDashboard() {
     setDealPageInput(String(dealPage));
   }, [dealPage]);
 
-  // Helper to match official 13 Warehouse Hub codes (GK, BB, SM, BL, ML, RB, KG, PY, PE, SK, WT, ON, RK)
-  const matchWarehouseHub = (itemLocation: string = '', itemAsalGudang: string = '', skuStr: string = '', hubFilter: string = 'ALL') => {
-    if (!hubFilter || hubFilter === 'ALL') return true;
-    const wh = hubFilter.toUpperCase().trim();
-    const code = (itemAsalGudang || '').toUpperCase().trim();
-    const loc = (itemLocation || '').toUpperCase().trim();
-    const sku = (skuStr || '').toUpperCase().trim();
-
-    if (code && (code === wh || code.includes(wh))) return true;
-    if (loc && (loc === wh || loc.includes(wh))) return true;
-
-    const hubObj = WAREHOUSE_13_HUBS.find((h) => h.code === wh);
-    if (hubObj) {
-      const hubGroup = hubObj.hubGroup.toUpperCase();
-      const partner = hubObj.partnerName.toUpperCase();
-      const hubLoc = hubObj.hubLocation.toUpperCase();
-      if (
-        loc.includes(hubGroup) ||
-        loc.includes(partner) ||
-        loc.includes(hubLoc) ||
-        code.includes(hubGroup) ||
-        code.includes(partner) ||
-        code.includes(hubLoc)
-      ) {
-        return true;
-      }
-    }
-
-    if (
-      sku.startsWith(`${wh}-`) ||
-      sku.startsWith(`${wh}_`) ||
-      sku.startsWith(`BBK-${wh}-`) ||
-      sku.startsWith(`BBK_${wh}_`) ||
-      sku.includes(`-${wh}-`)
-    ) {
-      return true;
-    }
-
-    return false;
-  };
-
-  // Helper to match Category across Parent Groups, Children Slugs & Aliases
-  const matchCategory = (itemTitle: string = '', itemCatSlugOrName: string = '', filter: string = 'ALL') => {
-    if (!filter || filter === 'ALL') return true;
-
-    const cleanFilter = filter.toLowerCase().trim();
-    const cleanTitle = (itemTitle || '').toLowerCase();
-    const cleanCat = (itemCatSlugOrName || '').toLowerCase();
-
-    // Direct match check
-    if (cleanCat && (cleanCat === cleanFilter || cleanCat.includes(cleanFilter) || cleanFilter.includes(cleanCat))) {
-      return true;
-    }
-
-    // Find in OFFICIAL_CATEGORIES
-    const group = OFFICIAL_CATEGORIES.find(
-      (g) => g.name.toLowerCase() === cleanFilter || g.slug.toLowerCase() === cleanFilter
-    );
-
-    if (group) {
-      const validTokens = [
-        group.name.toLowerCase(),
-        group.slug.toLowerCase(),
-        group.slug.split('-')[0].toLowerCase(), // e.g. 'meja', 'sink', 'kompor', 'chiller', 'freezer', 'rak', 'hood', 'showcase'
-        ...group.children.map((c) => c.slug.toLowerCase()),
-        ...group.children.map((c) => c.name.toLowerCase()),
-      ];
-
-      // Add specific domain aliases
-      if (group.slug === 'kompor') {
-        validTokens.push('fryer', 'deep fryer', 'boiler', 'oven', 'kwali', 'wok', 'stove', 'grill', 'teppanyaki');
-      } else if (group.slug === 'hood-stainless') {
-        validTokens.push('exhaust', 'blower', 'ducting', 'hood');
-      } else if (group.slug === 'ice-system') {
-        validTokens.push('ice maker', 'ice bin', 'ice machine', 'es batu', 'es kristal');
-      } else if (group.slug === 'rak-stainless') {
-        validTokens.push('wallshelf', 'troli', 'trolley', 'shelf');
-      }
-
-      return validTokens.some((token) => {
-        if (!token) return false;
-        return cleanCat.includes(token) || token.includes(cleanCat) || cleanTitle.includes(token);
-      });
-    }
-
-    // Find in child subcategories
-    for (const g of OFFICIAL_CATEGORIES) {
-      const child = g.children.find(
-        (c) => c.name.toLowerCase() === cleanFilter || c.slug.toLowerCase() === cleanFilter
-      );
-      if (child) {
-        const childTokens = [child.name.toLowerCase(), child.slug.toLowerCase(), ...child.name.toLowerCase().split(' ')];
-        const hasMatch = childTokens.some((t) => t.length > 2 && (cleanCat.includes(t) || cleanTitle.includes(t)));
-        if (hasMatch) return true;
-      }
-    }
-
-    // Fallback: word token matching
-    const words = cleanFilter.split(/\s+/).filter((w) => w.length > 2 && w !== 'stainless' && w !== 'dan' && w !== '&');
-    if (words.length > 0) {
-      return words.some((w) => cleanCat.includes(w) || cleanTitle.includes(w));
-    }
-
-    return cleanTitle.includes(cleanFilter) || cleanCat.includes(cleanFilter);
-  };
-
   // Dynamic Date Bounds for Active Period & Previous Period (For Growth Calculation)
   const { dateBounds, prevDateBounds } = useMemo(() => {
     let startFilter: string | null = null;
@@ -383,11 +282,11 @@ export function FinanceDashboard() {
         let matchedAny = false;
 
         for (const it of deal.items) {
-          const itemWh = it.warehouseLocation || it.asalGudang || deal.lokasiGudang || deal.asalGudang || '';
+          const itemWh = it.warehouseLocation || it.asalGudang || '';
           const itemCat = it.condition || it.category || '';
           const itemTitle = it.description || it.sku || '';
 
-          const whMatch = matchWarehouseHub(itemWh, it.asalGudang || deal.asalGudang, it.sku || deal.sku, whFilter);
+          const whMatch = matchWarehouseHub(itemWh, it.asalGudang || itemWh, it.sku || deal.sku, whFilter);
           const catMatch = matchCategory(itemTitle, itemCat, catFilter);
 
           if (whMatch && catMatch) {
@@ -674,12 +573,12 @@ export function FinanceDashboard() {
     filteredDeals.forEach((deal) => {
       if (deal.items && deal.items.length > 0) {
         deal.items.forEach((it) => {
-          const itemWh = it.warehouseLocation || it.asalGudang || deal.lokasiGudang || deal.asalGudang || '';
+          const itemWh = it.warehouseLocation || it.asalGudang || '';
           const itemCat = it.condition || it.category || '';
           const itemTitle = it.description || it.sku || '';
 
           // Only aggregate item if it matches the current warehouse and category filter
-          const whMatch = matchWarehouseHub(itemWh, it.asalGudang || deal.asalGudang, it.sku || deal.sku, warehouseFilter);
+          const whMatch = matchWarehouseHub(itemWh, it.asalGudang || itemWh, it.sku || deal.sku, warehouseFilter);
           const catMatch = matchCategory(itemTitle, itemCat, categoryFilter);
 
           if (!whMatch || !catMatch) return;
@@ -1909,11 +1808,11 @@ export function FinanceDashboard() {
                   // Find matching items in multi-item invoice
                   const matchingItems = isMultiItem && deal.items
                     ? deal.items.filter((it) => {
-                        const itemWh = it.warehouseLocation || it.asalGudang || deal.lokasiGudang || deal.asalGudang || '';
+                        const itemWh = it.warehouseLocation || it.asalGudang || '';
                         const itemCat = it.condition || it.category || '';
                         const itemTitle = it.description || it.sku || '';
                         return (
-                          matchWarehouseHub(itemWh, it.asalGudang || deal.asalGudang, it.sku || deal.sku, warehouseFilter) &&
+                          matchWarehouseHub(itemWh, it.asalGudang || itemWh, it.sku || deal.sku, warehouseFilter) &&
                           matchCategory(itemTitle, itemCat, categoryFilter)
                         );
                       })
