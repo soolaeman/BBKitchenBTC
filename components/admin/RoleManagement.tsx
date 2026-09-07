@@ -37,6 +37,8 @@ const CAPABILITIES: Array<{
   { label: 'Supplier data', viewKey: 'canViewSupplierData' },
 ];
 
+const STORAGE_KEY = 'bbk_role_permissions_overrides';
+
 type Overrides = Partial<Record<UserRole, Partial<RolePermissions>>>;
 
 function readOverrides(): Overrides {
