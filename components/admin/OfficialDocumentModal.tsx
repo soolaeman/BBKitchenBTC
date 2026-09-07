@@ -498,7 +498,7 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                     {activeType === 'QUOTATION' ? 'Terbilang Estimasi Penawaran:' : 'Terbilang Total Transaksi:'}
                   </span>
                   <p className="italic font-bold text-slate-900 leading-snug">
-                    "{terbilangRupiah(total)} Rupiah"
+                    &quot;{terbilangRupiah(total)} Rupiah&quot;
                   </p>
                 </div>
 
