@@ -291,7 +291,19 @@ function invoiceToRow(inv: Invoice): any[] {
   ];
 }
 
-export async function fetchGoogleSheetsInvoices(): Promise<Invoice[]> {
+let cachedInvoicesList: { data: Invoice[]; timestamp: number } | null = null;
+const INVOICES_CACHE_TTL_MS = 25_000; // 25 seconds
+
+export function invalidateInvoicesCache() {
+  cachedInvoicesList = null;
+}
+
+export async function fetchGoogleSheetsInvoices(forceRefresh = false): Promise<Invoice[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedInvoicesList && now - cachedInvoicesList.timestamp < INVOICES_CACHE_TTL_MS) {
+    return cachedInvoicesList.data;
+  }
+
   const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
   if (!spreadsheetId) return [];
 
@@ -305,13 +317,20 @@ export async function fetchGoogleSheetsInvoices(): Promise<Invoice[]> {
     });
 
     const rows = res.data.values || [];
-    return rows
+    const invoices = rows
       .filter((r) => Boolean(r[0]))
       .map((r) => rowToInvoice(r))
       .reverse(); // Newest first
-  } catch (err) {
+
+    cachedInvoicesList = { data: invoices, timestamp: now };
+    return invoices;
+  } catch (err: any) {
+    if (cachedInvoicesList && (err?.message?.includes('Quota exceeded') || err?.status === 429 || err?.code === 429)) {
+      console.warn('Google Sheets quota exceeded, serving cached invoices gracefully');
+      return cachedInvoicesList.data;
+    }
     console.warn('Failed to fetch invoices from Google Sheets:', err);
-    return [];
+    return cachedInvoicesList?.data || [];
   }
 }
 
@@ -639,7 +658,19 @@ function nonSkuTransactionToRow(tx: NonSkuTransaction): any[] {
   ];
 }
 
-export async function fetchGoogleSheetsNonSkuTransactions(): Promise<NonSkuTransaction[]> {
+let cachedNonSkuList: { data: NonSkuTransaction[]; timestamp: number } | null = null;
+const NON_SKU_CACHE_TTL_MS = 25_000; // 25 seconds
+
+export function invalidateNonSkuCache() {
+  cachedNonSkuList = null;
+}
+
+export async function fetchGoogleSheetsNonSkuTransactions(forceRefresh = false): Promise<NonSkuTransaction[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedNonSkuList && now - cachedNonSkuList.timestamp < NON_SKU_CACHE_TTL_MS) {
+    return cachedNonSkuList.data;
+  }
+
   const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
   if (!spreadsheetId) return [];
 
@@ -653,13 +684,20 @@ export async function fetchGoogleSheetsNonSkuTransactions(): Promise<NonSkuTrans
     });
 
     const rows = res.data.values || [];
-    return rows
+    const txs = rows
       .filter((r) => Boolean(r[0]))
       .map((r) => rowToNonSkuTransaction(r))
       .reverse();
-  } catch (err) {
+
+    cachedNonSkuList = { data: txs, timestamp: now };
+    return txs;
+  } catch (err: any) {
+    if (cachedNonSkuList && (err?.message?.includes('Quota exceeded') || err?.status === 429 || err?.code === 429)) {
+      console.warn('Google Sheets quota exceeded, serving cached non-sku transactions gracefully');
+      return cachedNonSkuList.data;
+    }
     console.warn('Failed to fetch Non-SKU transactions from Google Sheets:', err);
-    return [];
+    return cachedNonSkuList?.data || [];
   }
 }
 

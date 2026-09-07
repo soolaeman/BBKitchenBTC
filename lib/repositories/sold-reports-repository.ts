@@ -88,7 +88,19 @@ export async function ensureLaporanTerjualSheetExists(spreadsheetId: string): Pr
   }
 }
 
-export async function getPendingSoldReports(): Promise<PendingSoldReport[]> {
+let cachedSoldReports: { data: PendingSoldReport[]; timestamp: number } | null = null;
+const SOLD_REPORTS_CACHE_TTL_MS = 25_000; // 25 seconds
+
+export function invalidateSoldReportsCache() {
+  cachedSoldReports = null;
+}
+
+export async function getPendingSoldReports(forceRefresh = false): Promise<PendingSoldReport[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedSoldReports && now - cachedSoldReports.timestamp < SOLD_REPORTS_CACHE_TTL_MS) {
+    return cachedSoldReports.data;
+  }
+
   const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
   if (!spreadsheetId) return [];
 
@@ -124,10 +136,16 @@ export async function getPendingSoldReports(): Promise<PendingSoldReport[]> {
       });
     });
 
-    return reports.filter((rep) => rep.status === 'PENDING');
-  } catch (err) {
+    const pending = reports.filter((rep) => rep.status === 'PENDING');
+    cachedSoldReports = { data: pending, timestamp: now };
+    return pending;
+  } catch (err: any) {
+    if (cachedSoldReports && (err?.message?.includes('Quota exceeded') || err?.status === 429 || err?.code === 429)) {
+      console.warn('Google Sheets quota exceeded, serving cached sold reports gracefully');
+      return cachedSoldReports.data;
+    }
     console.warn('Failed to get pending sold reports from Google Sheets:', err);
-    return [];
+    return cachedSoldReports?.data || [];
   }
 }
 

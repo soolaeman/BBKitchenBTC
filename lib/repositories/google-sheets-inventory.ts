@@ -171,26 +171,60 @@ function toItem(row: string[]): MasterInventoryItem {
   };
 }
 
-export async function getGoogleSheetsInventory(): Promise<MasterInventoryItem[]> {
+// In-Memory High-Speed Cache with Quota Fallback Protection
+let cachedInventory: MasterInventoryItem[] | null = null;
+let lastInventoryFetchTime = 0;
+const INVENTORY_CACHE_TTL_MS = 30_000; // 30 seconds
+
+export function invalidateInventoryCache() {
+  cachedInventory = null;
+  lastInventoryFetchTime = 0;
+  cachedRowsMap = null;
+}
+
+export async function getGoogleSheetsInventory(forceRefresh = false): Promise<MasterInventoryItem[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedInventory && now - lastInventoryFetchTime < INVENTORY_CACHE_TTL_MS) {
+    return cachedInventory;
+  }
+
   const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || "").replace(/['"]/g, "").trim();
   const range = (process.env.GOOGLE_SHEETS_RANGE || "MASTER_INVENTORY!A:AI").replace(/['"]/g, "").trim();
 
   if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_NOT_CONFIGURED: Missing GOOGLE_SHEETS_SPREADSHEET_ID");
 
-  const sheets = getSheetsClient();
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range,
-    valueRenderOption: "UNFORMATTED_VALUE",
-  });
+  try {
+    const sheets = getSheetsClient();
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range,
+      valueRenderOption: "UNFORMATTED_VALUE",
+    });
 
-  const rows = response.data.values ?? [];
-  if (rows.length <= 1) return [];
+    const rows = response.data.values ?? [];
+    if (rows.length <= 1) {
+      cachedInventory = [];
+      lastInventoryFetchTime = now;
+      return [];
+    }
 
-  // Header row is row 1; data starts at row 2.
-  return rows.slice(1)
-    .map((row) => toItem(row as string[]))
-    .filter((item) => Boolean(item.SKU));
+    // Header row is row 1; data starts at row 2.
+    const items = rows
+      .slice(1)
+      .map((row) => toItem(row as string[]))
+      .filter((item) => Boolean(item.SKU));
+
+    cachedInventory = items;
+    lastInventoryFetchTime = now;
+    return items;
+  } catch (err: any) {
+    // If rate limited by Google Sheets (Quota Exceeded / 429), gracefully serve cache
+    if (cachedInventory && (err?.message?.includes("Quota exceeded") || err?.status === 429 || err?.code === 429)) {
+      console.warn("Google Sheets quota exceeded, serving cached inventory gracefully");
+      return cachedInventory;
+    }
+    throw err;
+  }
 }
 
 function maskForRole(item: MasterInventoryItem, role: UserRole): MasterInventoryItem {
@@ -348,17 +382,37 @@ export async function queryGoogleSheetsInventory(
   return { items, total, page, pageSize, totalPages, stats };
 }
 
+let cachedRowsMap: { rows: any[]; timestamp: number } | null = null;
+const ROWS_MAP_CACHE_TTL_MS = 30_000;
+
 export async function findRowIndexBySku(sku: string): Promise<{ rowIndex: number; rowData?: string[] } | null> {
   const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || "").replace(/['"]/g, "").trim();
   if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_NOT_CONFIGURED");
 
-  const sheets = getSheetsClient();
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "MASTER_INVENTORY!A:S",
-  });
+  const now = Date.now();
+  let rows: any[] = [];
 
-  const rows = response.data.values ?? [];
+  if (cachedRowsMap && now - cachedRowsMap.timestamp < ROWS_MAP_CACHE_TTL_MS) {
+    rows = cachedRowsMap.rows;
+  } else {
+    try {
+      const sheets = getSheetsClient();
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: "MASTER_INVENTORY!A:S",
+      });
+
+      rows = response.data.values ?? [];
+      cachedRowsMap = { rows, timestamp: now };
+    } catch (err: any) {
+      if (cachedRowsMap) {
+        rows = cachedRowsMap.rows;
+      } else {
+        throw err;
+      }
+    }
+  }
+
   const rawSku = (sku || "").trim();
   const upperSku = rawSku.toUpperCase();
   const alphanumericSku = upperSku.replace(/[^A-Z0-9]/g, "");
