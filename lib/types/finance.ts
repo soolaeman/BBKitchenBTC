@@ -34,6 +34,8 @@ export interface InvoiceItem {
   total: number;
   condition?: string;
   warehouseLocation?: string;
+  asalGudang?: string;
+  category?: string;
 }
 
 export interface Invoice {
