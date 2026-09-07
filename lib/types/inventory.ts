@@ -102,7 +102,7 @@ export interface InventoryFilterOptions {
   hasProductId?: boolean;
   minPrice?: number;
   maxPrice?: number;
-  sortBy?: 'TANGGAL_MASUK' | 'SKU' | 'PRODUCT_TITLE' | 'HARGA_BUKA_WA' | 'DURASI_TERJUAL';
+  sortBy?: 'TANGGAL_MASUK' | 'SKU' | 'PRODUCT_TITLE' | 'HARGA_MODAL' | 'HARGA_BUKA_WA' | 'HARGA_ESTIMASI_PUBLIK' | 'HARGA_DEAL_AKHIR' | 'DURASI_TERJUAL' | string;
   sortOrder?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
