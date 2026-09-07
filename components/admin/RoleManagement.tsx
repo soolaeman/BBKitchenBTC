@@ -38,6 +38,8 @@ const CAPABILITIES: Array<{
   { label: 'Social Distribution', viewKey: 'canManageSocialMedia', editKey: 'canManageSocialMedia' },
 ];
 
+const STORAGE_KEY = 'bbk_role_permissions_overrides';
+
 type Overrides = Partial<Record<UserRole, Partial<RolePermissions>>>;
 
 function readOverrides(): Overrides {
