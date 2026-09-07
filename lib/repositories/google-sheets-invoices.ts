@@ -322,3 +322,62 @@ export async function updateGoogleSheetsInvoice(invoice: Invoice): Promise<boole
     return false;
   }
 }
+
+export async function deleteGoogleSheetsInvoice(idOrNumber: string): Promise<boolean> {
+  const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
+  if (!spreadsheetId) return false;
+
+  try {
+    await ensureInvoiceSheetExists(spreadsheetId);
+    const sheets = getSheetsClient();
+
+    const metadata = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'sheets.properties',
+    });
+    const sheetObj = (metadata.data.sheets || []).find(
+      (s) => s.properties?.title === INVOICE_SHEET_NAME
+    );
+    const sheetId = sheetObj?.properties?.sheetId;
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${INVOICE_SHEET_NAME}!A:B`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    });
+
+    const rows = res.data.values || [];
+    const targetIdx = rows.findIndex(
+      (r, idx) => idx > 0 && (String(r[0]).trim() === idOrNumber || String(r[1]).trim() === idOrNumber)
+    );
+
+    if (targetIdx === -1) {
+      return false;
+    }
+
+    if (sheetId !== undefined && sheetId !== null) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId,
+                  dimension: 'ROWS',
+                  startIndex: targetIdx,
+                  endIndex: targetIdx + 1,
+                },
+              },
+            },
+          ],
+        },
+      });
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Failed to delete invoice from Google Sheets:', err);
+    return false;
+  }
+}

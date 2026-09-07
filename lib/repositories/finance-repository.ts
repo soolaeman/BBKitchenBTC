@@ -7,6 +7,7 @@ import {
   appendGoogleSheetsInvoice,
   updateGoogleSheetsInvoiceStatus,
   updateGoogleSheetsInvoice,
+  deleteGoogleSheetsInvoice,
 } from './google-sheets-invoices';
 
 // Clean Real Invoices store for BBKitchen (in-memory cache)
@@ -73,6 +74,15 @@ export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Pr
     status,
     status === 'PAID' ? new Date().toISOString().split('T')[0] : undefined
   ).catch((e) => console.warn('Google Sheets invoice status update warning:', e));
+
+export async function deleteInvoice(idOrNumber: string): Promise<boolean> {
+  cachedInvoices = cachedInvoices.filter(
+    (inv) => inv.id !== idOrNumber && inv.invoiceNumber !== idOrNumber
+  );
+
+  await deleteGoogleSheetsInvoice(idOrNumber).catch((e) =>
+    console.warn('Google Sheets invoice deletion warning:', e)
+  );
 
   return true;
 }

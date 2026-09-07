@@ -190,6 +190,29 @@ export function InvoiceManager() {
     loadInvoices();
   }, [loadInvoices]);
 
+  // Handle Delete Invoice
+  const handleDeleteInvoice = async (inv: Invoice) => {
+    const docTitle = inv.invoiceNumber || inv.quotationNumber || inv.id;
+    if (!window.confirm(`Hapus dokumen ${docTitle} dari arsip transaksi?\nData pada Google Sheets juga akan dihapus.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'DELETE', id: inv.id }),
+      });
+
+      if (res.ok) {
+        setInvoices((prev) => prev.filter((i) => i.id !== inv.id));
+        loadInvoices();
+      }
+    } catch (err) {
+      console.error('Failed to delete invoice:', err);
+    }
+  };
+
   // Handle Multi-Item Operations
   const addItemRow = (customSku: string = '', customTitle: string = '') => {
     const newId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
@@ -647,6 +670,14 @@ export function InvoiceManager() {
                               <Pencil className="w-3 h-3 text-amber-400" />
                               <span>Edit</span>
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteInvoice(inv)}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
+                              title="Hapus Penawaran Ini"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </>
                         ) : inv.documentType === 'RECEIPT' ? (
                           <>
@@ -671,6 +702,14 @@ export function InvoiceManager() {
                             >
                               <Pencil className="w-3 h-3 text-amber-400" />
                               <span>Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteInvoice(inv)}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
+                              title="Hapus Kuitansi Ini"
+                            >
+                              <Trash2 className="w-3 h-3" />
                             </button>
                           </>
                         ) : (
@@ -722,6 +761,14 @@ export function InvoiceManager() {
                             >
                               <Pencil className="w-3 h-3 text-amber-400" />
                               <span>Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteInvoice(inv)}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
+                              title="Hapus Dokumen Transaksi Ini"
+                            >
+                              <Trash2 className="w-3 h-3" />
                             </button>
                           </>
                         )}

@@ -4,6 +4,7 @@ import {
   createInvoice,
   updateInvoice,
   updateInvoiceStatus,
+  deleteInvoice,
   getFinancialKPIs,
   getLiveClosingDealLedger,
 } from '@/lib/repositories/finance-repository';
@@ -70,6 +71,11 @@ export async function POST(request: NextRequest) {
     if (action === 'UPDATE_STATUS') {
       const updated = await updateInvoiceStatus(id, status);
       return NextResponse.json({ success: updated });
+    }
+
+    if (action === 'DELETE') {
+      const deleted = await deleteInvoice(id);
+      return NextResponse.json({ success: deleted });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
