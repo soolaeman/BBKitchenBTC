@@ -324,7 +324,8 @@ export function InventoryTable() {
     setSoldNotesInput('');
     setSoldByOther(false);
 
-    // Update local table state immediately
+    // Update local table state and clear pending notice banner immediately
+    setSoldNotices((prev) => prev.filter((n) => n.sku !== targetSku));
     if (data?.items) {
       setData((prev) => prev ? {
         ...prev,

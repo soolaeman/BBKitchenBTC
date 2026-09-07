@@ -19,7 +19,7 @@ export async function GET() {
     getPendingSoldReports().catch(() => []),
   ]);
 
-  // Convert sheet reports to SoldNotice format for client UI banner
+  // Convert sheet reports directly from LAPORAN_TERJUAL sheet
   const mappedNotices: SoldNotice[] = sheetReports.map((r) => ({
     id: r.id || `report_${r.sku}`,
     sku: r.sku,
@@ -29,13 +29,10 @@ export async function GET() {
     reportedBy: r.reportedBy || 'Sales',
   }));
 
-  // Fallback / merge if sheet reports available
-  const activeNotices = mappedNotices.length > 0 ? mappedNotices : state.soldNotices;
-
   return NextResponse.json({
     timestamps: state.timestamps,
     activeSku: state.activeSku,
-    soldNotices: activeNotices,
+    soldNotices: mappedNotices,
   });
 }
 
