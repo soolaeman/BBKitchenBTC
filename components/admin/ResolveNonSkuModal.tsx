@@ -202,10 +202,10 @@ export function ResolveNonSkuModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-indigo-950/80 via-slate-900 to-slate-900 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-4 sm:p-5 bg-gradient-to-r from-indigo-950/80 via-slate-900 to-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400">
               <Link2 className="w-5 h-5" />
@@ -233,7 +233,7 @@ export function ResolveNonSkuModal({
         </div>
 
         {/* Tab Switcher: Mode Resolusi */}
-        <div className="p-4 border-b border-slate-800/80 bg-slate-950/50">
+        <div className="p-3 sm:p-4 border-b border-slate-800/80 bg-slate-950/50 shrink-0">
           <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900 border border-slate-800 rounded-xl">
             <button
               type="button"
@@ -264,7 +264,7 @@ export function ResolveNonSkuModal({
         </div>
 
         {/* Body Content */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 text-xs flex-1 overflow-y-auto">
           
           {/* Notification Messages */}
           {errorMessage && (
