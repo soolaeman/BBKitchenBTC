@@ -270,7 +270,9 @@ export function CashflowFinanceView() {
       id: deal.invoiceId || `inv_${deal.sku}`,
       invoiceNumber: deal.invoiceNumber || deal.sku.replace('BBK-CUSTOM-', '').replace('INV-', '').split('_')[0],
       issueDate: deal.tanggalTerjual || new Date().toISOString().split('T')[0],
+      dueDate: deal.tanggalTerjual || new Date().toISOString().split('T')[0],
       customerName: deal.customerName || 'Pelanggan BBKitchen',
+      customerPhone: '0812-BBK-SALES',
       status: 'PAID',
       items: [
         {
@@ -280,10 +282,12 @@ export function CashflowFinanceView() {
           quantity: deal.quantity || 1,
           unitPrice: (deal.hargaClosing || 0) / (deal.quantity || 1),
           unitCost: (deal.hargaModal || 0) / (deal.quantity || 1),
-          totalPrice: deal.hargaClosing || 0,
+          total: deal.hargaClosing || 0,
         },
       ],
       subtotal: deal.hargaClosing || 0,
+      discount: 0,
+      tax: 0,
       totalAmount: deal.hargaClosing || 0,
       paidAmount: deal.hargaClosing || 0,
       remainingAmount: 0,

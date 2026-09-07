@@ -101,6 +101,39 @@ export function FinanceDashboard() {
   const [dealPageSize, setDealPageSize] = useState(25);
   const [dealPageInput, setDealPageInput] = useState('1');
 
+  // Helper: Open Document from Deal Row
+  const handleOpenDocFromDeal = (deal: ClosingDealItem, type: DocumentType) => {
+    const dummyInv: Invoice = {
+      id: deal.invoiceId || `inv_${deal.sku}`,
+      invoiceNumber: deal.invoiceNumber || deal.sku.replace('BBK-CUSTOM-', '').replace('INV-', '').split('_')[0],
+      issueDate: deal.tanggalTerjual || new Date().toISOString().split('T')[0],
+      dueDate: deal.tanggalTerjual || new Date().toISOString().split('T')[0],
+      customerName: deal.customerName || 'Pelanggan BBKitchen',
+      customerPhone: '0812-BBK-SALES',
+      status: 'PAID',
+      items: [
+        {
+          id: `it_${deal.sku}`,
+          sku: deal.sku,
+          description: deal.productTitle,
+          quantity: deal.quantity || 1,
+          unitPrice: (deal.hargaClosing || 0) / (deal.quantity || 1),
+          unitCost: (deal.hargaModal || 0) / (deal.quantity || 1),
+          total: deal.hargaClosing || 0,
+        },
+      ],
+      subtotal: deal.hargaClosing || 0,
+      discount: 0,
+      tax: 0,
+      totalAmount: deal.hargaClosing || 0,
+      paidAmount: deal.hargaClosing || 0,
+      remainingAmount: 0,
+    };
+    setSelectedInvoice(dummyInv);
+    setDocumentModalType(type);
+    setIsDocModalOpen(true);
+  };
+
   const now = useMemo(() => new Date(), []);
   const currentYear = now.getFullYear();
 
