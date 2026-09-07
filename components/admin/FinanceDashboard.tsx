@@ -435,7 +435,7 @@ export function FinanceDashboard() {
     });
 
     const totalDeals = filteredDeals.length;
-    const unitsSold = totalDeals; // Each deal corresponds to 1 unit in BBKitchen deal ledger
+    const unitsSold = filteredDeals.reduce((sum, d) => sum + (d.quantity || 1), 0);
     const grossMarginPct = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
 
     return {
@@ -463,7 +463,7 @@ export function FinanceDashboard() {
       prevDealsCount++;
     });
 
-    const prevUnitsSold = prevDealsCount;
+    const prevUnitsSold = previousDeals.reduce((sum, d) => sum + (d.quantity || 1), 0);
 
     const calcGrowth = (current: number, previous: number) => {
       if (previous === 0) return current > 0 ? 100 : 0;
@@ -508,7 +508,7 @@ export function FinanceDashboard() {
 
       const bucket = timelineMap.get(dateStr)!;
       bucket.closing++;
-      bucket.units++;
+      bucket.units += deal.quantity || 1;
       const closingVal = deal.hargaClosing > 0 ? deal.hargaClosing : (deal.hargaModal || 0);
       bucket.revenue += closingVal;
       bucket.profit += deal.realizedProfit || 0;
@@ -517,7 +517,26 @@ export function FinanceDashboard() {
     return Array.from(timelineMap.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [filteredDeals]);
 
-  // 6. UNIT ECONOMICS METRICS & TOP CATEGORIES BREAKDOWN
+  // Helper to categorize individual equipment description
+  const detectCategoryFromText = (text: string = ''): string => {
+    const clean = text.toLowerCase();
+    if (/showcase/i.test(clean)) return 'Showcase';
+    if (/chiller/i.test(clean)) return 'Chiller';
+    if (/freezer/i.test(clean)) return 'Freezer';
+    if (/deep fryer|fryer/i.test(clean)) return 'Deep Fryer';
+    if (/wok|kwali|kompor|stove|burner|noodle|grill|griddle|oven/i.test(clean)) return 'Kompor & Cooking';
+    if (/meja/i.test(clean)) return 'Meja Stainless';
+    if (/sink|wastafel|bak cuci/i.test(clean)) return 'Sink Stainless';
+    if (/rak|wallshelf|troli|trolley/i.test(clean)) return 'Rak Stainless';
+    if (/hood|exhaust|blower|axial|ducting/i.test(clean)) return 'Exhaust Hood & Blower';
+    if (/ice maker|ice bin|es batu/i.test(clean)) return 'Ice System';
+    if (/blender|mixer|sealer|slicer|cutter/i.test(clean)) return 'Food Processing';
+    
+    const firstWord = text.split(' ')[0] || 'Peralatan Dapur';
+    return firstWord.charAt(0).toUpperCase() + firstWord.slice(1);
+  };
+
+  // 6. UNIT ECONOMICS METRICS & TOP CATEGORIES BREAKDOWN (ITEMIZED)
   const categoryEconomics = useMemo(() => {
     const map = new Map<string, {
       category: string;
@@ -529,9 +548,7 @@ export function FinanceDashboard() {
       readyCostSum: number;
     }>();
 
-    // Aggregate from filtered deals
-    filteredDeals.forEach((deal) => {
-      const cat = deal.productTitle.split(' ')[0] || 'Umum';
+    const getEntry = (cat: string) => {
       if (!map.has(cat)) {
         map.set(cat, {
           category: cat,
@@ -543,31 +560,44 @@ export function FinanceDashboard() {
           readyCostSum: 0,
         });
       }
-      const entry = map.get(cat)!;
-      entry.unitsSold++;
-      const closingVal = deal.hargaClosing > 0 ? deal.hargaClosing : (deal.hargaModal || 0);
-      entry.revenueSum += closingVal;
-      entry.cogsSum += deal.hargaModal || 0;
-      entry.profitSum += deal.realizedProfit || 0;
+      return map.get(cat)!;
+    };
+
+    // Aggregate from filtered deals (Item-by-item breakdown so multi-item invoices are properly distributed)
+    filteredDeals.forEach((deal) => {
+      if (deal.items && deal.items.length > 0) {
+        deal.items.forEach((it) => {
+          const cat = detectCategoryFromText(it.description || it.sku);
+          const itemQty = it.quantity || 1;
+          const itemRevenue = (it.unitPrice || 0) * itemQty;
+          const itemCost = (it.unitCost || 0) * itemQty;
+          const itemProfit = Math.max(0, itemRevenue - itemCost);
+
+          const entry = getEntry(cat);
+          entry.unitsSold += itemQty;
+          entry.revenueSum += itemRevenue;
+          entry.cogsSum += itemCost;
+          entry.profitSum += itemProfit;
+        });
+      } else {
+        const cat = detectCategoryFromText(deal.category || deal.productTitle);
+        const qty = deal.quantity || 1;
+        const closingVal = deal.hargaClosing > 0 ? deal.hargaClosing : (deal.hargaModal || 0);
+
+        const entry = getEntry(cat);
+        entry.unitsSold += qty;
+        entry.revenueSum += closingVal;
+        entry.cogsSum += deal.hargaModal || 0;
+        entry.profitSum += deal.realizedProfit || 0;
+      }
     });
 
     // Aggregate ready supply from inventory
     filteredInventory.forEach((item) => {
       const isReady = item.statusUnit === 'READY' || item.statusUnit === 'AVAILABLE';
       if (isReady) {
-        const cat = item.category || 'Umum';
-        if (!map.has(cat)) {
-          map.set(cat, {
-            category: cat,
-            unitsSold: 0,
-            revenueSum: 0,
-            cogsSum: 0,
-            profitSum: 0,
-            readyUnits: 0,
-            readyCostSum: 0,
-          });
-        }
-        const entry = map.get(cat)!;
+        const cat = detectCategoryFromText(item.category || item.sku);
+        const entry = getEntry(cat);
         entry.readyUnits++;
         entry.readyCostSum += item.modal || 0;
       }
@@ -589,14 +619,14 @@ export function FinanceDashboard() {
     });
   }, [filteredDeals, filteredInventory]);
 
-  // Overall Unit Economics averages
+  // Overall Unit Economics averages (Based on REAL Physical Units Sold)
   const unitEconomicsAverages = useMemo(() => {
     const bbkDeals = filteredDeals.filter((d) => d.soldBy === 'SALES_BBK');
-    const totalCount = bbkDeals.length;
+    const totalPhysicalUnits = bbkDeals.reduce((sum, d) => sum + (d.quantity || 1), 0);
 
-    const asp = totalCount > 0 ? Math.round(healthKPIs.revenue / totalCount) : 0;
-    const avgHpp = totalCount > 0 ? Math.round(healthKPIs.totalCogs / totalCount) : 0;
-    const avgProfit = totalCount > 0 ? Math.round(healthKPIs.grossProfit / totalCount) : 0;
+    const asp = totalPhysicalUnits > 0 ? Math.round(healthKPIs.revenue / totalPhysicalUnits) : 0;
+    const avgHpp = totalPhysicalUnits > 0 ? Math.round(healthKPIs.totalCogs / totalPhysicalUnits) : 0;
+    const avgProfit = totalPhysicalUnits > 0 ? Math.round(healthKPIs.grossProfit / totalPhysicalUnits) : 0;
     const avgMargin = healthKPIs.grossMarginPct;
 
     return { asp, avgHpp, avgProfit, avgMargin };

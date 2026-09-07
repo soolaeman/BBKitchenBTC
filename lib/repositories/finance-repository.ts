@@ -155,6 +155,8 @@ export async function getLiveClosingDealLedger(): Promise<{
         let totalQty = 0;
         let hasNonSku = false;
 
+        const enrichedItems: InvoiceItem[] = [];
+
         for (const it of inv.items) {
           const qty = it.quantity || 1;
           totalQty += qty;
@@ -165,11 +167,14 @@ export async function getLiveClosingDealLedger(): Promise<{
             hasNonSku = true;
           }
 
+          let itemUnitCost = it.unitCost || 0;
+
           // Check if SKU exists in master inventory
           const rawMatch = !isCustomSku ? rawItems.find((r) => r.SKU.trim().toUpperCase() === itemSku) : undefined;
           if (rawMatch) {
             matchedSkusSet.add(itemSku);
-            invoiceModal += (rawMatch.HARGA_MODAL || 0) * qty;
+            itemUnitCost = rawMatch.HARGA_MODAL || 0;
+            invoiceModal += itemUnitCost * qty;
           } else {
             // Check if resolved in TRANSAKSI_NON_SKU
             const resolvedNonSku = nonSkuRecords.find(
@@ -179,11 +184,17 @@ export async function getLiveClosingDealLedger(): Promise<{
             );
 
             if (resolvedNonSku) {
+              itemUnitCost = resolvedNonSku.hppModal / qty;
               invoiceModal += resolvedNonSku.hppModal;
             } else {
               invoiceModal += (it.unitCost || 0) * qty;
             }
           }
+
+          enrichedItems.push({
+            ...it,
+            unitCost: itemUnitCost,
+          });
         }
 
         // If totalAmount was not preset or 0, sum from items
@@ -228,7 +239,7 @@ export async function getLiveClosingDealLedger(): Promise<{
           isNonSku: hasNonSku,
           invoiceNumber: inv.invoiceNumber,
           invoiceId: inv.id,
-          items: inv.items,
+          items: enrichedItems,
           itemsCount: inv.items.length,
           rawInvoice: inv,
         });

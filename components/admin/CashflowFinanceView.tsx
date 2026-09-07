@@ -376,7 +376,7 @@ export function CashflowFinanceView() {
         <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-emerald-500/40 shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-            <span className="uppercase tracking-wider">🏆 Laba Bersih Riil (Net Profit)</span>
+            <span className="uppercase tracking-wider">Laba Bersih Riil (Net Profit)</span>
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
           <div className={`text-2xl font-black font-mono tracking-tight mt-1 ${netProfitColor}`}>
@@ -404,7 +404,7 @@ export function CashflowFinanceView() {
         >
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
             <span className="uppercase tracking-wider flex items-center gap-1.5 text-amber-300">
-              <span>📦 Laba Kotor Mesin (Deals)</span>
+              <span>Laba Kotor Mesin (Deals)</span>
             </span>
             <ArrowUpRight className="w-4 h-4 text-amber-400" />
           </div>
@@ -414,7 +414,7 @@ export function CashflowFinanceView() {
           <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-800/60 pt-2">
             <span>Omset: {formatIDR(summary.totalDealsRevenue)}</span>
             <span className="text-amber-400 font-mono font-bold underline">
-              {summary.totalDealsCount} Closing ➔
+              {summary.totalDealsCount} Unit Terjual ➔
             </span>
           </p>
         </div>
@@ -422,7 +422,7 @@ export function CashflowFinanceView() {
         {/* Metric 3: Pemasukan Komisi & Referral */}
         <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-xl">
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-            <span className="uppercase tracking-wider">🤝 Komisi & Referral Masuk</span>
+            <span className="uppercase tracking-wider">Komisi & Referral Masuk</span>
             <Coins className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-black font-mono tracking-tight text-emerald-400 mt-1">
@@ -445,7 +445,7 @@ export function CashflowFinanceView() {
           title="Klik untuk melihat rincian tabel buku kas pengeluaran"
         >
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-            <span className="uppercase tracking-wider text-rose-300">💸 Total Beban OPEX</span>
+            <span className="uppercase tracking-wider text-rose-300">Total Beban OPEX</span>
             <ArrowDownRight className="w-4 h-4 text-rose-400" />
           </div>
           <div className="text-2xl font-black font-mono tracking-tight text-rose-400 mt-1">
