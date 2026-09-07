@@ -59,8 +59,8 @@ export async function GET() {
       existingCat.totalScore += report.overallScore;
       categoryMap.set(official.slug, existingCat);
 
-      // Collect real problem items for the first 50
-      if (report.healthStatus !== 'HEALTHY' && problemItems.length < 50) {
+      // Collect all real problem items across all inventory items
+      if (report.healthStatus !== 'HEALTHY') {
         const failedChecks = report.checks.filter((c) => !c.passed).map((c) => c.label);
         problemItems.push({
           sku: item.SKU,

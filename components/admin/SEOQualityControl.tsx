@@ -50,6 +50,9 @@ import {
   SlidersHorizontal,
   Wrench,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
 } from 'lucide-react';
 
 type PillarTab = 'OVERVIEW' | 'PILLAR_1' | 'PILLAR_2' | 'PILLAR_3' | 'PILLAR_4' | 'PILLAR_5' | 'PILLAR_6' | 'ARTICLES';
@@ -149,6 +152,13 @@ export function SEOQualityControl() {
   }>>([]);
   const [isLoadingInjector, setIsLoadingInjector] = useState(false);
   const [injectorMsg, setInjectorMsg] = useState('');
+
+  // Problem Table Interactive Filtering & Pagination State
+  const [problemSearchQuery, setProblemSearchQuery] = useState('');
+  const [problemCategoryFilter, setProblemCategoryFilter] = useState('ALL');
+  const [problemSeverityFilter, setProblemSeverityFilter] = useState<'ALL' | 'CRITICAL' | 'NEEDS_OPTIMIZATION'>('ALL');
+  const [problemPage, setProblemPage] = useState(1);
+  const [problemPageSize, setProblemPageSize] = useState(10);
 
   const stages: ArticlePipelineStage[] = [
     'IDEA',
@@ -386,6 +396,42 @@ export function SEOQualityControl() {
       return prev;
     });
   };
+
+  // Computed Filtered & Paginated Problem Items across all 2,797 items
+  const allProblems = summaryData?.problemItems || [];
+  const filteredProblems = allProblems.filter((item) => {
+    if (problemSearchQuery.trim()) {
+      const q = problemSearchQuery.toLowerCase().trim();
+      const matchSku = item.sku.toLowerCase().includes(q);
+      const matchTitle = item.title.toLowerCase().includes(q);
+      const matchLoc = item.location.toLowerCase().includes(q);
+      if (!matchSku && !matchTitle && !matchLoc) return false;
+    }
+
+    if (problemCategoryFilter !== 'ALL') {
+      if (
+        item.category !== problemCategoryFilter &&
+        !item.category.toLowerCase().includes(problemCategoryFilter.toLowerCase())
+      ) {
+        return false;
+      }
+    }
+
+    if (problemSeverityFilter === 'CRITICAL') {
+      if (item.score >= 60) return false;
+    } else if (problemSeverityFilter === 'NEEDS_OPTIMIZATION') {
+      if (item.score < 60 || item.score >= 85) return false;
+    }
+
+    return true;
+  });
+
+  const totalProblemPages = Math.max(1, Math.ceil(filteredProblems.length / problemPageSize));
+  const currentPageSafe = Math.min(Math.max(1, problemPage), totalProblemPages);
+  const paginatedProblems = filteredProblems.slice(
+    (currentPageSafe - 1) * problemPageSize,
+    currentPageSafe * problemPageSize
+  );
 
   // Schema generation
   const activeSchemaJson = schemaItem ? buildProductSchemaJsonLd(schemaItem) : null;
@@ -632,46 +678,183 @@ export function SEOQualityControl() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {summaryData?.contentPillars?.map((p) => (
-                <div key={p.slug} className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-slate-200 text-xs">{p.name}</div>
-                    <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                      {p.skuCount} Unit • /category/{p.slug}
+                <div key={p.slug} className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-slate-200 text-xs">{p.name}</div>
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                        {p.skuCount} Unit • /category/{p.slug}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono font-bold text-xs text-amber-400">
+                        Skor {p.avgScore}
+                      </div>
+                      <span className={`text-[10px] font-bold ${p.status === 'OPTIMAL' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        {p.status}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-mono font-bold text-xs text-amber-400">
-                      Skor {p.avgScore}
-                    </div>
-                    <span className={`text-[10px] font-bold ${p.status === 'OPTIMAL' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                      {p.status}
-                    </span>
+                  {/* Visual Progress Bar */}
+                  <div className="w-full bg-slate-900 rounded-full h-1.5 mt-3 overflow-hidden border border-slate-800/80">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        p.avgScore >= 85
+                          ? 'bg-emerald-400'
+                          : p.avgScore >= 60
+                          ? 'bg-amber-400'
+                          : 'bg-rose-500'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(5, p.avgScore))}%` }}
+                    />
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Top Priority Fixes Queue */}
-          <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
+          {/* Top Priority Fixes Queue across all 2,797 items */}
+          <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-6 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-400" />
-                  <span>Antrian Prioritas Optimasi SEO ({summaryData?.problemItems?.length || 0} SKU Terdeteksi)</span>
+                  <span>Antrian Prioritas Optimasi SEO ({filteredProblems.length.toLocaleString('id-ID')} SKU Terdeteksi)</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Klik &quot;Audit & Fix&quot; pada SKU di bawah untuk melihat rincian dan mengoptimasi metadata seketika.
                 </p>
               </div>
+
+              {/* Rows Per Page Dropdown */}
+              <div className="flex items-center gap-2 text-xs font-mono">
+                <span className="text-slate-400">Tampilkan:</span>
+                <select
+                  value={problemPageSize}
+                  onChange={(e) => {
+                    setProblemPageSize(Number(e.target.value));
+                    setProblemPage(1);
+                  }}
+                  className="px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-amber-400 font-bold focus:outline-none focus:ring-1 focus:ring-amber-500"
+                >
+                  <option value={10}>10 Baris</option>
+                  <option value={25}>25 Baris</option>
+                  <option value={50}>50 Baris</option>
+                  <option value={100}>100 Baris</option>
+                </select>
+              </div>
             </div>
 
+            {/* Filter & Search Toolbar */}
+            <div className="flex flex-col lg:flex-row gap-3 pt-1">
+              {/* Search Box */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={problemSearchQuery}
+                  onChange={(e) => {
+                    setProblemSearchQuery(e.target.value);
+                    setProblemPage(1);
+                  }}
+                  placeholder="Cari Kode SKU / Nama Produk / Lokasi Gudang..."
+                  className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                />
+              </div>
+
+              {/* Severity Filter */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProblemSeverityFilter('ALL');
+                    setProblemPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl font-semibold transition-colors whitespace-nowrap ${
+                    problemSeverityFilter === 'ALL'
+                      ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                      : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Semua Skor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProblemSeverityFilter('CRITICAL');
+                    setProblemPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl font-semibold transition-colors whitespace-nowrap ${
+                    problemSeverityFilter === 'CRITICAL'
+                      ? 'bg-rose-600 text-white font-bold shadow'
+                      : 'bg-slate-950 border border-slate-800 text-rose-400 hover:bg-rose-950/40'
+                  }`}
+                >
+                  🔴 Kritis (&lt;60)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProblemSeverityFilter('NEEDS_OPTIMIZATION');
+                    setProblemPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl font-semibold transition-colors whitespace-nowrap ${
+                    problemSeverityFilter === 'NEEDS_OPTIMIZATION'
+                      ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                      : 'bg-slate-950 border border-slate-800 text-amber-300 hover:bg-amber-950/40'
+                  }`}
+                >
+                  🟡 Perlu Optimasi (60–84)
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Category Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-[11px]">
+              <span className="text-slate-500 font-mono flex items-center gap-1 pr-1">
+                <Filter className="w-3 h-3" /> Kategori:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setProblemCategoryFilter('ALL');
+                  setProblemPage(1);
+                }}
+                className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-colors ${
+                  problemCategoryFilter === 'ALL'
+                    ? 'bg-slate-200 text-slate-900 font-bold'
+                    : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Semua
+              </button>
+              {OFFICIAL_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.slug}
+                  type="button"
+                  onClick={() => {
+                    setProblemCategoryFilter(cat.name);
+                    setProblemPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-colors ${
+                    problemCategoryFilter === cat.name
+                      ? 'bg-amber-500 text-slate-950 font-bold'
+                      : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Problem Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse font-mono">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
                     <th className="py-3 px-4">Kode SKU</th>
                     <th className="py-3 px-3">Nama Produk</th>
+                    <th className="py-3 px-3">Kategori</th>
                     <th className="py-3 px-3">Gudang</th>
                     <th className="py-3 px-3 text-center">Skor Saat Ini</th>
                     <th className="py-3 px-3">Isu yang Ditemukan</th>
@@ -679,37 +862,103 @@ export function SEOQualityControl() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-sans">
-                  {summaryData?.problemItems?.slice(0, 10).map((item) => (
-                    <tr key={item.sku} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-3 px-4 font-mono font-bold text-amber-400">{item.sku}</td>
-                      <td className="py-3 px-3 text-white font-medium max-w-xs truncate">{item.title}</td>
-                      <td className="py-3 px-3 text-slate-400 font-mono text-[11px]">{item.location}</td>
-                      <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded font-mono font-bold text-xs ${item.score >= 80 ? 'bg-emerald-950 text-emerald-300' : 'bg-amber-950 text-amber-300'}`}>
-                          {item.score}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-[11px] text-slate-400">
-                        {item.issues.slice(0, 2).join(', ')}
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAuditTargetSku(item.sku);
-                            runAudit(item.sku);
-                            setActiveTab('PILLAR_3');
-                          }}
-                          className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition-colors"
-                        >
-                          Audit & Fix
-                        </button>
+                  {paginatedProblems.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-500">
+                        Tidak ada unit SKU yang cocok dengan filter pencarian saat ini.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    paginatedProblems.map((item) => (
+                      <tr key={item.sku} className="hover:bg-slate-800/30 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-amber-400">{item.sku}</td>
+                        <td className="py-3 px-3 text-white font-medium max-w-xs truncate">{item.title}</td>
+                        <td className="py-3 px-3 text-slate-300 font-sans text-xs">{item.category}</td>
+                        <td className="py-3 px-3 text-slate-400 font-mono text-[11px]">{item.location}</td>
+                        <td className="py-3 px-3 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded font-mono font-bold text-xs ${
+                              item.score >= 85
+                                ? 'bg-emerald-950 text-emerald-300'
+                                : item.score >= 60
+                                ? 'bg-amber-950 text-amber-300'
+                                : 'bg-rose-950 text-rose-300'
+                            }`}
+                          >
+                            {item.score}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-[11px] text-slate-400">
+                          {item.issues.slice(0, 2).join(', ')}
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuditTargetSku(item.sku);
+                              runAudit(item.sku);
+                              setActiveTab('PILLAR_3');
+                            }}
+                            className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition-colors shadow"
+                          >
+                            Audit & Fix
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Interactive Pagination Toolbar */}
+            {filteredProblems.length > 0 && (
+              <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+                <div className="text-slate-400 font-mono text-[11px]">
+                  Menampilkan{' '}
+                  <span className="text-white font-bold">
+                    {(currentPageSafe - 1) * problemPageSize + 1}
+                  </span>{' '}
+                  -{' '}
+                  <span className="text-white font-bold">
+                    {Math.min(currentPageSafe * problemPageSize, filteredProblems.length)}
+                  </span>{' '}
+                  dari{' '}
+                  <span className="text-amber-400 font-bold">
+                    {filteredProblems.length.toLocaleString('id-ID')}
+                  </span>{' '}
+                  SKU Terdeteksi
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setProblemPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPageSafe <= 1}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed font-mono text-xs transition-colors"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Prev</span>
+                  </button>
+
+                  <div className="flex items-center gap-1 font-mono text-xs">
+                    <span className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-amber-400 font-bold rounded-lg">
+                      Hal {currentPageSafe} / {totalProblemPages}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setProblemPage((p) => Math.min(totalProblemPages, p + 1))}
+                    disabled={currentPageSafe >= totalProblemPages}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed font-mono text-xs transition-colors"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
