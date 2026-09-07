@@ -256,7 +256,11 @@ export function InvoiceManager() {
     const hasShipping = Boolean(inv.hasShipping || (inv.shippingFee && inv.shippingFee > 0) || inv.deliveryExpedition || inv.deliveryDriver);
     setHasShippingDetails(hasShipping);
     setShippingFee(inv.shippingFee ? String(inv.shippingFee) : '0');
-    setShippingFeeType(inv.shippingFeeType || 'BUYER_COD');
+    setShippingFeeType(
+      inv.shippingFeeType === 'INCLUDED' || inv.shippingFeeType === 'FREE_PROMO'
+        ? inv.shippingFeeType
+        : 'BUYER_COD'
+    );
     setDeliveryDriver(inv.deliveryDriver || '');
     setDriverPhone(inv.driverPhone || '');
     setVehiclePlate(inv.deliveryVehiclePlate || '');
