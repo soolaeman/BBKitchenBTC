@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { MasterInventoryItem, PaginatedInventoryResponse } from '@/lib/types/inventory';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { StatusBadge, PipelineBadge, GuardrailBadge } from '@/components/ui/StatusBadges';
-import { formatIDR, formatCleanProductUrl, WAREHOUSE_13_HUBS } from '@/lib/repositories/warehouse-utils';
+import { formatIDR, formatCleanProductUrl, WAREHOUSE_14_HUBS } from '@/lib/repositories/warehouse-utils';
 import {
   Search,
   Filter,
@@ -611,10 +611,10 @@ export function InventoryTable() {
                 }}
                 className="px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 text-xs"
               >
-                <option value="ALL">Semua Hub (13 Hub)</option>
-                {WAREHOUSE_13_HUBS.map((hub) => (
+                <option value="ALL">Semua Hub (14 Hub)</option>
+                {WAREHOUSE_14_HUBS.map((hub) => (
                   <option key={hub.code} value={hub.code}>
-                    {hub.code} - {hub.partnerName} ({hub.hubGroup})
+                    {hub.code === 'BK' ? 'BK - BBKitchen (HQ)' : `${hub.code} - ${hub.partnerName} (${hub.hubGroup})`}
                   </option>
                 ))}
               </select>

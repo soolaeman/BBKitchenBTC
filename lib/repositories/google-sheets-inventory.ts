@@ -74,12 +74,12 @@ function numberOrNull(raw: string): number | null {
 
 function extractWarehouseCode(sku: string, lokasi: string, rawAsalGudang: string): MasterInventoryItem["asal_gudang"] {
   const cleanRaw = (rawAsalGudang || "").trim().toUpperCase();
-  const validCodes = ["GK", "BB", "SM", "BL", "ML", "RB", "KG", "PY", "PE", "SK", "WT", "ON", "RK"];
+  const validCodes = ["BK", "GK", "BB", "SM", "BL", "ML", "RB", "KG", "PY", "PE", "SK", "WT", "ON", "RK"];
   if (validCodes.includes(cleanRaw)) {
     return cleanRaw as MasterInventoryItem["asal_gudang"];
   }
 
-  // Extract from SKU prefix: e.g. "GK-1234", "BBK-GK-1234", "RK-1234", "SK-1234", "KG-1234"
+  // Extract from SKU prefix: e.g. "BK-1234", "BBK-BK-1234", "GK-1234", "BBK-GK-1234", "RK-1234"
   const upperSku = (sku || "").toUpperCase().trim();
   const match = upperSku.match(/^(?:BBK[-_]?)?([A-Z]{2,4})[-_0-9]/i);
   if (match && match[1]) {
@@ -91,6 +91,7 @@ function extractWarehouseCode(sku: string, lokasi: string, rawAsalGudang: string
 
   // Fallback by Location text
   const upperLokasi = (lokasi || "").toUpperCase();
+  if (upperLokasi.includes("BBKITCHEN") || upperLokasi.includes("GUDANG PUSAT") || upperLokasi.includes("HQ") || upperLokasi === "BK") return "BK";
   if (upperLokasi.includes("RAWAKALONG") || upperLokasi.includes("RIZKI")) return "RK";
   if (upperLokasi.includes("SANJAYA")) return "SK";
   if (upperLokasi.includes("GEMBEL")) return "KG";

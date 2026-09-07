@@ -12,6 +12,7 @@ export type PipelineStatus =
   | 'AMBIGUOUS';
 
 export type WarehouseCode =
+  | 'BK'
   | 'GK'
   | 'BB'
   | 'SM'
@@ -27,6 +28,7 @@ export type WarehouseCode =
   | 'RK';
 
 export type WarehouseLocation =
+  | 'BBKITCHEN (HQ)'
   | 'PAMULANG 2, TANGSEL'
   | 'PAMULANG BARAT, TANGSEL'
   | 'SETU, TANGSEL'

@@ -30,7 +30,7 @@ const BRANDS = [
   'Nuova Simonelli', 'Gea', 'Crown', 'Mastro', 'Electrolux Professional'
 ];
 
-const WAREHOUSES: WarehouseCode[] = ['GK', 'BB', 'SM', 'BL', 'ML', 'RB', 'PY', 'PE', 'WT', 'ON'];
+const WAREHOUSES: WarehouseCode[] = ['BK', 'GK', 'BB', 'SM', 'BL', 'ML', 'RB', 'KG', 'PY', 'PE', 'SK', 'WT', 'ON', 'RK'];
 
 const CONDITIONS = [
   'Bekas Resto Bintang 5 (95% Mulus)',

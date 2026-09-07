@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { MasterInventoryItem, PaginatedInventoryResponse } from '@/lib/types/inventory';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
-import { formatIDR, formatCleanProductUrl, WAREHOUSE_13_HUBS } from '@/lib/repositories/warehouse-utils';
+import { formatIDR, formatCleanProductUrl, WAREHOUSE_14_HUBS } from '@/lib/repositories/warehouse-utils';
 import {
   MessageSquare,
   Search,
@@ -486,10 +486,10 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
               }}
               className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             >
-              <option value="ALL">Semua Hub (13 Hub)</option>
-              {WAREHOUSE_13_HUBS.map((hub) => (
+              <option value="ALL">Semua Hub (14 Hub)</option>
+              {WAREHOUSE_14_HUBS.map((hub) => (
                 <option key={hub.code} value={hub.code}>
-                  {hub.code} - {hub.partnerName} ({hub.hubGroup})
+                  {hub.code === 'BK' ? 'BK - BBKitchen (HQ)' : `${hub.code} - ${hub.partnerName} (${hub.hubGroup})`}
                 </option>
               ))}
             </select>

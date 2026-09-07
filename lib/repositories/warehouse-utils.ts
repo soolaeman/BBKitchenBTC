@@ -2,6 +2,7 @@ import { WarehouseCode, WarehouseLocation } from '@/lib/types/inventory';
 import { OFFICIAL_CATEGORIES } from './categories';
 
 export const WAREHOUSE_LOCATION_MAP: Record<WarehouseCode, WarehouseLocation> = {
+  BK: 'BBKITCHEN (HQ)',
   GK: 'PAMULANG 2, TANGSEL',
   BB: 'PAMULANG 2, TANGSEL',
   SM: 'PAMULANG 2, TANGSEL',
@@ -17,7 +18,8 @@ export const WAREHOUSE_LOCATION_MAP: Record<WarehouseCode, WarehouseLocation> = 
   RK: 'RAWAKALONG, BOGOR',
 };
 
-export const WAREHOUSE_13_HUBS = [
+export const WAREHOUSE_14_HUBS = [
+  { code: 'BK' as WarehouseCode, name: 'BK - BBKitchen (HQ)', partnerName: 'BBKitchen (HQ)', hubLocation: 'BBKITCHEN (HQ)' as WarehouseLocation, hubGroup: 'BBKitchen Central' },
   { code: 'GK' as WarehouseCode, name: 'Griya Kitchen', partnerName: 'Griya Kitchen', hubLocation: 'PAMULANG 2, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang 2' },
   { code: 'BB' as WarehouseCode, name: 'BB Equipment', partnerName: 'BB Equipment', hubLocation: 'PAMULANG 2, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang 2' },
   { code: 'SM' as WarehouseCode, name: 'Suma Equipment', partnerName: 'Suma Equipment', hubLocation: 'PAMULANG 2, TANGSEL' as WarehouseLocation, hubGroup: 'Pamulang 2' },
@@ -33,7 +35,19 @@ export const WAREHOUSE_13_HUBS = [
   { code: 'RK' as WarehouseCode, name: 'Rizkitchen', partnerName: 'Rizkitchen', hubLocation: 'RAWAKALONG, BOGOR' as WarehouseLocation, hubGroup: 'Rawakalong' },
 ];
 
+export const WAREHOUSE_13_HUBS = WAREHOUSE_14_HUBS;
+export const WAREHOUSE_HUBS = WAREHOUSE_14_HUBS;
+
 export const WAREHOUSE_HUB_DETAILS = [
+  {
+    hubId: 'BK_HQ',
+    name: 'BK - BBKitchen (HQ)',
+    city: 'Tangerang Selatan / Jakarta',
+    codes: ['BK'],
+    address: 'Gudang Pusat BBKitchen (HQ Expansion Manifest)',
+    capacityUnits: 2000,
+    specialty: 'Direct Purchase, Central Inventory, Custom Fabrication & Showroom',
+  },
   {
     hubId: 'PAMULANG_2',
     name: 'Hub Pamulang 2',
