@@ -127,6 +127,7 @@ export function InventoryTable() {
     return null;
   });
 
+  const [soldNotices, setSoldNotices] = useState<any[]>([]);
   const [auditTimestamps, setAuditTimestamps] = useState<Record<string, string>>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -152,6 +153,9 @@ export function InventoryTable() {
             return merged;
           });
         }
+        if (Array.isArray(data.soldNotices)) {
+          setSoldNotices(data.soldNotices);
+        }
         if (data.activeSku) {
           setActiveClickedSku(data.activeSku);
           if (typeof window !== 'undefined') {
@@ -169,6 +173,17 @@ export function InventoryTable() {
       window.removeEventListener('focus', syncTimestamps);
     };
   }, []);
+
+  const handleDismissSoldNotice = async (noticeId: string) => {
+    setSoldNotices((prev) => prev.filter((n) => n.id !== noticeId));
+    try {
+      await fetch('/api/audit-timestamps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'DISMISS_SOLD_NOTICE', noticeId }),
+      });
+    } catch {}
+  };
 
   const markSkuAsVisited = (sku: string) => {
     setActiveClickedSku(sku);
@@ -399,6 +414,64 @@ export function InventoryTable() {
           <div>
             <div className="font-bold text-rose-200">Gagal Memuat Data Google Sheets</div>
             <div className="mt-0.5 text-rose-300/90 font-mono text-[11px]">{errorMessage}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Incoming Sold Notices from Sales */}
+      {soldNotices.length > 0 && (
+        <div className="bg-amber-950/40 border border-amber-500/40 rounded-2xl p-4 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-amber-300 flex items-center gap-2">
+              <span>📢 {soldNotices.length} Laporan Unit Terjual dari Tim Sales:</span>
+            </span>
+            <span className="text-[10px] text-amber-400 font-mono font-bold uppercase bg-amber-950 px-2 py-0.5 rounded border border-amber-800">
+              Menunggu Verifikasi Admin
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {soldNotices.map((notice) => (
+              <div key={notice.id} className="p-3 bg-slate-950/90 border border-amber-500/30 rounded-xl flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-amber-400 text-xs">{notice.sku}</span>
+                    {notice.dealPrice ? (
+                      <span className="text-emerald-400 font-mono text-[11px] font-bold">
+                        Deal: {formatIDR(notice.dealPrice)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-[11px] text-slate-300 truncate mt-0.5">{notice.notes}</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetItem = data?.items?.find((i) => i.SKU === notice.sku) || ({
+                        SKU: notice.sku,
+                        PRODUCT_TITLE: notice.sku,
+                        HARGA_BUKA_WA: notice.dealPrice,
+                      } as any);
+                      setDealPriceInput(notice.dealPrice ? String(notice.dealPrice) : '');
+                      setSoldNotesInput(notice.notes || '');
+                      setSoldModalItem(targetItem);
+                      handleDismissSoldNotice(notice.id);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition-colors"
+                  >
+                    ✓ Ubah ke SOLD
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDismissSoldNotice(notice.id)}
+                    className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-[11px]"
+                    title="Abaikan Laporan"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -636,6 +709,7 @@ export function InventoryTable() {
                   const isAudited = Boolean(auditTimestamps[item.SKU]);
                   const rawTime = auditTimestamps[item.SKU] || item.TANGGAL_MASUK;
                   const displayTime = rawTime ? formatTimestampWithYear(rawTime) : null;
+                  const soldNotice = soldNotices.find((n) => n.sku === item.SKU);
 
                   return (
                     <tr
@@ -655,6 +729,11 @@ export function InventoryTable() {
                           <span className={isActive ? 'text-amber-300 font-black' : ''}>{item.SKU}</span>
                           {item.IS_DIRTY && (
                             <span className="w-2 h-2 rounded-full bg-rose-500" title="Dirty Data" />
+                          )}
+                          {soldNotice && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold">
+                              📢 Lapor Sold
+                            </span>
                           )}
                         </div>
                         {isActive && (

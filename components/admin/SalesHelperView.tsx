@@ -135,7 +135,7 @@ export function SalesHelperView() {
     }
   }, []);
 
-  // Cross-device synchronization for audit timestamps & active row (Desktop <-> Mobile)
+  // Cross-device synchronization for audit timestamps ONLY (Row control strictly in Master Inventory)
   useEffect(() => {
     async function syncTimestamps() {
       try {
@@ -150,33 +150,6 @@ export function SalesHelperView() {
             return merged;
           });
         }
-        if (data.activeSku) {
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem('bbk_last_active_sku', data.activeSku);
-          }
-          // If searchedItem is not set yet or different from activeSku, auto-load it
-          setSearchedItem((current) => {
-            if (current?.SKU === data.activeSku) return current;
-            // Try finding in current items
-            const found = items.find((i) => i.SKU === data.activeSku);
-            if (found) {
-              setQuotePrice(found.HARGA_BUKA_WA || found.HARGA_ESTIMASI_PUBLIK || '');
-              return found;
-            }
-            // Otherwise fetch the specific item
-            fetch(`/api/inventory?search=${data.activeSku}&pageSize=1`)
-              .then((r) => r.json())
-              .then((resData) => {
-                if (resData.items && resData.items.length > 0) {
-                  const it = resData.items[0];
-                  setSearchedItem(it);
-                  setQuotePrice(it.HARGA_BUKA_WA || it.HARGA_ESTIMASI_PUBLIK || '');
-                }
-              })
-              .catch(() => {});
-            return current;
-          });
-        }
       } catch {}
     }
 
@@ -187,7 +160,7 @@ export function SalesHelperView() {
       clearInterval(interval);
       window.removeEventListener('focus', syncTimestamps);
     };
-  }, [items]);
+  }, []);
 
   const markSkuAsVisited = (sku: string) => {
     const now = new Date();
@@ -196,7 +169,6 @@ export function SalesHelperView() {
     const timeStr = `${datePart}, ${timePart}`;
 
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem('bbk_last_active_sku', sku);
       setAuditTimestamps((prev) => {
         const next = { ...prev, [sku]: timeStr };
         localStorage.setItem('bbk_audit_timestamps', JSON.stringify(next));
@@ -204,11 +176,11 @@ export function SalesHelperView() {
       });
     }
 
-    // Sync to shared backend in background
+    // Sync check timestamp ONLY to shared backend (Do NOT send activeSku from Sales tab)
     fetch('/api/audit-timestamps', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sku, timestamp: timeStr, activeSku: sku }),
+      body: JSON.stringify({ sku, timestamp: timeStr }),
     }).catch(() => {});
   };
 
@@ -296,8 +268,8 @@ export function SalesHelperView() {
     setPage(1);
   };
 
-  // Mark as Sold Handler (Optimistic & Blazing Fast)
-  const handleMarkAsSoldSubmit = async (e: React.FormEvent) => {
+  // Report Sold Notice to Master Inventory Handler (No Direct Status Mutation Authority)
+  const handleReportSoldNoticeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchedItem) return;
 
@@ -308,44 +280,34 @@ export function SalesHelperView() {
 
     const finalPrice = soldByOther ? 0 : (dealPriceInput ? Number(dealPriceInput) : (searchedItem.HARGA_DEAL_WA || searchedItem.HARGA_BUKA_WA || 0));
 
-    // 1. Optimistic Instant UI Feedback (0.05s)
-    setSoldSuccessMsg(`⚡ Unit ${targetSku} berhasil ditandai SOLD! Menyinkronkan ke Web & Google Sheets...`);
     setShowSoldModal(false);
     setDealPriceInput('');
     setSoldNotesInput('');
     setSoldByOther(false);
 
-    // Remove from local list immediately
-    setItems((prev) => prev.filter((i) => i.SKU !== targetSku));
-    setTotalItems((prev) => Math.max(0, prev - 1));
-
     try {
-      const res = await fetch('/api/inventory', {
+      const res = await fetch('/api/audit-timestamps', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(role ? { 'x-bbk-role': role } : {}),
         },
         body: JSON.stringify({
-          action: 'MARK_AS_SOLD',
+          action: 'REPORT_SOLD_NOTICE',
           sku: targetSku,
           dealPrice: finalPrice,
           notes: finalNotes,
+          reportedBy: role || 'Sales Desk',
         }),
       });
 
-      const resJson = await res.json();
       if (res.ok) {
-        setSoldSuccessMsg(`✓ Unit ${targetSku} 100% Selesai Ditandai Terjual (SOLD) di Web & Database.`);
-        fetchItems();
-        setTimeout(() => setSoldSuccessMsg(''), 4000);
+        setSoldSuccessMsg(`✓ Laporan unit ${targetSku} berhasil diteruskan ke Master Inventory! Tim Admin/Gudang telah diinfokan untuk verifikasi & update status.`);
+        setTimeout(() => setSoldSuccessMsg(''), 6000);
       } else {
-        alert(resJson.error || 'Gagal menyinkronkan status terjual');
-        fetchItems();
+        alert('Gagal mengirimkan laporan terjual ke Master Inventory');
       }
     } catch (err) {
-      console.error('Error marking as sold in SalesHelper', err);
-      fetchItems();
+      console.error('Error reporting sold notice in SalesHelper', err);
     }
   };
 
@@ -871,21 +833,19 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                 <span>Dokumen</span>
               </button>
 
-              {/* Mark As Sold Action */}
-              {permissions?.canMarkAsSold && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDealPriceInput(String(searchedItem.HARGA_DEAL_WA || searchedItem.HARGA_BUKA_WA || ''));
-                    setShowSoldModal(true);
-                  }}
-                  className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-bold transition-colors text-center"
-                  title="Tandai unit sudah laku terjual"
-                >
-                  <ShoppingBag className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Mark Sold</span>
-                </button>
-              )}
+              {/* Report Sold Action (Notice to Master Inventory) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setDealPriceInput(String(searchedItem.HARGA_DEAL_WA || searchedItem.HARGA_BUKA_WA || ''));
+                  setShowSoldModal(true);
+                }}
+                className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-800 text-xs font-bold transition-colors text-center"
+                title="Kirim notifikasi lapor terjual ke tim Master Inventory"
+              >
+                <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />
+                <span>📢 Lapor Terjual</span>
+              </button>
             </div>
 
             {/* Photo Gallery with Direct Download / Preview */}
@@ -1037,13 +997,18 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
         </div>
       )}
 
-      {/* Mark As Sold Modal */}
+      {/* Report Sold Notice Modal (Inform to Master Inventory) */}
       {showSoldModal && searchedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-base font-bold text-white">Tandai Unit Terjual (Sold)</h3>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>📢 Lapor Unit Terjual</span>
+                  <span className="text-[10px] font-mono font-bold bg-amber-950 border border-amber-800 text-amber-300 px-2 py-0.5 rounded">
+                    Info ke Master Inventory
+                  </span>
+                </h3>
                 <p className="text-xs text-slate-400 font-mono mt-0.5">{searchedItem.SKU} • {searchedItem.PRODUCT_TITLE}</p>
               </div>
               <button
@@ -1055,7 +1020,11 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
               </button>
             </div>
 
-            <form onSubmit={handleMarkAsSoldSubmit} className="space-y-4">
+            <p className="text-xs text-slate-400 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+              ℹ️ <strong>Catatan:</strong> Laporan ini akan otomatis dikirimkan sebagai notifikasi ke tab <strong>Master Inventory</strong>. Status unit di database resmi akan divalidasi & diubah oleh Admin/Operator Gudang.
+            </p>
+
+            <form onSubmit={handleReportSoldNoticeSubmit} className="space-y-4">
               {/* Dual Channel Choice */}
               <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
                 <div className="text-xs font-bold text-slate-300">Siapa yang menjual unit ini?</div>
@@ -1103,7 +1072,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
 
               <div>
                 <label className="block text-xs text-slate-300 font-medium mb-1">
-                  Catatan Penjualan / Keterangan
+                  Catatan Penjualan / Keterangan Pembeli
                 </label>
                 <textarea
                   rows={2}
@@ -1124,9 +1093,9 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/20"
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-lg shadow-amber-950/40"
                 >
-                  Simpan Status Terjual
+                  Kirim Info Terjual
                 </button>
               </div>
             </form>
