@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { Invoice, InvoiceItem, InvoiceStatus, DocumentType } from '@/lib/types/finance';
+import { Invoice, InvoiceItem, InvoiceStatus, DocumentType, PaymentRecord } from '@/lib/types/finance';
 import { MasterInventoryItem } from '@/lib/types/inventory';
 import { formatIDR } from '@/lib/repositories/warehouse-utils';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
@@ -10,8 +10,6 @@ import {
   FileText,
   Plus,
   Printer,
-  Receipt,
-  FileCheck,
   Truck,
   Search,
   RefreshCw,
@@ -24,6 +22,10 @@ import {
   X,
   ExternalLink,
   Pencil,
+  Lock,
+  ShieldCheck,
+  CreditCard,
+  Calendar,
 } from 'lucide-react';
 
 interface DocumentItemRow {
@@ -51,7 +53,6 @@ export function InvoiceManager() {
   const { role } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
@@ -80,14 +81,24 @@ export function InvoiceManager() {
   const [searchResults, setSearchResults] = useState<MasterInventoryItem[]>([]);
   const [isSearchingInventory, setIsSearchingInventory] = useState(false);
 
+  // Multi-Payment Installments (Termin)
+  const [payments, setPayments] = useState<PaymentRecord[]>([
+    {
+      id: 'pay_1',
+      label: 'Pembayaran 1 (DP)',
+      amount: 0,
+      date: new Date().toISOString().split('T')[0],
+      method: 'TRANSFER_JAGO_SYARIAH',
+    },
+  ]);
+
   // Financial States
   const [discount, setDiscount] = useState<string>('0');
-  const [dpAmount, setDpAmount] = useState<string>('0');
-  const [paymentMethod, setPaymentMethod] = useState<'TRANSFER_JAGO_SYARIAH' | 'CASH_PICKUP'>('TRANSFER_JAGO_SYARIAH');
+
+  // Optional Shipping States
+  const [hasShippingDetails, setHasShippingDetails] = useState<boolean>(false);
   const [shippingFeeType, setShippingFeeType] = useState<'BUYER_COD' | 'INCLUDED' | 'FREE_PROMO'>('BUYER_COD');
   const [shippingFee, setShippingFee] = useState<string>('0');
-
-  // Logistics / Driver States
   const [expeditionChoice, setExpeditionChoice] = useState<string>('LALAMOVE');
   const [customExpeditionText, setCustomExpeditionText] = useState('');
   const [deliveryDriver, setDeliveryDriver] = useState('');
@@ -95,8 +106,65 @@ export function InvoiceManager() {
   const [vehiclePlate, setVehiclePlate] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Helper Methods for Multi-Payment Rows
+  const addPaymentRow = () => {
+    const nextIdx = payments.length + 1;
+    const defaultLabel = nextIdx === 2 ? 'Pembayaran 2 (Pelunasan)' : `Pembayaran ${nextIdx}`;
+    setPayments((prev) => [
+      ...prev,
+      {
+        id: `pay_${Date.now()}_${nextIdx}`,
+        label: defaultLabel,
+        amount: 0,
+        date: new Date().toISOString().split('T')[0],
+        method: 'TRANSFER_JAGO_SYARIAH',
+      },
+    ]);
+  };
+
+  const removePaymentRow = (id: string) => {
+    if (payments.length <= 1) {
+      setPayments([
+        {
+          id: 'pay_1',
+          label: 'Pembayaran 1 (DP)',
+          amount: 0,
+          date: new Date().toISOString().split('T')[0],
+          method: 'TRANSFER_JAGO_SYARIAH',
+        },
+      ]);
+      return;
+    }
+    setPayments((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const updatePaymentRow = (id: string, field: keyof PaymentRecord, val: any) => {
+    setPayments((prev) =>
+      prev.map((p) => {
+        if (p.id === id) {
+          return { ...p, [field]: val };
+        }
+        return p;
+      })
+    );
+  };
+
+  // Helper to quickly mark invoice as fully paid with 1 payment
+  const handleQuickLunas = (targetTotal: number) => {
+    setPayments([
+      {
+        id: `pay_lunas_${Date.now()}`,
+        label: 'Pembayaran Lunas (100%)',
+        amount: targetTotal,
+        date: new Date().toISOString().split('T')[0],
+        method: 'TRANSFER_JAGO_SYARIAH',
+      },
+    ]);
+  };
+
   // 1-Click Convert Quotation to Invoice
   const handleConvertQuotationToInvoice = (quotation: Invoice) => {
+    setEditingInvoice(null);
     setFormDocType('INVOICE');
     setCustomerName(quotation.customerName || '');
     setCustomerPhone(quotation.customerPhone || '');
@@ -116,7 +184,16 @@ export function InvoiceManager() {
       );
     }
     setDiscount(quotation.discount ? String(quotation.discount) : '0');
-    setDpAmount('0');
+    setPayments([
+      {
+        id: `pay_1`,
+        label: 'Pembayaran 1 (DP)',
+        amount: 0,
+        date: new Date().toISOString().split('T')[0],
+        method: 'TRANSFER_JAGO_SYARIAH',
+      },
+    ]);
+    setHasShippingDetails(false);
     setNotes(
       quotation.notes
         ? `[Diambil dari ${quotation.quotationNumber || quotation.invoiceNumber}] ${quotation.notes}`
@@ -125,10 +202,10 @@ export function InvoiceManager() {
     setShowCreateModal(true);
   };
 
-  // Open Edit Modal for Invoice / Quotation / Custom Kuitansi
+  // Open Edit Modal for Invoice / Quotation
   const handleOpenEditModal = (inv: Invoice) => {
     setEditingInvoice(inv);
-    setFormDocType(inv.documentType || 'INVOICE');
+    setFormDocType(inv.documentType === 'QUOTATION' ? 'QUOTATION' : 'INVOICE');
     setCustomerName(inv.customerName || '');
     setCustomerPhone(inv.customerPhone || '');
     setCustomerAddress(inv.customerAddress || '');
@@ -149,10 +226,37 @@ export function InvoiceManager() {
       setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: inv.totalAmount || 0 }]);
     }
     setDiscount(inv.discount ? String(inv.discount) : '0');
+
+    // Populate Payments
+    if (inv.payments && inv.payments.length > 0) {
+      setPayments(inv.payments);
+    } else if (inv.dpAmount && inv.dpAmount > 0) {
+      setPayments([
+        {
+          id: 'pay_1',
+          label: 'Pembayaran 1 (DP)',
+          amount: inv.dpAmount,
+          date: inv.issueDate || new Date().toISOString().split('T')[0],
+          method: inv.paymentMethod || 'TRANSFER_JAGO_SYARIAH',
+        },
+      ]);
+    } else {
+      setPayments([
+        {
+          id: 'pay_1',
+          label: 'Pembayaran 1 (DP)',
+          amount: inv.status === 'PAID' ? inv.totalAmount : 0,
+          date: inv.issueDate || new Date().toISOString().split('T')[0],
+          method: inv.paymentMethod || 'TRANSFER_JAGO_SYARIAH',
+        },
+      ]);
+    }
+
+    // Populate Shipping
+    const hasShipping = Boolean(inv.hasShipping || (inv.shippingFee && inv.shippingFee > 0) || inv.deliveryExpedition || inv.deliveryDriver);
+    setHasShippingDetails(hasShipping);
     setShippingFee(inv.shippingFee ? String(inv.shippingFee) : '0');
     setShippingFeeType(inv.shippingFeeType || 'BUYER_COD');
-    setDpAmount(inv.dpAmount ? String(inv.dpAmount) : '0');
-    setPaymentMethod(inv.paymentMethod === 'CASH_PICKUP' ? 'CASH_PICKUP' : 'TRANSFER_JAGO_SYARIAH');
     setDeliveryDriver(inv.deliveryDriver || '');
     setDriverPhone(inv.driverPhone || '');
     setVehiclePlate(inv.deliveryVehiclePlate || '');
@@ -182,7 +286,6 @@ export function InvoiceManager() {
       console.error('Failed to load invoices', err);
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
   }, [role]);
 
@@ -224,7 +327,6 @@ export function InvoiceManager() {
 
   const removeItemRow = (id: string) => {
     if (itemRows.length <= 1) {
-      // Don't remove if it's the last row, just clear it
       setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: 0 }]);
       return;
     }
@@ -266,7 +368,6 @@ export function InvoiceManager() {
     }
   };
 
-  // Select Item from Live Search
   const handleSelectSearchedItem = (rowId: string, item: MasterInventoryItem) => {
     setItemRows((prev) =>
       prev.map((r) => {
@@ -293,10 +394,17 @@ export function InvoiceManager() {
   }, [itemRows]);
 
   const discNum = Number(discount.replace(/\D/g, '')) || 0;
-  const shippingNum = shippingFeeType === 'INCLUDED' ? (Number(shippingFee.replace(/\D/g, '')) || 0) : 0;
+  const shippingNum = (hasShippingDetails && shippingFeeType === 'INCLUDED') ? (Number(shippingFee.replace(/\D/g, '')) || 0) : 0;
   const calculatedTotal = Math.max(0, calculatedSubtotal + shippingNum - discNum);
-  const dpNum = Number(dpAmount.replace(/\D/g, '')) || 0;
-  const calculatedSisa = Math.max(0, calculatedTotal - dpNum);
+
+  // Total Paid across all installments
+  const totalPaid = useMemo(() => {
+    if (formDocType === 'QUOTATION') return 0;
+    return payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  }, [payments, formDocType]);
+
+  const calculatedSisa = Math.max(0, calculatedTotal - totalPaid);
+  const isFormFullyPaid = calculatedTotal > 0 && totalPaid >= calculatedTotal;
 
   // Submit & Create Document
   const handleCreateDocument = async (e: React.FormEvent) => {
@@ -304,7 +412,7 @@ export function InvoiceManager() {
 
     const cleanItems: InvoiceItem[] = itemRows.map((r, idx) => {
       const q = Math.max(1, Number(r.quantity) || 1);
-      const p = formDocType === 'DELIVERY_NOTE' ? 0 : Number(r.unitPrice) || 0;
+      const p = Number(r.unitPrice) || 0;
       return {
         id: r.id || `item_${idx}_${Date.now()}`,
         sku: r.sku.trim() || `BBK-CUSTOM-${idx + 1}`,
@@ -324,14 +432,31 @@ export function InvoiceManager() {
     const dueDate = dueDateObj.toISOString().split('T')[0];
     const randomNum = Math.floor(1000 + Math.random() * 9000);
 
-    const resolvedExpedition =
-      expeditionChoice === 'CUSTOM'
-        ? customExpeditionText.trim() || 'Ekspedisi Rekanan'
-        : EXPEDITION_OPTIONS.find((o) => o.value === expeditionChoice)?.label || expeditionChoice;
+    const resolvedExpedition = hasShippingDetails
+      ? (expeditionChoice === 'CUSTOM'
+          ? customExpeditionText.trim() || 'Ekspedisi Rekanan'
+          : EXPEDITION_OPTIONS.find((o) => o.value === expeditionChoice)?.label || expeditionChoice)
+      : undefined;
+
+    // Filter valid payment records (only for Invoices)
+    const cleanPayments: PaymentRecord[] = formDocType === 'INVOICE'
+      ? payments.map((p, idx) => ({
+          id: p.id || `pay_${idx + 1}`,
+          label: p.label.trim() || `Pembayaran ${idx + 1}`,
+          amount: Number(p.amount) || 0,
+          date: p.date || issueDate,
+          method: p.method || 'TRANSFER_JAGO_SYARIAH',
+          notes: p.notes?.trim() || undefined,
+        }))
+      : [];
+
+    const isPaid = formDocType === 'INVOICE' && calculatedTotal > 0 && totalPaid >= calculatedTotal;
+    const finalStatus: InvoiceStatus = formDocType === 'QUOTATION'
+      ? 'GENERATED'
+      : (isPaid ? 'PAID' : (totalPaid > 0 ? 'DP_PAID' : 'GENERATED'));
 
     const newInv: Omit<Invoice, 'id'> = {
       invoiceNumber: `INV-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${randomNum}`,
-      kuitansiNumber: `KWT-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${randomNum}`,
       quotationNumber: `QUO-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${randomNum}`,
       suratJalanNumber: `SJ-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${randomNum}`,
       documentType: formDocType,
@@ -345,18 +470,20 @@ export function InvoiceManager() {
       discount: discNum,
       tax: 0,
       totalAmount: calculatedTotal,
-      dpAmount: formDocType === 'RECEIPT' ? calculatedTotal : dpNum,
-      remainingAmount: formDocType === 'RECEIPT' ? 0 : calculatedSisa,
+      dpAmount: cleanPayments[0]?.amount || 0,
+      remainingAmount: formDocType === 'QUOTATION' ? 0 : calculatedSisa,
+      payments: cleanPayments,
       issueDate,
       dueDate,
-      status: formDocType === 'RECEIPT' || dpNum >= calculatedTotal ? 'PAID' : 'GENERATED',
-      paymentMethod,
-      deliveryDriver: deliveryDriver.trim() || undefined,
-      driverPhone: driverPhone.trim() || undefined,
-      deliveryVehiclePlate: vehiclePlate.trim() || undefined,
+      status: finalStatus,
+      paymentMethod: cleanPayments[0]?.method || 'TRANSFER_JAGO_SYARIAH',
+      hasShipping: hasShippingDetails,
+      deliveryDriver: hasShippingDetails ? deliveryDriver.trim() || undefined : undefined,
+      driverPhone: hasShippingDetails ? driverPhone.trim() || undefined : undefined,
+      deliveryVehiclePlate: hasShippingDetails ? vehiclePlate.trim() || undefined : undefined,
       deliveryExpedition: resolvedExpedition,
-      shippingFeeType,
-      shippingFee: shippingNum,
+      shippingFeeType: hasShippingDetails ? shippingFeeType : undefined,
+      shippingFee: hasShippingDetails ? shippingNum : 0,
       notes: notes.trim(),
       createdBy: 'Sales / Finance Desk',
     };
@@ -375,16 +502,18 @@ export function InvoiceManager() {
           discount: discNum,
           tax: 0,
           totalAmount: calculatedTotal,
-          dpAmount: formDocType === 'RECEIPT' ? calculatedTotal : dpNum,
-          remainingAmount: formDocType === 'RECEIPT' ? 0 : calculatedSisa,
-          status: (dpNum >= calculatedTotal && calculatedTotal > 0) || formDocType === 'RECEIPT' ? 'PAID' : editingInvoice.status,
-          paymentMethod,
-          deliveryDriver: deliveryDriver.trim() || undefined,
-          driverPhone: driverPhone.trim() || undefined,
-          deliveryVehiclePlate: vehiclePlate.trim() || undefined,
+          dpAmount: cleanPayments[0]?.amount || 0,
+          remainingAmount: formDocType === 'QUOTATION' ? 0 : calculatedSisa,
+          payments: cleanPayments,
+          status: finalStatus,
+          paymentMethod: cleanPayments[0]?.method || 'TRANSFER_JAGO_SYARIAH',
+          hasShipping: hasShippingDetails,
+          deliveryDriver: hasShippingDetails ? deliveryDriver.trim() || undefined : undefined,
+          driverPhone: hasShippingDetails ? driverPhone.trim() || undefined : undefined,
+          deliveryVehiclePlate: hasShippingDetails ? vehiclePlate.trim() || undefined : undefined,
           deliveryExpedition: resolvedExpedition,
-          shippingFeeType,
-          shippingFee: shippingNum,
+          shippingFeeType: hasShippingDetails ? shippingFeeType : undefined,
+          shippingFee: hasShippingDetails ? shippingNum : 0,
           notes: notes.trim(),
         };
 
@@ -398,18 +527,6 @@ export function InvoiceManager() {
           const updatedData = await res.json();
           setShowCreateModal(false);
           setEditingInvoice(null);
-          // Reset form
-          setCustomerName('');
-          setCustomerPhone('');
-          setCustomerAddress('');
-          setCustomerCompany('');
-          setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: 0 }]);
-          setDiscount('0');
-          setDpAmount('0');
-          setDeliveryDriver('');
-          setDriverPhone('');
-          setVehiclePlate('');
-          setNotes('');
           loadInvoices();
 
           if (updatedData.invoice) {
@@ -427,19 +544,6 @@ export function InvoiceManager() {
         if (res.ok) {
           const createdData = await res.json();
           setShowCreateModal(false);
-
-          // Reset form
-          setCustomerName('');
-          setCustomerPhone('');
-          setCustomerAddress('');
-          setCustomerCompany('');
-          setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: 0 }]);
-          setDiscount('0');
-          setDpAmount('0');
-          setDeliveryDriver('');
-          setDriverPhone('');
-          setVehiclePlate('');
-          setNotes('');
           loadInvoices();
 
           if (createdData.invoice) {
@@ -454,7 +558,7 @@ export function InvoiceManager() {
     }
   };
 
-  // Filter invoices for list
+  // Filter invoices for table
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
       const matchStatus = statusFilter === 'ALL' || inv.status === statusFilter;
@@ -463,6 +567,7 @@ export function InvoiceManager() {
       const matchQ =
         !q ||
         inv.invoiceNumber.toLowerCase().includes(q) ||
+        (inv.quotationNumber && inv.quotationNumber.toLowerCase().includes(q)) ||
         inv.customerName.toLowerCase().includes(q) ||
         (inv.customerPhone && inv.customerPhone.toLowerCase().includes(q)) ||
         inv.items.some((i) => i.description.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q));
@@ -477,17 +582,17 @@ export function InvoiceManager() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-2xl backdrop-blur-xl">
         <div className="flex items-center gap-2">
           <span className="p-2 rounded-xl bg-amber-950 border border-amber-800 text-amber-400">
-            <Receipt className="w-5 h-5" />
+            <FileText className="w-5 h-5" />
           </span>
           <div>
             <h2 className="text-xl font-black text-slate-100 tracking-tight flex items-center gap-2">
-              INVOICES & DOKUMEN RESMI
+              DOKUMEN RESMI &amp; INVOICE
               <span className="px-2 py-0.5 rounded-full bg-amber-950 border border-amber-800 text-amber-300 text-[10px] font-mono font-bold">
-                4-in-1 Generator
+                BBKitchen Finance
               </span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Faktur Tagihan (Invoice), Kuitansi Lunas, Surat Penawaran (Quotation) & Surat Jalan Tanpa Harga.
+              Faktur Invoice (Multi-Termin), Penawaran Resmi (Quotation) &amp; Surat Jalan (Syarat Lunas).
             </p>
           </div>
         </div>
@@ -506,7 +611,25 @@ export function InvoiceManager() {
           <button
             type="button"
             onClick={() => {
+              setEditingInvoice(null);
+              setFormDocType('INVOICE');
+              setCustomerName('');
+              setCustomerPhone('');
+              setCustomerAddress('');
+              setCustomerCompany('');
               setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: 0 }]);
+              setDiscount('0');
+              setPayments([
+                {
+                  id: 'pay_1',
+                  label: 'Pembayaran 1 (DP)',
+                  amount: 0,
+                  date: new Date().toISOString().split('T')[0],
+                  method: 'TRANSFER_JAGO_SYARIAH',
+                },
+              ]);
+              setHasShippingDetails(false);
+              setNotes('');
               setShowCreateModal(true);
             }}
             className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-950/50 flex items-center gap-2"
@@ -537,11 +660,9 @@ export function InvoiceManager() {
             onChange={(e) => setTypeFilter(e.target.value)}
             className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold text-xs"
           >
-            <option value="ALL">Semua Format Dokumen</option>
-            <option value="INVOICE">📄 Invoice (Faktur)</option>
-            <option value="RECEIPT">🧾 Kuitansi Pembayaran</option>
-            <option value="QUOTATION">📋 Quotation (Penawaran)</option>
-            <option value="DELIVERY_NOTE">🚚 Surat Jalan (Delivery)</option>
+            <option value="ALL">Semua Dokumen</option>
+            <option value="INVOICE">📄 Faktur Tagihan (Invoice)</option>
+            <option value="QUOTATION">📋 Surat Penawaran (Quotation)</option>
           </select>
         </div>
 
@@ -553,9 +674,9 @@ export function InvoiceManager() {
             className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold text-xs"
           >
             <option value="ALL">Semua Status</option>
-            <option value="PAID">✓ Lunas</option>
+            <option value="PAID">✓ Lunas Penuh</option>
+            <option value="DP_PAID">⏳ Pembayaran Bertahap (DP)</option>
             <option value="GENERATED">Terbit (Unpaid)</option>
-            <option value="SENT">Terkirim</option>
           </select>
         </div>
       </div>
@@ -578,7 +699,7 @@ export function InvoiceManager() {
                 <th className="py-3 px-3.5">Rincian Unit</th>
                 <th className="py-3 px-3.5">Tanggal Terbit</th>
                 <th className="py-3 px-3.5 text-right">Total Transaksi</th>
-                <th className="py-3 px-3.5 text-center">Status</th>
+                <th className="py-3 px-3.5 text-center">Status Pembayaran</th>
                 <th className="py-3 px-3.5 text-center">Aksi</th>
               </tr>
             </thead>
@@ -594,188 +715,184 @@ export function InvoiceManager() {
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-500">
                     <FileText className="w-8 h-8 mx-auto text-slate-600 mb-2" />
-                    Belum ada dokumen yang diterbitkan.
+                    Belum ada dokumen transaksi yang diterbitkan.
                   </td>
                 </tr>
               ) : (
-                filteredInvoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-slate-850/50 transition-colors">
-                    <td className="py-3 px-3.5 font-mono font-bold text-amber-400">
-                      {inv.invoiceNumber}
-                    </td>
-                    <td className="py-3 px-3.5">
-                      <span className="inline-block px-2 py-0.5 bg-slate-950 border border-slate-800 rounded text-[10px] font-bold text-slate-300">
-                        {inv.documentType || 'INVOICE'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3.5">
-                      <p className="font-bold text-slate-200">{inv.customerName}</p>
-                      <p className="text-[10px] text-slate-500 font-mono">{inv.customerPhone}</p>
-                    </td>
-                    <td className="py-3 px-3.5 max-w-xs">
-                      <p className="text-slate-300 line-clamp-1">
-                        {inv.items.map((i) => i.description).join(', ')}
-                      </p>
-                      <p className="text-[10px] text-slate-500 font-mono">
-                        {inv.items.map((i) => `${i.sku} (${i.quantity} unit)`).join(', ')}
-                      </p>
-                    </td>
-                    <td className="py-3 px-3.5 font-mono text-slate-300">{inv.issueDate}</td>
-                    <td className="py-3 px-3.5 text-right font-mono font-bold text-white">
-                      {formatIDR(inv.totalAmount)}
-                    </td>
-                    <td className="py-3 px-3.5 text-center">
-                      {inv.status === 'PAID' ? (
-                        <span className="inline-block px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded text-[10px] font-bold">
-                          ✓ LUNAS
+                filteredInvoices.map((inv) => {
+                  // Calculate dynamic multi-payment metrics for this row
+                  const invPayments = (inv.payments && inv.payments.length > 0)
+                    ? inv.payments
+                    : (inv.dpAmount && inv.dpAmount > 0
+                        ? [{ id: 'p1', label: 'Pembayaran 1 (DP)', amount: inv.dpAmount, date: inv.issueDate || '', method: 'TRANSFER_JAGO_SYARIAH' }]
+                        : []);
+
+                  const invPaid = invPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+                  const isPaid = inv.status === 'PAID' || (inv.totalAmount > 0 && invPaid >= inv.totalAmount);
+                  const invRemaining = Math.max(0, inv.totalAmount - invPaid);
+
+                  return (
+                    <tr key={inv.id} className="hover:bg-slate-850/50 transition-colors">
+                      <td className="py-3 px-3.5 font-mono font-bold text-amber-400">
+                        {inv.documentType === 'QUOTATION' ? (inv.quotationNumber || inv.invoiceNumber) : inv.invoiceNumber}
+                      </td>
+                      <td className="py-3 px-3.5">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                          inv.documentType === 'QUOTATION'
+                            ? 'bg-blue-950 text-blue-300 border border-blue-800'
+                            : 'bg-amber-950 text-amber-300 border border-amber-800'
+                        }`}>
+                          {inv.documentType === 'QUOTATION' ? '📋 QUOTATION' : '📄 INVOICE'}
                         </span>
-                      ) : (
-                        <span className="inline-block px-2 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded text-[10px] font-bold">
-                          {inv.status}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-3.5 text-center">
-                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      </td>
+                      <td className="py-3 px-3.5">
+                        <p className="font-bold text-slate-200">{inv.customerName}</p>
+                        <p className="text-[10px] text-slate-500 font-mono">{inv.customerPhone}</p>
+                      </td>
+                      <td className="py-3 px-3.5 max-w-xs">
+                        <p className="text-slate-300 line-clamp-1">
+                          {inv.items.map((i) => i.description).join(', ')}
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-mono">
+                          {inv.items.map((i) => `${i.sku} (${i.quantity} unit)`).join(', ')}
+                        </p>
+                      </td>
+                      <td className="py-3 px-3.5 font-mono text-slate-300">{inv.issueDate}</td>
+                      <td className="py-3 px-3.5 text-right font-mono font-bold text-white">
+                        {formatIDR(inv.totalAmount)}
+                      </td>
+                      <td className="py-3 px-3.5 text-center">
                         {inv.documentType === 'QUOTATION' ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedInvoice(inv);
-                                setDocumentModalType('QUOTATION');
-                                setIsDocModalOpen(true);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-xs font-bold border border-blue-500/30 transition-colors"
-                              title="Buka & Cetak Surat Penawaran"
-                            >
-                              <Printer className="w-3.5 h-3.5" />
-                              <span>Quotation</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleConvertQuotationToInvoice(inv)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-md transition-colors"
-                              title="Ambil data penawaran ini dan buat menjadi Faktur Invoice Resmi"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>Ambil ke Invoice</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(inv)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition-colors"
-                              title="Edit rincian unit dan penawaran harga"
-                            >
-                              <Pencil className="w-3 h-3 text-amber-400" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteInvoice(inv)}
-                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
-                              title="Hapus Penawaran Ini"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </>
-                        ) : inv.documentType === 'RECEIPT' ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedInvoice(inv);
-                                setDocumentModalType('RECEIPT');
-                                setIsDocModalOpen(true);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-colors"
-                              title="Buka & Cetak Kuitansi Pembayaran"
-                            >
-                              <Printer className="w-3.5 h-3.5" />
-                              <span>Kuitansi</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(inv)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition-colors"
-                              title="Edit rincian unit, nominal DP, atau status pelunasan"
-                            >
-                              <Pencil className="w-3 h-3 text-amber-400" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteInvoice(inv)}
-                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
-                              title="Hapus Kuitansi Ini"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </>
+                          /* RULE 3: Quotation jangan ada lunas / ga lunas */
+                          <span className="inline-block px-2.5 py-0.5 bg-blue-950 text-blue-300 border border-blue-800 rounded-full text-[10px] font-bold">
+                            📋 PENAWARAN AKTIF
+                          </span>
+                        ) : isPaid ? (
+                          <span className="inline-block px-2.5 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-full text-[10px] font-bold">
+                            ✓ LUNAS
+                          </span>
                         ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedInvoice(inv);
-                                setDocumentModalType('INVOICE');
-                                setIsDocModalOpen(true);
-                              }}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30 transition-colors"
-                              title="Buka / Cetak Faktur Invoice"
-                            >
-                              <FileText className="w-3 h-3" />
-                              <span>Invoice</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedInvoice(inv);
-                                setDocumentModalType('RECEIPT');
-                                setIsDocModalOpen(true);
-                              }}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-colors"
-                              title="Cetak Kuitansi DP / Lunas dari Invoice Ini"
-                            >
-                              <Receipt className="w-3 h-3" />
-                              <span>Kuitansi</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedInvoice(inv);
-                                setDocumentModalType('DELIVERY_NOTE');
-                                setIsDocModalOpen(true);
-                              }}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 text-xs font-bold border border-orange-500/30 transition-colors"
-                              title="Ambil Surat Jalan dari Invoice Ini (Tanpa Harga)"
-                            >
-                              <Truck className="w-3 h-3" />
-                              <span>Surat Jalan</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(inv)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition-colors"
-                              title="Edit rincian unit, diskon, custom kuitansi DP, atau data kurir"
-                            >
-                              <Pencil className="w-3 h-3 text-amber-400" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteInvoice(inv)}
-                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
-                              title="Hapus Dokumen Transaksi Ini"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </>
+                          <div className="space-y-0.5">
+                            <span className="inline-block px-2 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded-full text-[10px] font-bold">
+                              ⏳ Sisa {formatIDR(invRemaining)}
+                            </span>
+                            {invPaid > 0 && (
+                              <p className="text-[9px] text-slate-400 font-mono">Masuk: {formatIDR(invPaid)}</p>
+                            )}
+                          </div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="py-3 px-3.5 text-center">
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          {inv.documentType === 'QUOTATION' ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedInvoice(inv);
+                                  setDocumentModalType('QUOTATION');
+                                  setIsDocModalOpen(true);
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-xs font-bold border border-blue-500/30 transition-colors"
+                                title="Buka & Cetak Surat Penawaran"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>Quotation</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleConvertQuotationToInvoice(inv)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-md transition-colors"
+                                title="Ambil penawaran ini dan buat menjadi Faktur Invoice Resmi"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Ambil ke Invoice</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(inv)}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition-colors"
+                                title="Edit penawaran harga"
+                              >
+                                <Pencil className="w-3 h-3 text-amber-400" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteInvoice(inv)}
+                                className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
+                                title="Hapus Penawaran Ini"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedInvoice(inv);
+                                  setDocumentModalType('INVOICE');
+                                  setIsDocModalOpen(true);
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30 transition-colors"
+                                title="Buka / Cetak Faktur Invoice"
+                              >
+                                <FileText className="w-3 h-3" />
+                                <span>Invoice</span>
+                              </button>
+
+                              {/* RULE 4: Surat jalan gabisa ada sebelum lunas */}
+                              {isPaid ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedInvoice(inv);
+                                    setDocumentModalType('DELIVERY_NOTE');
+                                    setIsDocModalOpen(true);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-colors"
+                                  title="Cetak Surat Jalan Pengiriman (Invoice Sudah Lunas)"
+                                >
+                                  <Truck className="w-3 h-3" />
+                                  <span>Surat Jalan</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/40 text-slate-500 text-xs font-medium border border-slate-800 cursor-not-allowed opacity-60"
+                                  title="🔒 Surat Jalan terkunci. Syarat penerbitan: Tagihan Invoice harus 100% LUNAS terlebih dahulu."
+                                >
+                                  <Lock className="w-3 h-3 text-slate-500" />
+                                  <span>Surat Jalan</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(inv)}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition-colors"
+                                title="Edit rincian unit, diskon, termin pembayaran, atau data ekspedisi"
+                              >
+                                <Pencil className="w-3 h-3 text-amber-400" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteInvoice(inv)}
+                                className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
+                                title="Hapus Invoice Ini"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -794,13 +911,13 @@ export function InvoiceManager() {
                 <div>
                   <h3 className="text-base font-black text-white">
                     {editingInvoice
-                      ? `Edit Transaksi & Custom Kuitansi: ${editingInvoice.invoiceNumber || editingInvoice.quotationNumber}`
+                      ? `Edit Transaksi: ${editingInvoice.invoiceNumber || editingInvoice.quotationNumber}`
                       : 'Penerbitan Dokumen Legal Resmi BBKitchen'}
                   </h3>
                   <p className="text-xs text-slate-400">
                     {editingInvoice
-                      ? 'Sesuaikan rincian unit, harga kesepakatan, DP kuitansi, atau data ekspedisi kurir.'
-                      : 'Mendukung multi-unit, pencarian otomatis stok live, dan surat jalan tanpa harga.'}
+                      ? 'Sesuaikan rincian unit, harga kesepakatan, tahap pembayaran (termin), atau data ekspedisi.'
+                      : 'Mendukung multi-unit, pencarian otomatis stok live, pembayaran bertahap, dan pengiriman opsional.'}
                   </p>
                 </div>
               </div>
@@ -817,7 +934,7 @@ export function InvoiceManager() {
             </div>
 
             <form onSubmit={handleCreateDocument} className="space-y-5 text-xs">
-              {/* 1. DOCUMENT TYPE SELECTOR */}
+              {/* 1. DOCUMENT TYPE SELECTOR (ONLY QUOTATION & INVOICE) */}
               <div>
                 <label className="block text-slate-400 font-bold mb-1.5 uppercase text-[10px] tracking-wider">
                   Pilih Format Dokumen:
@@ -834,7 +951,7 @@ export function InvoiceManager() {
                   >
                     <span className="block text-sm">📋 Surat Penawaran (Quotation)</span>
                     <span className="block text-[10px] font-normal text-blue-200 mt-0.5">
-                      Buka harga awal sebelum negosiasi & DP
+                      Buka estimasi harga awal tanpa status lunas / belum lunas
                     </span>
                   </button>
                   <button
@@ -848,13 +965,10 @@ export function InvoiceManager() {
                   >
                     <span className="block text-sm">📄 Faktur Tagihan Resmi (Invoice)</span>
                     <span className="block text-[10px] font-normal text-amber-950 mt-0.5">
-                      Deal harga sah, DP &gt;50%, pengiriman &amp; rekening Jago
+                      Deal harga sah, pembayaran bertahap (termin) &amp; rekening Jago
                     </span>
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 p-2 bg-slate-950 border border-slate-800 rounded-lg">
-                  💡 <strong>Catatan:</strong> <em>Kuitansi (Bukti Pembayaran DP/Lunas)</em> dan <em>Surat Jalan Pengiriman</em> adalah bagian resmi dari Faktur Invoice dan langsung dicetak dari baris Invoice.
-                </p>
               </div>
 
               {/* 2. CUSTOMER & DESTINATION INFO */}
@@ -893,7 +1007,7 @@ export function InvoiceManager() {
 
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">
-                    Alamat Lengkap Pengiriman / Restoran
+                    Alamat Lengkap Pengiriman / Restoran (Opsional)
                   </label>
                   <input
                     type="text"
@@ -905,15 +1019,15 @@ export function InvoiceManager() {
                 </div>
               </div>
 
-              {/* 3. MULTI-UNIT ITEMS BUILDER (BEBAS MANUAL / CARI DARI KATALOG) */}
+              {/* 3. MULTI-UNIT ITEMS BUILDER (MANUAL / AUTO-FILL DARI STOK) */}
               <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <span className="font-bold text-slate-300 uppercase tracking-wider text-[10px] block">
-                      📦 Rincian Unit Barang & Jasa ({itemRows.length} Baris)
+                      📦 Rincian Unit Barang ({itemRows.length} Baris)
                     </span>
                     <span className="text-[10px] text-slate-500">
-                      Bisa ketik nama unit bebas (manual) atau ketik kode SKU untuk auto-fill dari katalog.
+                      Bisa ketik nama unit bebas (manual) atau ketik kode SKU untuk auto-fill dari stok.
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -923,16 +1037,7 @@ export function InvoiceManager() {
                       className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg font-bold text-[11px] border border-amber-500/30 flex items-center gap-1 transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>+ Tambah Baris Unit Bebas</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => addItemRow('BIAYA-JASA', 'Ongkos Kirim Armada / Jasa Testing')}
-                      className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg font-bold text-[11px] border border-cyan-500/30 flex items-center gap-1 transition-colors"
-                      title="Tambah Biaya Ongkir, Packing Kayu, atau Jasa Teknisi"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>+ Tambah Jasa / Ongkir</span>
+                      <span>+ Tambah Baris Unit</span>
                     </button>
                   </div>
                 </div>
@@ -945,7 +1050,7 @@ export function InvoiceManager() {
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-slate-400">
-                          {row.sku === 'BIAYA-JASA' ? '🛠️ Biaya / Jasa #' : 'Unit Barang #'}{index + 1}
+                          Unit Barang #{index + 1}
                         </span>
                         {itemRows.length > 1 && (
                           <button
@@ -960,7 +1065,7 @@ export function InvoiceManager() {
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                        {/* Product Title Input (Main input) */}
+                        {/* Product Title Input */}
                         <div className="sm:col-span-6">
                           <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
                             Nama Unit / Deskripsi Barang *
@@ -975,7 +1080,7 @@ export function InvoiceManager() {
                           />
                         </div>
 
-                        {/* SKU Search Input (Optional) */}
+                        {/* SKU Search Input */}
                         <div className="sm:col-span-2 relative">
                           <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
                             Kode SKU (Opsional)
@@ -1053,77 +1158,13 @@ export function InvoiceManager() {
                 </div>
               </div>
 
-              {/* 4. FINANCIAL TOTALS & ONGKIR */}
+              {/* 4. FINANCIAL SUMMARY */}
               <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-4">
                 <span className="font-bold text-slate-300 uppercase tracking-wider text-[10px] block">
-                  💰 Rincian Finansial {formDocType === 'INVOICE' ? '& Opsi Pengiriman' : ''}
+                  💰 Ringkasan Finansial {formDocType === 'QUOTATION' ? 'Penawaran' : 'Kesepakatan'}
                 </span>
 
-                {/* Skema Ongkos Kirim Selector (HANYA ADA DI INVOICE SESUAI INSTRUKSI) */}
-                {formDocType === 'INVOICE' && (
-                  <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-2">
-                    <label className="block text-slate-300 font-bold text-xs">
-                      🚚 Ketentuan Ongkos Kirim (Opsional):
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShippingFeeType('BUYER_COD')}
-                        className={`p-2.5 rounded-xl text-left border text-xs transition-all ${
-                          shippingFeeType === 'BUYER_COD'
-                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
-                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        <div className="font-bold">🚚 Bayar Sendiri / COD</div>
-                        <div className="text-[10px] opacity-80 mt-0.5">Ditanggung pembeli bayar ke kurir saat tiba</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setShippingFeeType('INCLUDED')}
-                        className={`p-2.5 rounded-xl text-left border text-xs transition-all ${
-                          shippingFeeType === 'INCLUDED'
-                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
-                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        <div className="font-bold">🧾 Include di Tagihan</div>
-                        <div className="text-[10px] opacity-80 mt-0.5">Ditambahkan langsung ke total Invoice</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setShippingFeeType('FREE_PROMO')}
-                        className={`p-2.5 rounded-xl text-left border text-xs transition-all ${
-                          shippingFeeType === 'FREE_PROMO'
-                            ? 'bg-blue-500/20 border-blue-500 text-blue-300 font-bold'
-                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        <div className="font-bold">🎁 Free Ongkir Promo</div>
-                        <div className="text-[10px] opacity-80 mt-0.5">Gratis subsidi ongkir dari BBKitchen</div>
-                      </button>
-                    </div>
-
-                    {shippingFeeType === 'INCLUDED' && (
-                      <div className="pt-2">
-                        <label className="block text-[11px] text-emerald-400 font-semibold mb-1">
-                          Nominal Ongkir yang Ditagihkan ke Pembeli (Rp):
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="Contoh: 250000"
-                          value={shippingFee}
-                          onChange={(e) => setShippingFee(e.target.value)}
-                          className="w-full sm:w-1/2 px-3 py-2 bg-slate-950 border border-emerald-500/50 rounded-xl text-emerald-400 font-mono font-bold text-xs focus:ring-1 focus:ring-emerald-500"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className={`grid grid-cols-1 ${formDocType === 'INVOICE' ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3`}>
+                <div className={`grid grid-cols-1 ${hasShippingDetails && shippingFeeType === 'INCLUDED' ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3`}>
                   <div>
                     <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
                       Subtotal Unit:
@@ -1133,13 +1174,13 @@ export function InvoiceManager() {
                     </div>
                   </div>
 
-                  {formDocType === 'INVOICE' && (
+                  {hasShippingDetails && shippingFeeType === 'INCLUDED' && (
                     <div>
                       <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
                         Ongkos Kirim (Include):
                       </label>
                       <div className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-xs">
-                        {shippingFeeType === 'INCLUDED' ? `+ ${formatIDR(shippingNum)}` : 'Rp 0'}
+                        + {formatIDR(shippingNum)}
                       </div>
                     </div>
                   )}
@@ -1159,112 +1200,324 @@ export function InvoiceManager() {
 
                   <div>
                     <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
-                      Total Tagihan Akhir:
+                      {formDocType === 'QUOTATION' ? 'Total Penawaran:' : 'Total Tagihan Invoice:'}
                     </label>
                     <div className="px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-xl text-amber-400 font-mono font-black text-sm">
                       {formatIDR(calculatedTotal)}
                     </div>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
-                      DP Diterima (Rp) <span className="text-[10px] text-slate-500 font-normal">(Kosongkan jika belum DP / Isi full jika Lunas)</span>:
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="0"
-                      value={formDocType === 'RECEIPT' ? calculatedTotal : dpAmount}
-                      disabled={formDocType === 'RECEIPT'}
-                      onChange={(e) => setDpAmount(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
-                      Metode Pembayaran Rekening:
-                    </label>
-                    <select
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-semibold text-xs"
-                    >
-                      <option value="TRANSFER_JAGO_SYARIAH">Bank Jago Syariah (5079 8068 4419 - Ahmad Sulaeman)</option>
-                      <option value="CASH_PICKUP">Tunai di Tempat / Pick-up Gudang</option>
-                    </select>
-                  </div>
-                </div>
               </div>
 
-              {/* 5. LOGISTICS & DELIVERY DETAILS (OPTIONAL FOR INVOICE TO PASS TO SURAT JALAN) */}
+              {/* 5. MULTI-PAYMENT TERMINS (RULE 2: KOLOM PEMBAYARAN 1, DST SAMPAI LUNAS - HANYA UNTUK INVOICE) */}
               {formDocType === 'INVOICE' && (
-                <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-3">
-                  <span className="font-bold text-amber-400 uppercase tracking-wider text-[10px] block">
-                    🚚 Detail Ekspedisi & Driver (Opsional - Terbawa ke Surat Jalan)
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
                     <div>
-                      <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
-                        Pilihan Ekspedisi:
-                      </label>
-                      <select
-                        value={expeditionChoice}
-                        onChange={(e) => setExpeditionChoice(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-xs"
+                      <span className="font-bold text-emerald-400 uppercase tracking-wider text-[10px] block">
+                        💳 Riwayat Tahap Pembayaran / Termin ({payments.length} Tahap)
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        Catat Pembayaran 1 (DP), Pembayaran 2, dst hingga invoice lunas.
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={addPaymentRow}
+                        className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg font-bold text-[11px] border border-emerald-500/30 flex items-center gap-1 transition-colors"
                       >
-                        {EXPEDITION_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
-                        Nama Driver / Kurir:
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Contoh: Pak Ujang"
-                        value={deliveryDriver}
-                        onChange={(e) => setDeliveryDriver(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-xs"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
-                        No. Polisi Kendaraan:
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Contoh: B 9482 SXZ"
-                        value={vehiclePlate}
-                        onChange={(e) => setVehiclePlate(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-mono text-xs"
-                      />
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Tambah Pembayaran {payments.length + 1}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickLunas(calculatedTotal)}
+                        className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg font-black text-[11px] shadow transition-colors"
+                        title="Set langsung 1 pembayaran 100% LUNAS"
+                      >
+                        ⚡ Set Langsung Lunas
+                      </button>
                     </div>
                   </div>
 
-                  {expeditionChoice === 'CUSTOM' && (
+                  {/* Payments Rows */}
+                  <div className="space-y-3">
+                    {payments.map((pm, pIndex) => (
+                      <div
+                        key={pm.id || pIndex}
+                        className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                            <CreditCard className="w-3.5 h-3.5" />
+                            Tahap #{pIndex + 1}: {pm.label || `Pembayaran ${pIndex + 1}`}
+                          </span>
+                          {payments.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removePaymentRow(pm.id)}
+                              className="text-slate-500 hover:text-rose-400 p-1"
+                              title="Hapus tahap pembayaran ini"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                          {/* Label (e.g. Pembayaran 1 (DP), Pembayaran 2) */}
+                          <div className="sm:col-span-4">
+                            <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                              Keterangan Pembayaran
+                            </label>
+                            <input
+                              type="text"
+                              value={pm.label}
+                              onChange={(e) => updatePaymentRow(pm.id, 'label', e.target.value)}
+                              placeholder={`Pembayaran ${pIndex + 1}`}
+                              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 font-medium"
+                            />
+                          </div>
+
+                          {/* Date */}
+                          <div className="sm:col-span-3">
+                            <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                              Tanggal Pembayaran
+                            </label>
+                            <input
+                              type="date"
+                              value={pm.date || ''}
+                              onChange={(e) => updatePaymentRow(pm.id, 'date', e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 font-mono"
+                            />
+                          </div>
+
+                          {/* Nominal Amount */}
+                          <div className="sm:col-span-3">
+                            <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                              Nominal Masuk (Rp) *
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={pm.amount || ''}
+                              onChange={(e) => updatePaymentRow(pm.id, 'amount', Number(e.target.value))}
+                              placeholder="0"
+                              className="w-full px-2.5 py-1.5 bg-slate-950 border border-emerald-500/40 rounded-lg text-emerald-400 font-mono font-bold text-xs focus:ring-1 focus:ring-emerald-500 text-right"
+                            />
+                          </div>
+
+                          {/* Method */}
+                          <div className="sm:col-span-2">
+                            <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                              Metode
+                            </label>
+                            <select
+                              value={pm.method || 'TRANSFER_JAGO_SYARIAH'}
+                              onChange={(e) => updatePaymentRow(pm.id, 'method', e.target.value)}
+                              className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500"
+                            >
+                              <option value="TRANSFER_JAGO_SYARIAH">Transfer Bank Jago</option>
+                              <option value="CASH_PICKUP">Tunai / Pick-up</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Payment Balance Calculation Card */}
+                  <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Total Pembayaran Masuk:</span>
+                        <span className="font-mono font-bold text-emerald-400 text-xs">{formatIDR(totalPaid)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Sisa Tagihan Pelunasan:</span>
+                        <span className={`font-mono font-bold text-xs ${calculatedSisa > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          {formatIDR(calculatedSisa)}
+                        </span>
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
-                        Nama Ekspedisi Kustom:
-                      </label>
+                      {isFormFullyPaid ? (
+                        <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500 rounded-full font-bold text-xs flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Status: LUNAS SEPENUHNYA (Surat Jalan Terbuka)</span>
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500 rounded-full font-bold text-xs flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>Status: BELUM LUNAS (Surat Jalan Terkunci)</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 6. OPTIONAL SHIPPING DETAILS (RULE 5: PENGIRIMAN ADALAH OPSI OPSIONAL) */}
+              {formDocType === 'INVOICE' && (
+                <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
-                        type="text"
-                        placeholder="Contoh: Baraka Sarana Tama / Truk Ekspedisi"
-                        value={customExpeditionText}
-                        onChange={(e) => setCustomExpeditionText(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-xs"
+                        type="checkbox"
+                        checked={hasShippingDetails}
+                        onChange={(e) => setHasShippingDetails(e.target.checked)}
+                        className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-amber-500 cursor-pointer"
                       />
+                      <span className="font-bold text-slate-200 text-xs">
+                        🚚 Tambahkan Rincian &amp; Biaya Pengiriman (Opsional)
+                      </span>
+                    </label>
+                    <span className="text-[10px] text-slate-500">
+                      {hasShippingDetails ? 'Aktif' : 'Nonaktif (Tanpa Pengiriman)'}
+                    </span>
+                  </div>
+
+                  {hasShippingDetails && (
+                    <div className="space-y-3 pt-2 border-t border-slate-800">
+                      <label className="block text-slate-400 font-bold text-[10px] uppercase tracking-wider">
+                        Ketentuan Ongkos Kirim:
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShippingFeeType('BUYER_COD')}
+                          className={`p-2.5 rounded-xl text-left border text-xs transition-all ${
+                            shippingFeeType === 'BUYER_COD'
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <div className="font-bold">🚚 Bayar Sendiri / COD</div>
+                          <div className="text-[10px] opacity-80 mt-0.5">Ditanggung pembeli ke kurir</div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShippingFeeType('INCLUDED')}
+                          className={`p-2.5 rounded-xl text-left border text-xs transition-all ${
+                            shippingFeeType === 'INCLUDED'
+                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <div className="font-bold">🧾 Include Tagihan</div>
+                          <div className="text-[10px] opacity-80 mt-0.5">Masuk ke total Invoice</div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShippingFeeType('FREE_PROMO')}
+                          className={`p-2.5 rounded-xl text-left border text-xs transition-all ${
+                            shippingFeeType === 'FREE_PROMO'
+                              ? 'bg-blue-500/20 border-blue-500 text-blue-300 font-bold'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <div className="font-bold">🎁 Free Ongkir</div>
+                          <div className="text-[10px] opacity-80 mt-0.5">Gratis subsidi BBKitchen</div>
+                        </button>
+                      </div>
+
+                      {shippingFeeType === 'INCLUDED' && (
+                        <div>
+                          <label className="block text-[10px] text-emerald-400 font-semibold mb-1">
+                            Nominal Ongkir yang Ditagihkan (Rp):
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="Contoh: 250000"
+                            value={shippingFee}
+                            onChange={(e) => setShippingFee(e.target.value)}
+                            className="w-full sm:w-1/2 px-3 py-2 bg-slate-950 border border-emerald-500/50 rounded-xl text-emerald-400 font-mono font-bold text-xs focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                        <div>
+                          <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
+                            Pilihan Ekspedisi:
+                          </label>
+                          <select
+                            value={expeditionChoice}
+                            onChange={(e) => setExpeditionChoice(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-xs"
+                          >
+                            {EXPEDITION_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
+                            Nama Driver / Kurir:
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: Pak Ujang"
+                            value={deliveryDriver}
+                            onChange={(e) => setDeliveryDriver(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
+                            No. Polisi Kendaraan:
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: B 9482 SXZ"
+                            value={vehiclePlate}
+                            onChange={(e) => setVehiclePlate(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 font-mono text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {expeditionChoice === 'CUSTOM' && (
+                        <div>
+                          <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
+                            Nama Ekspedisi Kustom:
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: Baraka Sarana Tama / Truk Ekspedisi"
+                            value={customExpeditionText}
+                            onChange={(e) => setCustomExpeditionText(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-xs"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
+
+              {/* 7. NOTES */}
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1 text-[11px]">
+                  Catatan Tambahan Dokumen (Opsional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Garansi fungsi 7 hari, serah-terima unit di gudang Tangerang"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-amber-500"
+                />
+              </div>
 
               {/* ACTION BUTTONS */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
@@ -1285,10 +1538,10 @@ export function InvoiceManager() {
                   {editingInvoice ? (
                     <>
                       <Pencil className="w-4 h-4" />
-                      <span>Simpan Perubahan Transaksi</span>
+                      <span>Simpan Perubahan Dokumen</span>
                     </>
                   ) : (
-                    <span>Simpan & Cetak Dokumen</span>
+                    <span>Simpan &amp; Lihat Dokumen</span>
                   )}
                 </button>
               </div>
@@ -1297,7 +1550,7 @@ export function InvoiceManager() {
         </div>
       )}
 
-      {/* 4-IN-1 OFFICIAL DOCUMENT PRINT & PREVIEW MODAL */}
+      {/* OFFICIAL DOCUMENT PRINT & PREVIEW MODAL */}
       {selectedInvoice && (
         <OfficialDocumentModal
           invoice={selectedInvoice}

@@ -10,10 +10,18 @@ export type InvoiceStatus =
   | 'ERROR';
 
 export type DocumentType =
-  | 'INVOICE'      // Faktur Penagihan Resmi
-  | 'RECEIPT'      // Kuitansi Pembayaran Lunas
-  | 'QUOTATION'    // Surat Penawaran Harga Komersial
-  | 'DELIVERY_NOTE'; // Surat Jalan & Tanda Terima Ekspedisi/Driver
+  | 'INVOICE'        // Faktur Penagihan Resmi
+  | 'QUOTATION'      // Surat Penawaran Harga Komersial
+  | 'DELIVERY_NOTE'; // Surat Jalan & Tanda Terima Ekspedisi/Driver (Hanya saat LUNAS)
+
+export interface PaymentRecord {
+  id: string;
+  label: string; // e.g. "Pembayaran 1 (DP)", "Pembayaran 2", "Pembayaran 3 (Pelunasan)"
+  amount: number;
+  date: string;  // YYYY-MM-DD
+  method?: 'TRANSFER_JAGO_SYARIAH' | 'CASH_PICKUP' | string;
+  notes?: string;
+}
 
 export interface InvoiceItem {
   id: string;
@@ -30,7 +38,7 @@ export interface Invoice {
   id: string;
   invoiceNumber: string;
   documentType?: DocumentType;
-  kuitansiNumber?: string;
+  kuitansiNumber?: string; // legacy support
   quotationNumber?: string;
   suratJalanNumber?: string;
   customerName: string;
@@ -45,6 +53,7 @@ export interface Invoice {
   totalAmount: number;
   dpAmount?: number;
   remainingAmount?: number;
+  payments?: PaymentRecord[]; // Riwayat pembayaran termin 1, 2, dst hingga lunas
   issueDate: string; // YYYY-MM-DD
   dueDate: string;   // YYYY-MM-DD
   validUntilDate?: string; // Untuk Quotation
@@ -52,12 +61,13 @@ export interface Invoice {
   paidDate?: string | null;
   paymentMethod?: 'TRANSFER_JAGO_SYARIAH' | 'TRANSFER_BCA' | 'TRANSFER_MANDIRI' | 'CASH_PICKUP' | 'WOOCOMMERCE_GATEWAY';
   
-  // Shipping & Delivery Details (Optional in Invoice, carried over to Surat Jalan)
+  // Shipping & Delivery Details (Opsional dalam Invoice)
+  hasShipping?: boolean;
   deliveryDriver?: string;
   driverPhone?: string;
   deliveryVehiclePlate?: string;
   deliveryExpedition?: string;
-  shippingFeeType?: 'INCLUDED' | 'BUYER_COD' | 'FREE_PROMO';
+  shippingFeeType?: 'INCLUDED' | 'BUYER_COD' | 'FREE_PROMO' | 'NO_SHIPPING';
   shippingFee?: number;
   
   salesPic?: string;

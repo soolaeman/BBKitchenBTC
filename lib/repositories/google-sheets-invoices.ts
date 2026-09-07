@@ -1,8 +1,8 @@
-import { Invoice, InvoiceStatus, InvoiceItem, DocumentType } from '@/lib/types/finance';
+import { Invoice, InvoiceStatus, InvoiceItem, DocumentType, PaymentRecord } from '@/lib/types/finance';
 import { getSheetsClient } from './google-sheets-inventory';
 
 const INVOICE_SHEET_NAME = 'INVOICE_ARCHIVE';
-const INVOICE_RANGE = `${INVOICE_SHEET_NAME}!A:AA`;
+const INVOICE_RANGE = `${INVOICE_SHEET_NAME}!A:AB`;
 
 const INVOICE_HEADERS = [
   'ID',
@@ -32,6 +32,7 @@ const INVOICE_HEADERS = [
   'QUOTATION_NUMBER',
   'KUITANSI_NUMBER',
   'SURAT_JALAN_NUMBER',
+  'PAYMENTS_JSON',
 ];
 
 let sheetEnsured = false;
@@ -93,6 +94,27 @@ function parseItemsJson(raw: string): InvoiceItem[] {
   return [];
 }
 
+function parsePaymentsJson(raw: string, fallbackDp: number, date: string): PaymentRecord[] {
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+  }
+  if (fallbackDp > 0) {
+    return [
+      {
+        id: 'pay_1',
+        label: 'Pembayaran 1 (DP)',
+        amount: fallbackDp,
+        date: date,
+        method: 'TRANSFER_JAGO_SYARIAH',
+      },
+    ];
+  }
+  return [];
+}
+
 function rowToInvoice(row: any[]): Invoice {
   const v = (idx: number) => String(row[idx] ?? '').trim();
   const num = (idx: number) => {
@@ -105,6 +127,11 @@ function rowToInvoice(row: any[]): Invoice {
   const subtotal = num(9);
   const totalAmount = num(13) || subtotal;
   const rawDate = v(3) || new Date().toISOString().split('T')[0];
+  const dpVal = num(14);
+  const payments = parsePaymentsJson(v(27), dpVal, rawDate);
+  const totalPaid = payments.length > 0
+    ? payments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
+    : dpVal;
 
   return {
     id: v(0),
@@ -130,10 +157,12 @@ function rowToInvoice(row: any[]): Invoice {
     discount: num(10),
     tax: 0,
     shippingFee: num(11),
-    shippingFeeType: (v(12) || 'INCLUDED') as any,
+    shippingFeeType: (v(12) || 'BUYER_COD') as any,
+    hasShipping: v(12) !== 'NO_SHIPPING' && Boolean(v(11) || v(19) || v(20)),
     totalAmount,
-    dpAmount: num(14),
-    remainingAmount: num(15) || Math.max(0, totalAmount - num(14)),
+    dpAmount: totalPaid,
+    remainingAmount: Math.max(0, totalAmount - totalPaid),
+    payments,
     status: (v(16) || 'ISSUED') as InvoiceStatus,
     paidDate: v(17) || undefined,
     paymentMethod: (v(18) || 'TRANSFER_JAGO_SYARIAH') as any,
@@ -150,6 +179,10 @@ function rowToInvoice(row: any[]): Invoice {
 }
 
 function invoiceToRow(inv: Invoice): any[] {
+  const totalPaid = (inv.payments && inv.payments.length > 0)
+    ? inv.payments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
+    : (inv.dpAmount || 0);
+
   return [
     inv.id,
     inv.invoiceNumber,
@@ -163,10 +196,10 @@ function invoiceToRow(inv: Invoice): any[] {
     inv.subtotal || 0,
     inv.discount || 0,
     inv.shippingFee || 0,
-    inv.shippingFeeType || 'INCLUDED',
+    inv.hasShipping ? (inv.shippingFeeType || 'BUYER_COD') : 'NO_SHIPPING',
     inv.totalAmount || 0,
-    inv.dpAmount || 0,
-    inv.remainingAmount ?? Math.max(0, (inv.totalAmount || 0) - (inv.dpAmount || 0)),
+    totalPaid,
+    inv.remainingAmount ?? Math.max(0, (inv.totalAmount || 0) - totalPaid),
     inv.status || 'ISSUED',
     inv.paidDate || '',
     inv.paymentMethod || 'TRANSFER_JAGO_SYARIAH',
@@ -178,6 +211,7 @@ function invoiceToRow(inv: Invoice): any[] {
     inv.quotationNumber || '',
     inv.kuitansiNumber || '',
     inv.suratJalanNumber || '',
+    JSON.stringify(inv.payments || []),
   ];
 }
 

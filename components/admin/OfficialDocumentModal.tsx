@@ -34,7 +34,7 @@ export function OfficialDocumentModal({
   onClose,
   initialType = 'INVOICE',
 }: OfficialDocumentModalProps) {
-  const [activeType, setActiveType] = useState<DocumentType>(initialType);
+  const [activeType, setActiveType] = useState<DocumentType>(initialType === 'DELIVERY_NOTE' ? 'DELIVERY_NOTE' : (initialType || 'INVOICE'));
   const [copied, setCopied] = useState(false);
 
   // Editable fields for Surat Jalan / Driver (no fake defaults)
@@ -56,14 +56,21 @@ export function OfficialDocumentModal({
   const subtotal = invoice.subtotal || invoice.totalAmount;
   const discount = invoice.discount || 0;
   const total = invoice.totalAmount;
-  const dp = invoice.dpAmount || (invoice.status === 'PAID' ? total : 0);
-  const sisa = Math.max(0, total - dp);
+  
+  // Multi-Payment installments calculation
+  const paymentsList = (invoice.payments && invoice.payments.length > 0)
+    ? invoice.payments
+    : (invoice.dpAmount && invoice.dpAmount > 0
+        ? [{ id: 'pay_1', label: 'Pembayaran 1 (DP)', amount: invoice.dpAmount, date: invoice.issueDate || todayFormatted, method: invoice.paymentMethod || 'TRANSFER_JAGO_SYARIAH' }]
+        : []);
+
+  const totalPaid = paymentsList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const sisa = Math.max(0, total - totalPaid);
+  const isFullyPaid = invoice.status === 'PAID' || (total > 0 && totalPaid >= total);
 
   // Numbers generator
   const docNumber = (() => {
     switch (activeType) {
-      case 'RECEIPT':
-        return invoice.kuitansiNumber || `KWT-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${invoice.id.replace(/\D/g, '').slice(-4) || '1024'}`;
       case 'QUOTATION':
         return invoice.quotationNumber || `QUO-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${invoice.id.replace(/\D/g, '').slice(-4) || '1024'}`;
       case 'DELIVERY_NOTE':
@@ -100,9 +107,9 @@ export function OfficialDocumentModal({
         .join('\n');
 
       return `Halo Kak *${invoice.customerName}*! 🙏
-Berikut kami lampirkan dokumen surat jalan pengiriman unit dari *Bukan Baru Kitchen (BBKitchen)*:
+Berikut kami lampirkan dokumen surat jalan serah-terima unit dari *Bukan Baru Kitchen (BBKitchen)*:
 
-🚚 *SURAT JALAN PENGIRIMAN UNIT*
+🚚 *SURAT JALAN PENGIRIMAN UNIT (LUNAS)*
 No: *${docNumber}*
 Tanggal: ${todayFormatted}
 
@@ -127,13 +134,30 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
       .map((it, idx) => `${idx + 1}. *${it.description}* (${it.sku})\n   ${it.quantity} unit x ${formatIDR(it.unitPrice)} = *${formatIDR(it.total)}*`)
       .join('\n');
 
-    let titleText = '';
-    if (activeType === 'INVOICE') titleText = `📄 *FAKTUR TAGIHAN RESMI (INVOICE)*\nNo: *${docNumber}*`;
-    else if (activeType === 'RECEIPT') titleText = `🧾 *KUITANSI PEMBAYARAN LUNAS*\nNo: *${docNumber}*`;
-    else titleText = `📋 *SURAT PENAWARAN HARGA (QUOTATION)*\nNo: *${docNumber}*`;
+    if (activeType === 'QUOTATION') {
+      return `Halo Kak *${invoice.customerName}*! 🙏
+Berikut kami lampirkan penawaran harga resmi dari *Bukan Baru Kitchen (BBKitchen)*:
 
+📋 *SURAT PENAWARAN HARGA (QUOTATION)*
+No: *${docNumber}*
+Tanggal: ${todayFormatted}
+
+📌 *Rincian Unit:*
+${itemsList}
+${discount > 0 ? `🏷️ *Diskon:* -${formatIDR(discount)}\n` : ''}
+💰 *Total Penawaran:* ${formatIDR(total)}
+
+ℹ️ *Ketentuan:* Harga di atas adalah penawaran awal sebelum negosiasi deal & penguncian DP.
+
+🏢 *Bukan Baru Kitchen*
+Pusat Peralatan Dapur Komersial & Resto Second Terpercaya
+Gudang Pamulang 2 / Sawangan / Kedaung, Tangerang Selatan
+Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
+    }
+
+    // INVOICE WA Share
     let shippingTextWA = '';
-    if (activeType === 'INVOICE') {
+    if (invoice.hasShipping) {
       if (invoice.shippingFeeType === 'INCLUDED' && (invoice.shippingFee || 0) > 0) {
         shippingTextWA = `\n🚚 *Ongkos Kirim (Include):* ${formatIDR(invoice.shippingFee || 0)}`;
       } else if (invoice.shippingFeeType === 'BUYER_COD') {
@@ -143,23 +167,28 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
       }
     }
 
-    const bankPaymentWA = activeType === 'INVOICE'
-      ? `\n💳 *Rekening Resmi Pembayaran:*\n• Bank Jago Syariah: *5079 8068 4419* a.n. *Ahmad Sulaeman*\n*(DP minimal 50% untuk penguncian unit & jadwal kirim)*\n`
+    const paymentsListWA = paymentsList.length > 0
+      ? `\n💳 *Riwayat Pembayaran:*\n` + paymentsList.map((p) => `• ${p.label}: ${formatIDR(p.amount)} (${p.date || todayFormatted})`).join('\n')
       : '';
 
-    return `Halo Kak *${invoice.customerName}*! 🙏
-Berikut kami lampirkan dokumen transaksi resmi dari *Bukan Baru Kitchen (BBKitchen)*:
+    const bankPaymentWA = !isFullyPaid
+      ? `\n💳 *Rekening Resmi Pembayaran:*\n• Bank Jago Syariah: *5079 8068 4419* a.n. *Ahmad Sulaeman*\n*(DP minimal 50% untuk penguncian unit & jadwal kirim)*\n`
+      : `\n✅ *STATUS: LUNAS BERSIH (Siap Penerbitan Surat Jalan)*\n`;
 
-${titleText}
+    return `Halo Kak *${invoice.customerName}*! 🙏
+Berikut kami lampirkan faktur transaksi resmi dari *Bukan Baru Kitchen (BBKitchen)*:
+
+📄 *FAKTUR TAGIHAN RESMI (INVOICE)*
+No: *${docNumber}*
 Tanggal: ${todayFormatted}
 
 📌 *Rincian Unit:*
 ${itemsList}
 ${shippingTextWA}
 ${discount > 0 ? `🏷️ *Diskon:* -${formatIDR(discount)}\n` : ''}
-💰 *Total Transaksi:* ${formatIDR(total)}
-${dp > 0 && dp < total ? `• DP Dibayarkan: ${formatIDR(dp)}\n• Sisa Pelunasan: *${formatIDR(sisa)}*` : ''}
-${activeType === 'RECEIPT' ? `✅ *STATUS: LUNAS BERSIH*` : ''}
+💰 *Total Tagihan:* ${formatIDR(total)}
+${paymentsListWA}
+${!isFullyPaid ? `• Total Masuk: ${formatIDR(totalPaid)}\n• Sisa Pelunasan: *${formatIDR(sisa)}*` : ''}
 ${bankPaymentWA}
 🏢 *Bukan Baru Kitchen*
 Pusat Peralatan Dapur Komersial & Resto Second Terpercaya
@@ -204,31 +233,29 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                   <span>📄 Faktur Invoice</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveType('RECEIPT')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    activeType === 'RECEIPT'
-                      ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                      : 'bg-slate-850 text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <Receipt className="w-3.5 h-3.5" />
-                  <span>🧾 Kuitansi {dp >= total ? 'Lunas' : 'DP'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveType('DELIVERY_NOTE')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    activeType === 'DELIVERY_NOTE'
-                      ? 'bg-orange-500 text-slate-950 shadow-md shadow-orange-500/20'
-                      : 'bg-slate-850 text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <Truck className="w-3.5 h-3.5" />
-                  <span>🚚 Surat Jalan</span>
-                </button>
+                {isFullyPaid ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveType('DELIVERY_NOTE')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      activeType === 'DELIVERY_NOTE'
+                        ? 'bg-orange-500 text-slate-950 shadow-md shadow-orange-500/20'
+                        : 'bg-slate-850 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>🚚 Surat Jalan (Lunas)</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    title="Surat Jalan hanya dapat dicetak setelah transaksi LUNAS"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-850 text-slate-500 opacity-50 cursor-not-allowed border border-slate-800"
+                  >
+                    <span>🔒 Surat Jalan (Syarat Lunas)</span>
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -464,42 +491,52 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
               <div className="space-y-3">
                 <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
                   <span className="font-bold text-slate-500 uppercase text-[10px] block mb-0.5">
-                    {activeType === 'RECEIPT' && dp < total ? 'Terbilang Pembayaran DP:' : 'Terbilang Total Transaksi:'}
+                    {activeType === 'QUOTATION' ? 'Terbilang Estimasi Penawaran:' : 'Terbilang Total Transaksi:'}
                   </span>
                   <p className="italic font-bold text-slate-900 leading-snug">
-                    "{terbilangRupiah(activeType === 'RECEIPT' && dp > 0 ? dp : total)} Rupiah"
+                    "{terbilangRupiah(total)} Rupiah"
                   </p>
                 </div>
 
                 {activeType === 'INVOICE' && (
-                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs space-y-1.5">
-                    <span className="font-bold text-blue-900 uppercase text-[10px] block">Rekening Resmi Pembayaran:</span>
-                    <div className="flex items-center justify-between font-mono text-slate-800">
-                      <span>• Bank Jago Syariah: <strong>5079 8068 4419</strong></span>
-                      <span className="text-[10px] font-bold text-slate-700">a.n. Ahmad Sulaeman</span>
-                    </div>
-                    <p className="text-[10px] text-blue-800 pt-1 border-t border-blue-200">
-                      * Harap transfer DP min. 50% untuk penguncian unit & konfirmasi jadwal pengiriman.
-                    </p>
-                  </div>
-                )}
-
-                {activeType === 'RECEIPT' && (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-950 space-y-1">
-                    <p>
-                      🧾 <strong>Keterangan Pembayaran:</strong> Bukti pembayaran {dp >= total ? 'Pelunasan Penuh (LUNAS)' : 'Uang Muka (DP) Sah'} atas pesanan unit sesuai Faktur <strong>{invoice.invoiceNumber}</strong>.
-                    </p>
-                    {dp < total && (
-                      <p className="text-red-700 font-medium">
-                        * Sisa tagihan pelunasan sebesar <strong>{formatIDR(sisa)}</strong> wajib diselesaikan saat serah-terima unit / sesuai jadwal pengiriman.
+                  <>
+                    <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs space-y-1.5">
+                      <span className="font-bold text-blue-900 uppercase text-[10px] block">Rekening Resmi Pembayaran:</span>
+                      <div className="flex items-center justify-between font-mono text-slate-800">
+                        <span>• Bank Jago Syariah: <strong>5079 8068 4419</strong></span>
+                        <span className="text-[10px] font-bold text-slate-700">a.n. Ahmad Sulaeman</span>
+                      </div>
+                      <p className="text-[10px] text-blue-800 pt-1 border-t border-blue-200">
+                        * Pembayaran bertahap (DP / Pelunasan) diverifikasi melalui mutasi rekening resmi ini.
                       </p>
+                    </div>
+
+                    {/* Breakdown Riwayat Pembayaran (Termin) */}
+                    {paymentsList.length > 0 && (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1.5">
+                        <span className="font-bold text-slate-700 uppercase text-[10px] block border-b border-slate-200 pb-1">
+                          Riwayat Catatan Pembayaran ({paymentsList.length} Tahap):
+                        </span>
+                        <div className="space-y-1">
+                          {paymentsList.map((p, pIdx) => (
+                            <div key={p.id || pIdx} className="flex justify-between items-center text-[11px]">
+                              <span className="text-slate-600">
+                                <strong>{p.label || `Pembayaran ${pIdx + 1}`}:</strong> {p.date ? `(${p.date})` : ''}
+                              </span>
+                              <span className="font-mono font-bold text-emerald-700">{formatIDR(p.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
 
                 {activeType === 'QUOTATION' && (
-                  <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-[11px] text-slate-600">
-                    ℹ️ <strong>Ketentuan Penawaran:</strong> Harga di atas adalah penawaran awal sebelum negosiasi final. Ketersediaan unit dapat berubah sewaktu-waktu sebelum pembayaran DP sah.
+                  <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-[11px] text-slate-600 space-y-1">
+                    <p className="font-bold text-slate-700">ℹ️ Ketentuan Penawaran Resmi:</p>
+                    <p>• Harga penawaran di atas adalah estimasi resmi sebelum finalisasi kesepakatan.</p>
+                    <p>• Unit tidak terikat/dikunci sebelum dilakukan transfer DP dan konfirmasi Invoice resmi.</p>
                   </div>
                 )}
               </div>
@@ -535,39 +572,27 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                   </div>
                 )}
                 <div className="flex justify-between py-2 border-b-2 border-slate-900 text-sm font-black text-slate-950">
-                  <span>TOTAL KESEPAKATAN:</span>
+                  <span>{activeType === 'QUOTATION' ? 'TOTAL PENAWARAN:' : 'TOTAL KESEPAKATAN:'}</span>
                   <span className="font-mono">{formatIDR(total)}</span>
                 </div>
 
-                {activeType === 'RECEIPT' && (
+                {activeType === 'INVOICE' && (
                   <>
                     <div className="flex justify-between py-1 text-emerald-700 font-bold bg-emerald-50 px-2 rounded">
-                      <span>Pembayaran Diterima (DP/Lunas):</span>
-                      <span className="font-mono">{formatIDR(dp > 0 ? dp : total)}</span>
+                      <span>Total Pembayaran Masuk:</span>
+                      <span className="font-mono">{formatIDR(totalPaid)}</span>
                     </div>
-                    {dp > 0 && dp < total && (
-                      <div className="flex justify-between py-1 font-bold text-red-600 px-2">
-                        <span>Sisa Tagihan Invoice:</span>
+                    {isFullyPaid ? (
+                      <div className="flex justify-between py-1.5 font-bold text-emerald-800 bg-emerald-100 px-2 rounded border border-emerald-300">
+                        <span>Status Tagihan:</span>
+                        <span>✓ LUNAS SEPENUHNYA</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between py-1 font-bold text-red-600 bg-red-50 px-2 rounded">
+                        <span>Sisa Tagihan Pelunasan:</span>
                         <span className="font-mono">{formatIDR(sisa)}</span>
                       </div>
                     )}
-                  </>
-                )}
-
-                {activeType === 'INVOICE' && (
-                  <>
-                    <div className="flex justify-between py-1 text-slate-600">
-                      <span>Kewajiban DP (&gt;50%):</span>
-                      <span className="font-mono font-bold text-emerald-600">
-                        {dp > 0 ? formatIDR(dp) : formatIDR(Math.round(total * 0.5))}
-                      </span>
-                    </div>
-                    {dp > 0 && dp < total ? (
-                      <div className="flex justify-between py-1 font-bold text-red-600">
-                        <span>Sisa Pelunasan:</span>
-                        <span className="font-mono">{formatIDR(sisa)}</span>
-                      </div>
-                    ) : null}
                   </>
                 )}
               </div>
@@ -588,11 +613,11 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                   <div className="space-y-12">
                     <p className="font-bold text-slate-600">Driver / Ekspedisi:</p>
                     <p className="font-bold text-slate-900 border-t border-slate-400 pt-1 mx-4">
-                      ( {driverName} )
+                      ( {driverName || '................................'} )
                     </p>
                   </div>
                   <div className="space-y-12">
-                    <p className="font-bold text-slate-600">Penerima di Restoran:</p>
+                    <p className="font-bold text-slate-600">Penerima di Lokasi:</p>
                     <p className="font-bold text-slate-900 border-t border-slate-400 pt-1 mx-4">
                       ( {invoice.customerName} )
                     </p>
@@ -602,17 +627,17 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                 <>
                   <div className="text-left col-span-2 space-y-1 text-[11px] text-slate-500">
                     <p className="font-bold text-slate-700">Syarat & Ketentuan BBKitchen:</p>
-                    <p>1. Unit komersial telah melalui uji QC teknisi 100% normal dan layak operasional resto.</p>
+                    <p>1. Unit komersial telah melalui uji QC teknisi 100% normal dan siap operasional.</p>
                     <p>2. Garansi fungsi 7 hari terhitung sejak tanggal unit diterima di lokasi pembeli.</p>
                     <p>3. Pembayaran sah hanya melalui rekening resmi yang tertera pada dokumen ini.</p>
                   </div>
                   <div className="space-y-12 text-center">
                     <p className="font-bold text-slate-700">Hormat Kami,</p>
                     <div className="relative">
-                      {activeType === 'RECEIPT' && (
-                        <div className="absolute inset-0 -top-8 flex items-center justify-center pointer-events-none opacity-80">
-                          <span className="border-4 border-red-600 text-red-600 font-black text-lg px-3 py-1 rounded rotate-[-12deg] tracking-widest uppercase">
-                            LUNAS
+                      {activeType === 'INVOICE' && isFullyPaid && (
+                        <div className="absolute inset-0 -top-8 flex items-center justify-center pointer-events-none opacity-85">
+                          <span className="border-4 border-emerald-600 text-emerald-600 font-black text-lg px-3 py-1 rounded rotate-[-12deg] tracking-widest uppercase shadow-sm">
+                            ✓ LUNAS
                           </span>
                         </div>
                       )}
