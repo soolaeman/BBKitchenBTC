@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { MasterInventoryItem, PaginatedInventoryResponse } from '@/lib/types/inventory';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
-import { formatIDR, formatCleanProductUrl } from '@/lib/repositories/warehouse-utils';
+import { formatIDR, formatCleanProductUrl, WAREHOUSE_13_HUBS } from '@/lib/repositories/warehouse-utils';
 import {
   MessageSquare,
   Search,
@@ -484,20 +484,12 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
               }}
               className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             >
-              <option value="ALL">Semua Hub</option>
-              <option value="GK">GK - Pamulang 2</option>
-              <option value="BB">BB - Pamulang 2</option>
-              <option value="SM">SM - Pamulang 2</option>
-              <option value="BL">BL - Pamulang 2</option>
-              <option value="ML">ML - Pamulang Barat</option>
-              <option value="RB">RB - Pamulang Barat</option>
-              <option value="KG">KG - Kitchen Gembel (Pamulang Barat)</option>
-              <option value="PY">PY - Setu Tangsel</option>
-              <option value="PE">PE - Sawangan Depok</option>
-              <option value="SK">SK - Sanjaya Kitchen (Sawangan Depok)</option>
-              <option value="WT">WT - Kedaung Tangsel</option>
-              <option value="ON">ON - Kedaung Tangsel</option>
-              <option value="RK">RK - Rizki Kitchen (Rawakalong Bogor)</option>
+              <option value="ALL">Semua Hub (13 Hub)</option>
+              {WAREHOUSE_13_HUBS.map((hub) => (
+                <option key={hub.code} value={hub.code}>
+                  {hub.code} - {hub.partnerName} ({hub.hubGroup})
+                </option>
+              ))}
             </select>
           </div>
 
