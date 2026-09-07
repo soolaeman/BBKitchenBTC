@@ -120,45 +120,6 @@ export function FinanceDashboard() {
     loadData();
   }, [loadData]);
 
-  const handleOpenDocFromDeal = (deal: ClosingDealItem, docType: DocumentType) => {
-    const nowDate = new Date();
-    const price = deal.hargaClosing || deal.hargaModal || 0;
-    const inv: Invoice = {
-      id: `inv_${deal.sku}_${Date.now()}`,
-      invoiceNumber: `INV-BBK-${nowDate.getFullYear()}${String(nowDate.getMonth() + 1).padStart(2, '0')}-${deal.sku.replace(/\D/g, '').slice(-4) || '1024'}`,
-      documentType: docType,
-      customerName: deal.customerName || 'Bpk/Ibu Pembeli',
-      customerPhone: '0851 2200 1051',
-      customerAddress: deal.lokasiGudang || 'Jabodetabek',
-      items: [
-        {
-          id: `item_${deal.sku}`,
-          sku: deal.sku,
-          description: deal.productTitle,
-          quantity: 1,
-          unitPrice: price,
-          total: price,
-          warehouseLocation: deal.lokasiGudang,
-        },
-      ],
-      subtotal: price,
-      discount: 0,
-      tax: 0,
-      totalAmount: price,
-      dpAmount: price,
-      remainingAmount: 0,
-      issueDate: deal.tanggalTerjual || nowDate.toISOString().split('T')[0],
-      dueDate: deal.tanggalTerjual || nowDate.toISOString().split('T')[0],
-      status: 'PAID',
-      paidDate: deal.tanggalTerjual || nowDate.toISOString().split('T')[0],
-      paymentMethod: 'TRANSFER_JAGO_SYARIAH',
-      createdBy: 'Finance Closing Ledger',
-    };
-    setSelectedInvoice(inv);
-    setDocumentModalType(docType);
-    setIsDocModalOpen(true);
-  };
-
   // Helper to match official 13 Warehouse Hub codes (GK, BB, SM, BL, ML, RB, KG, PY, PE, SK, WT, ON, RK)
   const matchWarehouseHub = (itemLocation: string, itemAsalGudang?: string, skuStr?: string, hubFilter: string = 'ALL') => {
     if (!hubFilter || hubFilter === 'ALL') return true;
