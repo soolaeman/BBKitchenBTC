@@ -28,9 +28,6 @@ export const metadata: Metadata = {
     locale: 'id_ID',
     type: 'website',
   },
-  verification: {
-    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || '',
-  },
 };
 
 const organizationSchema = {
