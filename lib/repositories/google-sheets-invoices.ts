@@ -258,6 +258,24 @@ async function syncInvoiceItemsToSold(invoice: Invoice) {
   }
 }
 
+async function syncInvoiceItemsToReady(invoice: Invoice) {
+  if (!invoice.items || invoice.items.length === 0) return;
+  for (const it of invoice.items) {
+    const sku = (it.sku || '').trim().toUpperCase();
+    if (sku && !sku.startsWith('BBK-CUSTOM') && !sku.startsWith('INV-')) {
+      try {
+        await updateGoogleSheetsStockStatus({
+          sku,
+          status: 'READY',
+          notes: `Reverted to READY (Invoice #${invoice.invoiceNumber || invoice.id} reset to UNPAID/Deleted)`,
+        });
+      } catch (e) {
+        console.warn(`Could not revert SKU ${sku} to READY:`, e);
+      }
+    }
+  }
+}
+
 export async function appendGoogleSheetsInvoice(invoice: Invoice): Promise<boolean> {
   const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
   if (!spreadsheetId) return false;
@@ -379,6 +397,11 @@ export async function updateGoogleSheetsInvoice(invoice: Invoice): Promise<boole
       syncInvoiceItemsToSold(invoice).catch((err) =>
         console.warn('Background auto-mark SOLD error:', err)
       );
+    } else {
+      // If invoice was updated to unpaid / DP only, revert units back to READY
+      syncInvoiceItemsToReady(invoice).catch((err) =>
+        console.warn('Background auto-revert READY error:', err)
+      );
     }
 
     return true;
@@ -407,17 +430,27 @@ export async function deleteGoogleSheetsInvoice(idOrNumber: string): Promise<boo
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${INVOICE_SHEET_NAME}!A:B`,
+      range: `${INVOICE_SHEET_NAME}!A2:AA`,
       valueRenderOption: 'UNFORMATTED_VALUE',
     });
 
     const rows = res.data.values || [];
     const targetIdx = rows.findIndex(
-      (r, idx) => idx > 0 && (String(r[0]).trim() === idOrNumber || String(r[1]).trim() === idOrNumber)
+      (r) => String(r[0]).trim() === idOrNumber || String(r[1]).trim() === idOrNumber
     );
 
     if (targetIdx === -1) {
       return false;
+    }
+
+    const targetRow = rows[targetIdx];
+    const existingInvoice = rowToInvoice(targetRow);
+
+    // If deleted invoice was marked PAID, automatically revert units back to READY in Master Inventory!
+    if (existingInvoice && existingInvoice.status === 'PAID') {
+      syncInvoiceItemsToReady(existingInvoice).catch((err) =>
+        console.warn('Background auto-revert READY upon delete error:', err)
+      );
     }
 
     if (sheetId !== undefined && sheetId !== null) {
@@ -430,8 +463,8 @@ export async function deleteGoogleSheetsInvoice(idOrNumber: string): Promise<boo
                 range: {
                   sheetId,
                   dimension: 'ROWS',
-                  startIndex: targetIdx,
-                  endIndex: targetIdx + 1,
+                  startIndex: targetIdx + 1, // Header is row 0, A2 is row 1
+                  endIndex: targetIdx + 2,
                 },
               },
             },
