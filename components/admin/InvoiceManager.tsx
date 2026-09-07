@@ -717,12 +717,17 @@ export function InvoiceManager() {
                 </div>
               </div>
 
-              {/* 3. MULTI-UNIT ITEMS BUILDER WITH AUTO-SEARCH */}
+              {/* 3. MULTI-UNIT ITEMS BUILDER (BEBAS MANUAL / CARI DARI KATALOG) */}
               <div className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-bold text-slate-300 uppercase tracking-wider text-[10px]">
-                    📦 Daftar Unit Barang & Jasa ({itemRows.length} Baris)
-                  </span>
+                  <div>
+                    <span className="font-bold text-slate-300 uppercase tracking-wider text-[10px] block">
+                      📦 Rincian Unit Barang & Jasa ({itemRows.length} Baris)
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Bisa ketik nama unit bebas (manual) atau ketik kode SKU untuk auto-fill dari katalog.
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -730,16 +735,16 @@ export function InvoiceManager() {
                       className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg font-bold text-[11px] border border-amber-500/30 flex items-center gap-1 transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>+ Tambah Unit Mesin (SKU)</span>
+                      <span>+ Tambah Baris Unit Bebas</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => addItemRow('BIAYA-JASA', 'Ongkos Kirim Armada / Jasa Testing Pemasangan')}
+                      onClick={() => addItemRow('BIAYA-JASA', 'Ongkos Kirim Armada / Jasa Testing')}
                       className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg font-bold text-[11px] border border-cyan-500/30 flex items-center gap-1 transition-colors"
                       title="Tambah Biaya Ongkir, Packing Kayu, atau Jasa Teknisi"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>+ Tambah Jasa / Custom</span>
+                      <span>+ Tambah Jasa / Ongkir</span>
                     </button>
                   </div>
                 </div>
@@ -752,7 +757,7 @@ export function InvoiceManager() {
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-slate-400">
-                          {row.sku === 'BIAYA-JASA' ? '🛠️ Biaya / Jasa #' : 'Unit Mesin #'}{index + 1}
+                          {row.sku === 'BIAYA-JASA' ? '🛠️ Biaya / Jasa #' : 'Unit Barang #'}{index + 1}
                         </span>
                         {itemRows.length > 1 && (
                           <button
@@ -767,21 +772,35 @@ export function InvoiceManager() {
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                        {/* SKU Search Input */}
-                        <div className="sm:col-span-3 relative">
+                        {/* Product Title Input (Main input) */}
+                        <div className="sm:col-span-6">
                           <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
-                            Kode SKU / Tag *
+                            Nama Unit / Deskripsi Barang *
                           </label>
                           <input
                             type="text"
                             required
-                            placeholder="Ketik BBK / JASA..."
+                            placeholder="Contoh: Chiller 2 Pintu Sanden 1.2m Rekondisi Prima..."
+                            value={row.description}
+                            onChange={(e) => updateItemRow(row.id, 'description', e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 text-xs focus:ring-1 focus:ring-amber-500 font-medium"
+                          />
+                        </div>
+
+                        {/* SKU Search Input (Optional) */}
+                        <div className="sm:col-span-2 relative">
+                          <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                            Kode SKU (Opsional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="BBK-xxx (Opsional)"
                             value={row.sku}
                             onChange={(e) => handleSearchSku(row.id, e.target.value.toUpperCase())}
                             onFocus={() => {
                               if (row.sku.length >= 2) handleSearchSku(row.id, row.sku);
                             }}
-                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-amber-400 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500"
+                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-amber-400 font-mono text-xs focus:ring-1 focus:ring-amber-500"
                           />
 
                           {/* Autocomplete Dropdown List */}
@@ -809,21 +828,6 @@ export function InvoiceManager() {
                               ))}
                             </div>
                           )}
-                        </div>
-
-                        {/* Product Title Input */}
-                        <div className="sm:col-span-5">
-                          <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
-                            Nama Produk & Spesifikasi / Uraian Biaya *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="Deskripsi nama produk / uraian jasa..."
-                            value={row.description}
-                            onChange={(e) => updateItemRow(row.id, 'description', e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 text-xs focus:ring-1 focus:ring-amber-500"
-                          />
                         </div>
 
                         {/* Qty Input */}
