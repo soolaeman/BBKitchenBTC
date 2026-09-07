@@ -694,59 +694,6 @@ export function InventoryTable() {
         </div>
       )}
 
-      {/* Pending Sold Reports Queue Banner (Read from LAPORAN_TERJUAL Sheet) */}
-      {soldNotices && soldNotices.length > 0 && (
-        <div className="space-y-2">
-          {soldNotices.map((notice) => (
-            <div
-              key={notice.id}
-              className="bg-emerald-950/80 border border-emerald-500/50 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg"
-            >
-              <div className="flex items-start gap-2.5">
-                <span className="p-1 rounded-lg bg-emerald-900 border border-emerald-700 text-xs">📢</span>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold text-white">Laporan Unit Terjual (Sheet LAPORAN_TERJUAL):</span>
-                    <span className="font-mono font-black text-amber-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-xs">
-                      {notice.sku}
-                    </span>
-                    {notice.dealPrice ? (
-                      <span className="text-xs font-mono font-bold text-emerald-400">
-                        {formatIDR(notice.dealPrice)}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="text-[11px] text-slate-300 mt-0.5">
-                    {notice.notes} • <span className="text-slate-400">Pelapor: {notice.reportedBy || 'Sales Desk'}</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 self-end sm:self-auto">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearch(notice.sku);
-                    setDebouncedSearch(notice.sku);
-                    setPage(1);
-                  }}
-                  className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition-colors"
-                >
-                  🔍 Cari Unit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDismissSoldNotice(notice.id)}
-                  className="px-2.5 py-1.5 bg-slate-900/80 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-800 rounded-lg text-xs transition-colors"
-                  title="Hapus / Abaikan Laporan ini dari Sheet LAPORAN_TERJUAL"
-                >
-                  ✕ Hapus Laporan
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Main Responsive Table */}
       <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl">
