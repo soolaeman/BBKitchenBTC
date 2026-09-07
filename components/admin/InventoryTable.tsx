@@ -849,9 +849,18 @@ export function InventoryTable() {
 
                       {/* Product Title & Category */}
                       <td className="py-3 px-4">
-                        <div className={`font-semibold line-clamp-1 transition-colors ${isActive ? 'text-amber-300' : 'text-slate-100 group-hover:text-amber-400'}`}>
-                          {item.PRODUCT_TITLE}
-                        </div>
+                        <a
+                          href={formatCleanProductUrl(item.PRODUCT_TITLE, item.LINK_UNIT)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`font-semibold line-clamp-1 transition-colors hover:underline inline-flex items-center gap-1.5 group/title ${
+                            isActive ? 'text-amber-300' : 'text-slate-100 hover:text-amber-400'
+                          }`}
+                          title="Buka Halaman Produk Publik di Website"
+                        >
+                          <span>{item.PRODUCT_TITLE}</span>
+                          <ExternalLink className="w-3 h-3 text-slate-500 group-hover/title:text-amber-400 shrink-0 opacity-60 group-hover/title:opacity-100 transition-opacity" />
+                        </a>
                         <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
                           <span className="text-amber-400/90">{item.CATEGORY_NAME}</span>
                           <span>•</span>
@@ -1084,9 +1093,16 @@ export function InventoryTable() {
                 <span className="font-mono text-xs text-amber-400 font-bold px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800/80">
                   {selectedItem.SKU}
                 </span>
-                <h2 className="text-lg font-bold text-white mt-1">
-                  {selectedItem.PRODUCT_TITLE}
-                </h2>
+                <a
+                  href={formatCleanProductUrl(selectedItem.PRODUCT_TITLE, selectedItem.LINK_UNIT)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-lg font-bold text-white hover:text-amber-300 transition-colors mt-1 inline-flex items-center gap-1.5 group hover:underline"
+                  title="Buka Halaman Publik"
+                >
+                  <span>{selectedItem.PRODUCT_TITLE}</span>
+                  <ExternalLink className="w-4 h-4 text-slate-500 group-hover:text-amber-400 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
+                </a>
                 <p className="text-xs text-slate-400">{selectedItem.KONDISI_UNIT} • {selectedItem.LOKASI_UNIT}</p>
               </div>
               <button
@@ -1167,12 +1183,13 @@ export function InventoryTable() {
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <a
-                href={`/product/${selectedItem.SKU.toLowerCase()}`}
+                href={formatCleanProductUrl(selectedItem.PRODUCT_TITLE, selectedItem.LINK_UNIT)}
                 target="_blank"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 text-slate-200 text-xs font-semibold hover:bg-slate-700"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 text-slate-200 text-xs font-semibold hover:bg-slate-700 hover:text-white transition-colors border border-slate-700"
               >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Lihat Halaman Publik
+                <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+                <span>Lihat Halaman Publik (Web)</span>
               </a>
               <button
                 type="button"
