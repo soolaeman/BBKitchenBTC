@@ -791,23 +791,197 @@ export function FinanceDashboard() {
     };
   }, [warehouseFilter, allHubsSupply, inventoryItems, filteredDeals, categoryFilter]);
 
-  // 8. RISKS & OPPORTUNITIES (DATA-DRIVEN INSIGHTS)
-  const businessInsights = useMemo(() => {
-    const lowMarginCats = categoryEconomics
-      .filter((c) => c.unitsSold >= 2 && c.marginPct < 18)
-      .sort((a, b) => a.marginPct - b.marginPct);
+  // 8. DUAL-MODE EXECUTIVE RISKS & OPPORTUNITIES INTELLIGENCE
+  const executiveIntelligence = useMemo(() => {
+    const isSalesWaMode = channelFilter === 'SALES_BBK';
 
-    const mostProfitableCat = [...categoryEconomics].sort((a, b) => b.profitSum - a.profitSum)[0];
-    const topVolumeCat = [...categoryEconomics].sort((a, b) => b.unitsSold - a.unitsSold)[0];
-    const topSupplyHub = allHubsSupply.list[0];
+    // 1. STOK READY POTENTIAL (Unlocked Gross Profit & Margins)
+    let totalReadyUnits = 0;
+    let totalReadyModal = 0;
+    let totalReadyEstimasiJual = 0;
+    let slowMovingUnits = 0;
+    let slowMovingModal = 0;
+    const nowMs = Date.now();
+
+    // Grouping ready stock by hub
+    const hubStockMap = new Map<string, {
+      code: string;
+      label: string;
+      readyUnits: number;
+      modalSum: number;
+      priceSum: number;
+      avgModal: number;
+      avgPrice: number;
+      spreadRp: number;
+      spreadMarginPct: number;
+      slowMovingCount: number;
+      slowMovingModal: number;
+    }>();
+
+    // Grouping ready stock by category
+    const catStockMap = new Map<string, {
+      category: string;
+      readyUnits: number;
+      modalSum: number;
+      priceSum: number;
+      avgModal: number;
+      avgPrice: number;
+      spreadRp: number;
+      spreadMarginPct: number;
+    }>();
+
+    inventoryItems.forEach((item) => {
+      const isReady = item.statusUnit === 'READY' || item.statusUnit === 'AVAILABLE';
+      const catMatch = matchCategory(item.sku, item.category, categoryFilter);
+      const whMatch = matchWarehouseHub(item.warehouse, item.asalGudang, item.sku, warehouseFilter);
+
+      if (!catMatch || !whMatch) return;
+
+      if (isReady) {
+        const itemModal = item.modal || 0;
+        const itemPrice = item.price > 0 ? item.price : Math.round(itemModal * 1.35);
+
+        totalReadyUnits++;
+        totalReadyModal += itemModal;
+        totalReadyEstimasiJual += itemPrice;
+
+        // Calculate aging (>60 days in stock considered slow-moving)
+        let isSlowMoving = false;
+        if (item.inDate) {
+          const inMs = new Date(item.inDate).getTime();
+          if (!isNaN(inMs)) {
+            const ageDays = Math.floor((nowMs - inMs) / (1000 * 60 * 60 * 24));
+            if (ageDays > 60) {
+              isSlowMoving = true;
+              slowMovingUnits++;
+              slowMovingModal += itemModal;
+            }
+          }
+        }
+
+        // Hub grouping
+        const hubCode = resolveHubCode(item.asalGudang, item.warehouse, item.sku) || (item.asalGudang ? item.asalGudang.toUpperCase() : 'GK');
+        const hubLabel = WAREHOUSE_13_HUBS.find((h) => h.code === hubCode)?.partnerName || `${hubCode} Hub`;
+        if (!hubStockMap.has(hubCode)) {
+          hubStockMap.set(hubCode, {
+            code: hubCode,
+            label: `${hubCode} - ${hubLabel}`,
+            readyUnits: 0,
+            modalSum: 0,
+            priceSum: 0,
+            avgModal: 0,
+            avgPrice: 0,
+            spreadRp: 0,
+            spreadMarginPct: 0,
+            slowMovingCount: 0,
+            slowMovingModal: 0,
+          });
+        }
+        const hEntry = hubStockMap.get(hubCode)!;
+        hEntry.readyUnits++;
+        hEntry.modalSum += itemModal;
+        hEntry.priceSum += itemPrice;
+        if (isSlowMoving) {
+          hEntry.slowMovingCount++;
+          hEntry.slowMovingModal += itemModal;
+        }
+
+        // Category grouping
+        const cat = resolveCategoryBucket(item.sku, item.category);
+        if (!catStockMap.has(cat)) {
+          catStockMap.set(cat, {
+            category: cat,
+            readyUnits: 0,
+            modalSum: 0,
+            priceSum: 0,
+            avgModal: 0,
+            avgPrice: 0,
+            spreadRp: 0,
+            spreadMarginPct: 0,
+          });
+        }
+        const cEntry = catStockMap.get(cat)!;
+        cEntry.readyUnits++;
+        cEntry.modalSum += itemModal;
+        cEntry.priceSum += itemPrice;
+      }
+    });
+
+    const totalPotentialGrossProfit = Math.max(0, totalReadyEstimasiJual - totalReadyModal);
+    const avgPotentialMarginPct = totalReadyEstimasiJual > 0 ? Math.round((totalPotentialGrossProfit / totalReadyEstimasiJual) * 100) : 0;
+
+    // Finalize hub stats
+    const hubStatsList = Array.from(hubStockMap.values()).map((h) => {
+      const avgModal = h.readyUnits > 0 ? Math.round(h.modalSum / h.readyUnits) : 0;
+      const avgPrice = h.readyUnits > 0 ? Math.round(h.priceSum / h.readyUnits) : 0;
+      const spreadRp = Math.max(0, avgPrice - avgModal);
+      const spreadMarginPct = avgPrice > 0 ? Math.round((spreadRp / avgPrice) * 100) : 0;
+      return { ...h, avgModal, avgPrice, spreadRp, spreadMarginPct };
+    });
+
+    // 2. HUB ARBITRAGE (Hub Termurah & Spread Margin Tertinggi)
+    const activeHubsWithStock = hubStatsList.filter((h) => h.readyUnits > 0);
+    const cheapestHubs = [...activeHubsWithStock].sort((a, b) => a.avgModal - b.avgModal);
+    const highestSpreadHubs = [...activeHubsWithStock].sort((a, b) => b.spreadMarginPct - a.spreadMarginPct);
+
+    // 3. BEST-VALUE OPPORTUNITIES (Categories with high demand + available ready stock + good spread)
+    const catOpportunities = Array.from(catStockMap.values()).map((c) => {
+      const avgModal = c.readyUnits > 0 ? Math.round(c.modalSum / c.readyUnits) : 0;
+      const avgPrice = c.readyUnits > 0 ? Math.round(c.priceSum / c.readyUnits) : 0;
+      const spreadRp = Math.max(0, avgPrice - avgModal);
+      const spreadMarginPct = avgPrice > 0 ? Math.round((spreadRp / avgPrice) * 100) : 0;
+      const econ = categoryEconomics.find((e) => e.category === c.category);
+      const unitsSold = econ?.unitsSold || 0;
+      const realizedProfit = econ?.profitSum || 0;
+      return {
+        ...c,
+        avgModal,
+        avgPrice,
+        spreadRp,
+        spreadMarginPct,
+        unitsSold,
+        realizedProfit,
+      };
+    }).sort((a, b) => (b.unitsSold * b.spreadMarginPct) - (a.unitsSold * a.spreadMarginPct));
+
+    // 4. RISKS: DEADSTOCK & AGING CONCENTRATION
+    const hubsWithDeadstock = [...activeHubsWithStock].sort((a, b) => b.slowMovingModal - a.slowMovingModal);
+    const topDeadstockHub = hubsWithDeadstock[0] || null;
+
+    // 5. RISKS: MARGIN COMPRESSION (Categories with slim spread < 18%)
+    const lowSpreadCats = catOpportunities.filter((c) => c.readyUnits > 0 && c.spreadMarginPct > 0 && c.spreadMarginPct < 18);
+
+    // 6. RISKS: SUPPLY DEFICIT (High Demand > 10 units sold, but ready stock < 3 units)
+    const supplyDeficitCats = categoryEconomics
+      .filter((e) => e.unitsSold >= 10 && e.readyUnits <= 3)
+      .sort((a, b) => b.unitsSold - a.unitsSold);
+
+    // 7. REALIZED SALES WA INSIGHTS (When in Sales WA mode)
+    const topRealizedProfitCat = [...categoryEconomics].sort((a, b) => b.profitSum - a.profitSum)[0] || null;
+    const topRealizedMarginCat = [...categoryEconomics].filter((c) => c.unitsSold >= 2).sort((a, b) => b.marginPct - a.marginPct)[0] || null;
+    const lowRealizedMarginCat = [...categoryEconomics].filter((c) => c.unitsSold >= 2 && c.marginPct < 15).sort((a, b) => a.marginPct - b.marginPct)[0] || null;
 
     return {
-      lowMarginCats,
-      mostProfitableCat,
-      topVolumeCat,
-      topSupplyHub,
+      isSalesWaMode,
+      totalReadyUnits,
+      totalReadyModal,
+      totalReadyEstimasiJual,
+      totalPotentialGrossProfit,
+      avgPotentialMarginPct,
+      slowMovingUnits,
+      slowMovingModal,
+      cheapestHubs,
+      highestSpreadHubs,
+      catOpportunities,
+      topDeadstockHub,
+      lowSpreadCats,
+      supplyDeficitCats,
+      topRealizedProfitCat,
+      topRealizedMarginCat,
+      lowRealizedMarginCat,
+      activeHubCount: activeHubsWithStock.length,
     };
-  }, [categoryEconomics, allHubsSupply]);
+  }, [inventoryItems, categoryEconomics, channelFilter, categoryFilter, warehouseFilter, resolveCategoryBucket]);
 
   if (!permissions?.canViewFinanceReports && role !== 'ADMIN' && role !== 'INVESTOR') {
     return (
@@ -1595,90 +1769,293 @@ export function FinanceDashboard() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 5. RISKS & OPPORTUNITIES (APA YANG PERLU DIPERHATIKAN?) */}
+      {/* 5. RISKS & OPPORTUNITIES: EXECUTIVE INTELLIGENCE MATRIX */}
       {/* ========================================================================= */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
-            <span>5. Risks & Opportunities (Insight Aktual Berbasis Data)</span>
-          </h2>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950/80 border border-amber-800 text-amber-400 font-mono font-bold">
-            Real Analytics
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-300">
+              5. Risks & Opportunities (Executive Intelligence Matrix)
+            </h2>
+          </div>
+          <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-mono font-bold self-start sm:self-auto ${
+            executiveIntelligence.isSalesWaMode
+              ? 'bg-emerald-950/80 border-emerald-800 text-emerald-300'
+              : 'bg-indigo-950/80 border-indigo-800 text-indigo-300'
+          }`}>
+            {executiveIntelligence.isSalesWaMode
+              ? '🎯 Mode: Realisasi Sales WA'
+              : '💎 Mode: Potensi Arbitrase & Rekanan'}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Risk: Low Margin */}
-          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2">
-            <div className="flex items-center gap-1.5 text-rose-400 font-bold text-xs">
-              <AlertTriangle className="w-4 h-4" />
-              <span>Produk Margin Rendah</span>
+        {/* Top 3 Metric Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Metric 1: Potential / Realized Profit */}
+          <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
+              <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{executiveIntelligence.isSalesWaMode ? 'Realisasi Laba Bersih WA' : 'Potensi Laba Kotor Stok Ready'}</span>
+            </span>
+            <div className="text-lg font-black text-emerald-400 font-mono">
+              {executiveIntelligence.isSalesWaMode
+                ? formatIDR(healthKPIs.grossProfit)
+                : formatIDR(executiveIntelligence.totalPotentialGrossProfit)}
             </div>
-            {businessInsights.lowMarginCats.length > 0 ? (
-              <div>
-                <p className="text-sm font-bold text-white">{businessInsights.lowMarginCats[0].category}</p>
-                <p className="text-[11px] text-rose-300/90 mt-0.5">
-                  Margin rata-rata hanya <strong>{businessInsights.lowMarginCats[0].marginPct}%</strong>. Perlu naikkan Harga Buka WA.
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400">Seluruh kategori saat ini memiliki margin sehat di atas 18%.</p>
-            )}
+            <p className="text-[10px] text-slate-400">
+              {executiveIntelligence.isSalesWaMode
+                ? `Margin Realisasi: ${healthKPIs.grossMarginPct}% dari ${healthKPIs.unitsSold} unit`
+                : `Spread potensi margin ${executiveIntelligence.avgPotentialMarginPct}% dari ${executiveIntelligence.totalReadyUnits} unit ready`}
+            </p>
           </div>
 
-          {/* Opportunity: Most Profitable */}
-          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2">
-            <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
-              <Award className="w-4 h-4" />
-              <span>Paling Profitable</span>
+          {/* Metric 2: Cheapest Supply Hub */}
+          <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
+              <Building className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Hub Pasokan Termurah</span>
+            </span>
+            <div className="text-lg font-black text-indigo-400 font-mono truncate" title={executiveIntelligence.cheapestHubs[0]?.label || 'Semua Hub'}>
+              {executiveIntelligence.cheapestHubs[0] ? executiveIntelligence.cheapestHubs[0].code : '-'}
+              <span className="text-xs font-normal text-slate-300 ml-1.5">
+                ({executiveIntelligence.cheapestHubs[0] ? formatIDR(executiveIntelligence.cheapestHubs[0].avgModal) : 'Rp 0'})
+              </span>
             </div>
-            {businessInsights.mostProfitableCat ? (
-              <div>
-                <p className="text-sm font-bold text-white">{businessInsights.mostProfitableCat.category}</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Total Laba Kotor: <strong className="text-amber-400 font-mono">{formatIDR(businessInsights.mostProfitableCat.profitSum)}</strong> ({businessInsights.mostProfitableCat.marginPct}% margin).
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400">-</p>
-            )}
+            <p className="text-[10px] text-slate-400 truncate">
+              {executiveIntelligence.cheapestHubs[0]
+                ? `${executiveIntelligence.cheapestHubs[0].label} (${executiveIntelligence.cheapestHubs[0].readyUnits} unit)`
+                : 'Belum ada data unit ready'}
+            </p>
           </div>
 
-          {/* Volume Leader */}
-          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2">
-            <div className="flex items-center gap-1.5 text-blue-400 font-bold text-xs">
-              <Flame className="w-4 h-4" />
-              <span>Volume Terlaris</span>
+          {/* Metric 3: Locked Slow-Moving Capital */}
+          <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Modal Tertahan (Aging &gt;60 Hari)</span>
+            </span>
+            <div className="text-lg font-black text-amber-400 font-mono">
+              {formatIDR(executiveIntelligence.slowMovingModal)}
             </div>
-            {businessInsights.topVolumeCat ? (
-              <div>
-                <p className="text-sm font-bold text-white">{businessInsights.topVolumeCat.category}</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Terjual <strong className="text-emerald-400 font-mono">{businessInsights.topVolumeCat.unitsSold} Unit</strong>. Demand sangat likuid di pasar resto.
-                </p>
+            <p className="text-[10px] text-slate-400">
+              {executiveIntelligence.slowMovingUnits > 0
+                ? `${executiveIntelligence.slowMovingUnits} unit siap jual butuh program akselerasi sales`
+                : 'Seluruh unit ready berada dalam siklus perputaran sehat'}
+            </p>
+          </div>
+        </div>
+
+        {/* 2-Column Split Deep Analytical Matrix */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* PANEL 1 (KIRI): OPPORTUNITIES & SUPPLY ARBITRAGE */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-3.5 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Award className="w-4 h-4 text-emerald-400" />
+                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    Peluang &amp; Arbitrase Pasokan Termurah
+                  </h3>
+                </div>
+                <span className="text-[10px] text-emerald-400 font-mono font-bold">Cost Advantage</span>
               </div>
-            ) : (
-              <p className="text-xs text-slate-400">-</p>
-            )}
+
+              {/* Sub-item A: Cheapest Hubs Comparison Table */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  🏭 4 Hub dengan Modal Rata-Rata Termurah:
+                </span>
+                <div className="divide-y divide-slate-800/60 bg-slate-950/60 rounded-xl border border-slate-800/80 p-2">
+                  {executiveIntelligence.cheapestHubs.slice(0, 4).length === 0 ? (
+                    <p className="text-xs text-slate-500 py-3 text-center">Tidak ada stok ready pada filter ini.</p>
+                  ) : (
+                    executiveIntelligence.cheapestHubs.slice(0, 4).map((hub, idx) => (
+                      <div key={hub.code} className="py-1.5 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 min-w-0 pr-2">
+                          <span className="w-4 h-4 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center font-bold text-[9px] text-indigo-300 font-mono shrink-0">
+                            {idx + 1}
+                          </span>
+                          <div className="truncate">
+                            <span className="font-semibold text-slate-200 block truncate">{hub.label}</span>
+                            <span className="text-[10px] text-slate-400">
+                              Modal: <strong className="text-slate-300 font-mono">{formatIDR(hub.avgModal)}</strong> • Ready: {hub.readyUnits} Unit
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono font-bold text-emerald-400 block">+{formatIDR(hub.spreadRp)}</span>
+                          <span className="text-[9px] text-emerald-300/80 font-mono">Potensi {hub.spreadMarginPct}% Margin</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Sub-item B: Top Recommended Fast-Moving Pitch */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  🚀 Kategori Prioritas Pitching Sales (Demand + Stok):
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {executiveIntelligence.catOpportunities.slice(0, 2).map((cat) => (
+                    <div key={cat.category} className="p-2.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1">
+                      <span className="font-bold text-xs text-slate-200 block truncate" title={cat.category}>
+                        {cat.category}
+                      </span>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-400 font-mono">{cat.readyUnits} Unit Ready</span>
+                        <span className="text-emerald-400 font-bold font-mono">Spread: {formatIDR(cat.spreadRp)}</span>
+                      </div>
+                      <div className="text-[9px] text-indigo-300 flex items-center justify-between">
+                        <span>Terjual: {cat.unitsSold} unit</span>
+                        <span className="font-bold">{cat.spreadMarginPct}% Margin</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500 border-t border-slate-800/60 pt-2">
+              💡 Rekomendasi pasokan di atas memberikan spread keuntungan tertinggi untuk penawaran sales.
+            </p>
           </div>
 
-          {/* Supply Concentration */}
-          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2">
-            <div className="flex items-center gap-1.5 text-purple-400 font-bold text-xs">
-              <Building className="w-4 h-4" />
-              <span>Fokus Pasokan Rekanan</span>
-            </div>
-            {businessInsights.topSupplyHub ? (
-              <div>
-                <p className="text-sm font-bold text-white">{businessInsights.topSupplyHub.label}</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Tersedia <strong className="text-purple-300 font-mono">{businessInsights.topSupplyHub.availableUnits} Unit</strong> siap closing untuk sales desk.
-                </p>
+          {/* PANEL 2 (KANAN): RISKS, AGING & SUPPLY DEFICIT */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-3.5 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    Risiko, Aging &amp; Defisit Pasokan
+                  </h3>
+                </div>
+                <span className="text-[10px] text-rose-400 font-mono font-bold">Capital Guardrail</span>
               </div>
-            ) : (
-              <p className="text-xs text-slate-400">-</p>
-            )}
+
+              {/* Sub-item A: Deadstock / Aging Concentration */}
+              <div className="p-3 bg-slate-950/80 border border-rose-950/60 rounded-xl space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>Konsentrasi Modal Tertahan Terbesar</span>
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-950 border border-rose-800 text-rose-300 font-mono font-bold">
+                    Slow-Moving
+                  </span>
+                </div>
+                {executiveIntelligence.topDeadstockHub && executiveIntelligence.topDeadstockHub.slowMovingModal > 0 ? (
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center justify-between mt-0.5">
+                      <span className="truncate">{executiveIntelligence.topDeadstockHub.label}</span>
+                      <span className="text-rose-400 font-mono font-black">{formatIDR(executiveIntelligence.topDeadstockHub.slowMovingModal)}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Terdapat {executiveIntelligence.topDeadstockHub.slowMovingCount} unit mengendap &gt;60 hari. Disarankan program bundling atau flash sale.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 py-1">Tidak terdeteksi modal tertahan signifikan pada filter ini.</p>
+                )}
+              </div>
+
+              {/* Sub-item B: Supply Deficit Warning (High Demand, Low Stock) */}
+              <div className="p-3 bg-slate-950/80 border border-amber-950/60 rounded-xl space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                    <Flame className="w-3 h-3" />
+                    <span>Peringatan Defisit Pasokan (Demand &gt; Stok)</span>
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950 border border-amber-800 text-amber-300 font-mono font-bold">
+                    Restock Alert
+                  </span>
+                </div>
+                {executiveIntelligence.supplyDeficitCats.length > 0 ? (
+                  <div>
+                    <div className="text-xs font-bold text-slate-200 flex items-center justify-between mt-0.5">
+                      <span className="truncate">{executiveIntelligence.supplyDeficitCats[0].category}</span>
+                      <span className="text-amber-400 font-mono">{executiveIntelligence.supplyDeficitCats[0].readyUnits} Unit Ready</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Demand pasar tinggi ({executiveIntelligence.supplyDeficitCats[0].unitsSold} unit terjual), namun pasokan siap jual kritis. Segera tambah pasokan rekanan.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 py-1">Rasio pasokan siap jual terhadap demand pasar dalam kondisi seimbang.</p>
+                )}
+              </div>
+
+              {/* Sub-item C: Margin Compression Warning */}
+              {executiveIntelligence.lowSpreadCats.length > 0 && (
+                <div className="px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Spread Margin Tipis:</span>
+                    <span className="font-semibold text-slate-200 text-[11px]">{executiveIntelligence.lowSpreadCats[0].category}</span>
+                  </div>
+                  <span className="text-[10px] text-rose-300 font-mono font-bold">
+                    Hanya {executiveIntelligence.lowSpreadCats[0].spreadMarginPct}% spread
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[10px] text-slate-500 border-t border-slate-800/60 pt-2">
+              ℹ️ Pantau modal tertahan secara berkala untuk menjaga kecepatan perputaran kas (cash conversion).
+            </p>
+          </div>
+        </div>
+
+        {/* PANEL 3 (BAWAH): STRATEGIC ACTION PLAN */}
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950/30 to-slate-900 border border-indigo-900/50 rounded-2xl p-4 space-y-2.5 shadow-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-amber-400" />
+              <span>Strategic Action Plan (Rekomendasi Tindakan 30 Detik)</span>
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">Executive Guidance</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+            {/* Action 1: Sales Action */}
+            <div className="p-3 bg-slate-950/80 border border-slate-800/80 rounded-xl space-y-1">
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
+                🎯 Aksi Sales Desk:
+              </span>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {executiveIntelligence.catOpportunities[0] && executiveIntelligence.cheapestHubs[0]
+                  ? `Push promosi ${executiveIntelligence.catOpportunities[0].category} dari ${executiveIntelligence.cheapestHubs[0].label} karena memiliki spread potensi margin ${executiveIntelligence.cheapestHubs[0].spreadMarginPct}% (modal terendah ${formatIDR(executiveIntelligence.cheapestHubs[0].avgModal)}).`
+                  : 'Fokuskan penawaran pada unit-unit dengan HPP modal di bawah rata-rata pasar untuk mengamankan margin tebal.'}
+              </p>
+            </div>
+
+            {/* Action 2: Procurement & Warehouse Action */}
+            <div className="p-3 bg-slate-950/80 border border-slate-800/80 rounded-xl space-y-1">
+              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
+                📦 Aksi Pengadaan &amp; Gudang:
+              </span>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {executiveIntelligence.supplyDeficitCats.length > 0
+                  ? `Prioritaskan pengadaan unit ${executiveIntelligence.supplyDeficitCats[0].category} dari mitra rekanan karena stok siap jual menipis (${executiveIntelligence.supplyDeficitCats[0].readyUnits} unit) di tengah tingginya permintaan.`
+                  : executiveIntelligence.topDeadstockHub && executiveIntelligence.topDeadstockHub.slowMovingModal > 0
+                  ? `Terapkan strategi cuci gudang/diskon khusus pada unit slow-moving di ${executiveIntelligence.topDeadstockHub.label} untuk melepaskan modal tertahan.`
+                  : 'Pertahankan kapasitas pasokan saat ini karena perputaran stok di seluruh hub berjalan seimbang.'}
+              </p>
+            </div>
+
+            {/* Action 3: Pricing Strategy */}
+            <div className="p-3 bg-slate-950/80 border border-slate-800/80 rounded-xl space-y-1">
+              <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider block">
+                🏷️ Strategi Penetapan Harga:
+              </span>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {executiveIntelligence.isSalesWaMode
+                  ? `Realisasi margin rata-rata saat ini sebesar ${healthKPIs.grossMarginPct}%. Pertahankan floor price penawaran awal agar tidak terdiskon di bawah 18%.`
+                  : `Potensi laba kotor stok siap jual mencapai ${formatIDR(executiveIntelligence.totalPotentialGrossProfit)}. Konversi calon pembeli langsung via Sales WA untuk menangkap margin tersebut.`}
+              </p>
+            </div>
           </div>
         </div>
       </div>
