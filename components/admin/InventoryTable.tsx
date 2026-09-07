@@ -572,13 +572,11 @@ export function InventoryTable() {
                 setStatusUnit(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
             >
               <option value="ALL">Semua Status Unit</option>
               <option value="READY">READY (Siap Jual)</option>
-              <option value="AVAILABLE">AVAILABLE (Tersedia)</option>
               <option value="SOLD">SOLD (Terjual)</option>
-              <option value="AMBIGUOUS">AMBIGUOUS</option>
             </select>
           </div>
 
@@ -590,15 +588,12 @@ export function InventoryTable() {
                 setStatusPipeline(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
             >
               <option value="ALL">Semua Status Pipeline</option>
               <option value="PUBLISHED">PUBLISHED (Live di Web)</option>
               <option value="READY_TO_PUBLISH">READY_TO_PUBLISH (Siap Tayang)</option>
               <option value="PENDING_PHOTOS">PENDING_PHOTOS (Menunggu Foto)</option>
-              <option value="NO_PHOTOS_FOUND">NO_PHOTOS_FOUND (Foto Belum Ada)</option>
-              <option value="ERROR">ERROR (Perlu Dicek)</option>
-              <option value="AMBIGUOUS">AMBIGUOUS</option>
             </select>
           </div>
         </div>
