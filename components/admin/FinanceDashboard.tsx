@@ -32,6 +32,7 @@ import {
   AlertTriangle,
   Award,
   Zap,
+  ChevronLeft,
   ChevronRight,
   CheckCircle2,
 } from 'lucide-react';
