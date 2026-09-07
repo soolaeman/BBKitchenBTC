@@ -740,12 +740,11 @@ export function SEOQualityControl() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-800 text-slate-400 font-mono text-[11px]">
-                      <th className="py-3 px-4">Kata Kunci (Google Suggest)</th>
-                      <th className="py-3 px-3">Search Intent</th>
-                      <th className="py-3 px-3">Volume Est.</th>
-                      <th className="py-3 px-3">Tingkat Persaingan</th>
-                      <th className="py-3 px-3">Est. Nilai CPC</th>
-                      <th className="py-3 px-3 text-right">Aksi</th>
+                      <th className="py-3 px-4">Kata Kunci Saran Google / DDG</th>
+                      <th className="py-3 px-3">Klasifikasi Intent</th>
+                      <th className="py-3 px-3">Tipe Pencarian</th>
+                      <th className="py-3 px-3">Sumber Engine</th>
+                      <th className="py-3 px-3 text-right">Aksi Langsung</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 font-mono">
@@ -762,28 +761,26 @@ export function SEOQualityControl() {
                                 ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
                                 : item.intent === 'COMMERCIAL'
                                 ? 'bg-amber-950 text-amber-300 border-amber-800'
+                                : item.intent === 'NAVIGATIONAL'
+                                ? 'bg-purple-950 text-purple-300 border-purple-800'
                                 : 'bg-sky-950 text-sky-300 border-sky-800'
                             }`}
                           >
                             {item.intent}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-slate-300">{item.volumeMonthly}</td>
-                        <td className="py-3 px-3">
-                          <span
-                            className={`text-[11px] font-bold ${
-                              item.difficulty === 'EASY'
-                                ? 'text-emerald-400'
-                                : item.difficulty === 'MEDIUM'
-                                ? 'text-amber-400'
-                                : 'text-rose-400'
-                            }`}
+                        <td className="py-3 px-3 text-slate-300 font-sans text-xs">{item.typeDesc || 'Investigasi Komersial'}</td>
+                        <td className="py-3 px-3 text-slate-400 text-[11px]">{item.source}</td>
+                        <td className="py-3 px-3 text-right flex items-center justify-end gap-2">
+                          <a
+                            href={`https://www.google.co.id/search?q=${encodeURIComponent(item.keyword)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] font-sans transition-colors inline-flex items-center gap-1"
                           >
-                            {item.difficulty}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-slate-400">{item.cpcEst}</td>
-                        <td className="py-3 px-3 text-right">
+                            <span>Google</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
                           <button
                             type="button"
                             onClick={() => {
@@ -792,7 +789,7 @@ export function SEOQualityControl() {
                               setNewArtIntent(item.intent);
                               setShowNewArticleModal(true);
                             }}
-                            className="px-2.5 py-1 bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-300 rounded text-[11px] font-bold transition-all"
+                            className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded text-[11px] font-bold font-sans transition-all"
                           >
                             + Jadi Artikel
                           </button>
@@ -1332,7 +1329,7 @@ Sitemap: https://bukanbarukitchen.com/sitemap.xml`}
       )}
 
       {/* ========================================================================= */}
-      {/* PILLAR 6: PEMANTAUAN & GSC RANK TRACKING (Google.co.id SERP) */}
+      {/* PILLAR 6: PEMANTAUAN & VERIFIKASI SERP GOOGLE INDONESIA */}
       {/* ========================================================================= */}
       {activeTab === 'PILLAR_6' && (
         <div className="space-y-6">
@@ -1341,19 +1338,16 @@ Sitemap: https://bukanbarukitchen.com/sitemap.xml`}
               <div>
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
-                  <span>Google Indonesia (Google.co.id) Keyword Rank Tracking</span>
+                  <span>Verifikasi Peringkat SERP Google Indonesia (Live SERP Checker)</span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Pemantauan posisi ranking organik Google Search Console 30 hari terakhir untuk kata kunci ber-intent komersial tinggi.
+                  Klik &quot;Cek Live di Google&quot; untuk langsung memverifikasi posisi halaman Bukan Baru Kitchen pada hasil pencarian real-time Google.co.id.
                 </p>
               </div>
 
               <div className="flex items-center gap-2 text-xs font-mono">
                 <span className="px-2.5 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-lg">
-                  Top 3: 4 Keywords
-                </span>
-                <span className="px-2.5 py-1 bg-slate-800 text-slate-300 rounded-lg">
-                  Total Clicks: 1.416 /bln
+                  Target: 6 Klaster Utama
                 </span>
               </div>
             </div>
@@ -1362,42 +1356,40 @@ Sitemap: https://bukanbarukitchen.com/sitemap.xml`}
               <table className="w-full text-left text-xs border-collapse font-mono">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
-                    <th className="py-3 px-4">Kata Kunci Target</th>
-                    <th className="py-3 px-3 text-center">Posisi SERP</th>
-                    <th className="py-3 px-3 text-center">Perubahan</th>
-                    <th className="py-3 px-3">Tayangan (30h)</th>
-                    <th className="py-3 px-3">Klik (30h)</th>
-                    <th className="py-3 px-3">CTR</th>
-                    <th className="py-3 px-3 text-right">Landing Page URL</th>
+                    <th className="py-3 px-4">Kata Kunci Fokus Komersial</th>
+                    <th className="py-3 px-3">Target Klaster Kategori</th>
+                    <th className="py-3 px-3">Landing Page Terpetakan</th>
+                    <th className="py-3 px-3 text-right">Verifikasi SERP Live</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {rankings.map((rk) => (
-                    <tr key={rk.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-3 px-4 text-white font-medium">
+                <tbody className="divide-y divide-slate-800/60 font-sans">
+                  {[
+                    { keyword: 'combi oven bekas restoran', category: 'Combi Oven & Steamer', path: '/category/combi-oven' },
+                    { keyword: 'chiller stainless 304 bekas', category: 'Commercial Refrigeration', path: '/category/refrigeration' },
+                    { keyword: 'kompor resto heavy duty bekas jakarta', category: 'Gas Range & Wok Burner', path: '/category/cooking-range' },
+                    { keyword: 'mesin espresso 2 group bekas cafe', category: 'Coffee & Beverage Machine', path: '/category/coffee-beverage' },
+                    { keyword: 'deep fryer gas bekas restoran', category: 'Commercial Deep Fryer', path: '/category/deep-fryer' },
+                    { keyword: 'ice maker scotsman bekas bergaransi', category: 'Commercial Ice Machine', path: '/category/ice-machine' },
+                    { keyword: 'meja stainless bekas restoran', category: 'Stainless Worktable & Sink', path: '/category/stainless-fabrication' },
+                  ].map((rk, idx) => (
+                    <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-3 px-4 text-white font-medium flex items-center gap-2 font-mono">
+                        <span className="text-slate-600 font-mono text-[10px]">#{idx + 1}</span>
                         <span>{rk.keyword}</span>
                       </td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="text-base font-black text-amber-400 font-mono">
-                          #{rk.position}
-                        </span>
+                      <td className="py-3 px-3 text-slate-300 font-sans text-xs">{rk.category}</td>
+                      <td className="py-3 px-3 font-mono text-slate-400 text-[11px]">
+                        <span className="text-amber-400">{rk.path}</span>
                       </td>
-                      <td className="py-3 px-3 text-center">
-                        {rk.rankingChange === 'UP' ? (
-                          <span className="text-emerald-400 font-bold text-[11px]">▲ Naik</span>
-                        ) : rk.rankingChange === 'DOWN' ? (
-                          <span className="text-rose-400 font-bold text-[11px]">▼ Turun</span>
-                        ) : (
-                          <span className="text-slate-400 font-bold text-[11px]">— Stabil</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-slate-300">{rk.impressions30d.toLocaleString('id-ID')}</td>
-                      <td className="py-3 px-3 text-emerald-400 font-bold">{rk.clicks30d.toLocaleString('id-ID')}</td>
-                      <td className="py-3 px-3 text-slate-400">{rk.ctr}</td>
-                      <td className="py-3 px-3 text-right text-slate-400 hover:text-white truncate max-w-xs">
-                        <a href={rk.landingPage} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:underline">
-                          <span className="truncate">{rk.landingPage.replace('https://bukanbarukitchen.com', '')}</span>
-                          <ExternalLink className="w-3 h-3 shrink-0" />
+                      <td className="py-3 px-3 text-right">
+                        <a
+                          href={`https://www.google.co.id/search?q=${encodeURIComponent(rk.keyword)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow transition-colors"
+                        >
+                          <span>Cek Live di Google</span>
+                          <ExternalLink className="w-3 h-3" />
                         </a>
                       </td>
                     </tr>

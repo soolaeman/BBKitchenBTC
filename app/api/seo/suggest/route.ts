@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     let googleKeywords: string[] = [];
     let ddgKeywords: string[] = [];
 
-    // 1. Fetch Google Suggest
+    // 1. Fetch Google Suggest Live (Google Indonesia)
     try {
       const gRes = await fetch(googleSuggestUrl, {
         headers: {
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       console.warn('Google suggest fetch error:', gErr);
     }
 
-    // 2. Fetch DuckDuckGo Suggest
+    // 2. Fetch DuckDuckGo Suggest Live
     try {
       const dRes = await fetch(ddgSuggestUrl, {
         headers: {
@@ -48,28 +48,53 @@ export async function GET(request: NextRequest) {
       console.warn('DuckDuckGo suggest fetch error:', dErr);
     }
 
-    // Deduplicate and enrich
+    // Deduplicate and classify with real linguistic intent
     const uniqueKeywords = Array.from(new Set([...googleKeywords, ...ddgKeywords]));
 
-    const enriched = uniqueKeywords.map((kw, idx) => {
+    const enriched = uniqueKeywords.map((kw) => {
       const lower = kw.toLowerCase();
       let intent: 'COMMERCIAL' | 'INFORMATIONAL' | 'TRANSACTIONAL' | 'NAVIGATIONAL' = 'COMMERCIAL';
-      if (lower.includes('cara') || lower.includes('tips') || lower.includes('panduan') || lower.includes('perbedaan')) {
+      let typeDesc = 'Investigasi Pembelian Alat Resto';
+
+      if (
+        lower.includes('cara') ||
+        lower.includes('tips') ||
+        lower.includes('panduan') ||
+        lower.includes('perbedaan') ||
+        lower.includes('fungsi') ||
+        lower.includes('review')
+      ) {
         intent = 'INFORMATIONAL';
-      } else if (lower.includes('beli') || lower.includes('jual') || lower.includes('harga') || lower.includes('murah')) {
+        typeDesc = 'Panduan & Edukasi Teknis';
+      } else if (
+        lower.includes('beli') ||
+        lower.includes('jual') ||
+        lower.includes('harga') ||
+        lower.includes('murah') ||
+        lower.includes('promo') ||
+        lower.includes('sewa')
+      ) {
         intent = 'TRANSACTIONAL';
+        typeDesc = 'Siap Transaksi / Inquiry WhatsApp';
+      } else if (
+        lower.includes('rational') ||
+        lower.includes('nayati') ||
+        lower.includes('hoshizaki') ||
+        lower.includes('unox') ||
+        lower.includes('marzocco') ||
+        lower.includes('berjaya')
+      ) {
+        intent = 'NAVIGATIONAL';
+        typeDesc = 'Pencarian Merek Spesifik';
       }
 
-      const diff: 'EASY' | 'MEDIUM' | 'HARD' = idx % 3 === 0 ? 'EASY' : idx % 3 === 1 ? 'MEDIUM' : 'HARD';
-      const vol = idx < 3 ? '1.200 - 3.400 /bln' : idx < 7 ? '500 - 1.200 /bln' : '150 - 500 /bln';
+      const source = googleKeywords.includes(kw) ? 'Google Indonesia (Live)' : 'DuckDuckGo (Live)';
 
       return {
         keyword: kw,
         intent,
-        volumeMonthly: vol,
-        difficulty: diff,
-        cpcEst: `Rp ${(Math.floor(Math.random() * 2500) + 1200).toLocaleString('id-ID')}`,
-        source: 'GOOGLE_SUGGEST',
+        typeDesc,
+        source,
       };
     });
 

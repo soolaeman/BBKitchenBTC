@@ -71,12 +71,8 @@ export interface SEOArticle {
 export interface SEOKeywordItem {
   keyword: string;
   intent: 'COMMERCIAL' | 'INFORMATIONAL' | 'TRANSACTIONAL' | 'NAVIGATIONAL';
-  volumeMonthly: string;
-  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
-  categorySlug: string;
-  targetSku?: string;
-  cpcEst: string;
-  source: 'GOOGLE_SUGGEST' | 'MARKETPLACE' | 'INTERNAL_SHEETS';
+  typeDesc?: string;
+  source: string;
 }
 
 export interface TechnicalSEOAudit {
