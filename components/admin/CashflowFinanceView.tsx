@@ -296,8 +296,9 @@ export function CashflowFinanceView() {
       discount: 0,
       tax: 0,
       totalAmount: deal.hargaClosing || 0,
-      paidAmount: deal.hargaClosing || 0,
+      dpAmount: deal.hargaClosing || 0,
       remainingAmount: 0,
+      createdBy: 'SALES_BBK',
     };
     setSelectedInvoice(dummyInv);
     setDocumentModalType(type);
