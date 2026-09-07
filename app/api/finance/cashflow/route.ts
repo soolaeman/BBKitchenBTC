@@ -6,6 +6,7 @@ import {
   CashflowType,
 } from '@/lib/repositories/cashflow-repository';
 import { getLiveClosingDealLedger } from '@/lib/repositories/finance-repository';
+import { parseToISODate } from '@/lib/repositories/google-sheets-invoices';
 import { auth } from '@/auth';
 
 export async function GET(req: NextRequest) {
@@ -28,8 +29,9 @@ export async function GET(req: NextRequest) {
     }
     if (startDate || endDate) {
       entries = entries.filter((e) => {
-        if (startDate && e.tanggal < startDate) return false;
-        if (endDate && e.tanggal > endDate) return false;
+        const cleanEdate = parseToISODate(e.tanggal) || e.tanggal;
+        if (startDate && cleanEdate < startDate) return false;
+        if (endDate && cleanEdate > endDate) return false;
         return true;
       });
     }
@@ -40,7 +42,7 @@ export async function GET(req: NextRequest) {
 
     // Filter deals by date if specified (Only deals sold in the active period)
     const filteredDeals = deals.filter((d) => {
-      const dDate = (d.tanggalTerjual || d.tanggalMasuk || '').split('T')[0];
+      const dDate = parseToISODate(d.tanggalTerjual || d.tanggalMasuk) || (d.tanggalTerjual || d.tanggalMasuk || '').split('T')[0];
       if (startDate && dDate && dDate < startDate) return false;
       if (endDate && dDate && dDate > endDate) return false;
       return true;
@@ -49,6 +51,7 @@ export async function GET(req: NextRequest) {
     const bbkDeals = filteredDeals.filter((d) => d.soldBy === 'SALES_BBK');
     const totalDealsRevenue = bbkDeals.reduce((sum, d) => sum + (d.hargaClosing || 0), 0);
     const totalDealsGrossProfit = bbkDeals.reduce((sum, d) => sum + (d.realizedProfit || 0), 0);
+    const totalPhysicalUnits = bbkDeals.reduce((sum, d) => sum + (d.quantity || 1), 0);
 
     let totalExpenses = 0;
     let totalCommissions = 0;
@@ -87,7 +90,7 @@ export async function GET(req: NextRequest) {
         totalInvestorInflow,
         totalInvestorOutflow,
         netInvestorPosition,
-        totalDealsCount: bbkDeals.length,
+        totalDealsCount: totalPhysicalUnits,
       },
     });
   } catch (error: any) {

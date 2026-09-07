@@ -6,6 +6,7 @@ import { ClosingDealItem, Invoice, DocumentType } from '@/lib/types/finance';
 import { formatIDR, resolveLocationFromCode } from '@/lib/repositories/warehouse-utils';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
+import { ResolveNonSkuModal, NonSkuResolveItem } from './ResolveNonSkuModal';
 import {
   Banknote,
   Percent,
@@ -35,6 +36,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
+  Link2,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -91,6 +93,8 @@ export function FinanceDashboard() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [documentModalType, setDocumentModalType] = useState<DocumentType>('INVOICE');
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+  const [resolveItem, setResolveItem] = useState<NonSkuResolveItem | null>(null);
+  const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
 
   // Pagination for Closing Deal Ledger
   const [dealPage, setDealPage] = useState(1);
@@ -1760,83 +1764,117 @@ export function FinanceDashboard() {
                   </td>
                 </tr>
               ) : (
-                paginatedDeals.map((deal) => (
-                  <tr key={deal.sku} className="hover:bg-slate-850/50 transition-colors">
-                    <td className="py-3 px-3.5 font-mono font-bold text-amber-400">
-                      {deal.sku}
-                    </td>
-                    <td className="py-3 px-3.5 max-w-xs">
-                      <p className="font-bold text-slate-200 line-clamp-1">{deal.productTitle}</p>
-                      <p className="text-[10px] text-slate-500 line-clamp-1">{deal.notes}</p>
-                    </td>
-                    <td className="py-3 px-3.5 text-slate-300 font-mono text-[11px]">
-                      {deal.tanggalTerjual || '-'}
-                    </td>
-                    <td className="py-3 px-3.5 text-slate-400 font-mono text-[11px]">
-                      {deal.durasiTerjual}
-                    </td>
-                    <td className="py-3 px-3.5 text-slate-300">
-                      <div className="flex items-center gap-1.5">
-                        <span className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono font-bold text-[10px] text-indigo-300">
-                          {deal.asalGudang || 'GK'}
-                        </span>
-                        <span className="text-[11px] text-slate-300">
-                          {resolveLocationFromCode((deal.asalGudang || 'GK') as any)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-3.5 text-right font-mono text-slate-400">
-                      {deal.hargaModal > 0 ? formatIDR(deal.hargaModal) : '-'}
-                    </td>
-                    <td className="py-3 px-3.5 text-right font-mono font-bold text-amber-400">
-                      {deal.hargaClosing > 0 ? formatIDR(deal.hargaClosing) : (deal.hargaModal > 0 ? formatIDR(deal.hargaModal) : '-')}
-                    </td>
-                    <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-400">
-                      {deal.realizedProfit > 0 ? (
-                        <span>
-                          +{formatIDR(deal.realizedProfit)} <span className="text-[10px] font-normal text-emerald-500/80">({deal.marginPercent}%)</span>
-                        </span>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                    <td className="py-3 px-3.5 text-center">
-                      {deal.soldBy === 'SALES_BBK' ? (
-                        <span className="inline-flex items-center px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded text-[10px] font-bold">
-                          Sales BBK
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 bg-slate-950 text-slate-400 border border-slate-800 rounded text-[10px] font-bold">
-                          Pihak Ketiga
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-3.5 text-center">
-                      {deal.soldBy === 'SALES_BBK' ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDocFromDeal(deal, 'INVOICE')}
-                            title="Cetak Faktur Tagihan (Invoice)"
-                            className="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-800 text-amber-300 border border-amber-800 transition-colors"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDocFromDeal(deal, 'DELIVERY_NOTE')}
-                            title="Cetak Surat Jalan Pengiriman"
-                            className="p-1.5 rounded-lg bg-orange-950/80 hover:bg-orange-800 text-orange-300 border border-orange-800 transition-colors"
-                          >
-                            <Truck className="w-3.5 h-3.5" />
-                          </button>
+                paginatedDeals.map((deal) => {
+                  const isItemNonSku = deal.isNonSku || deal.sku.startsWith('BBK-CUSTOM') || deal.sku.startsWith('INV-');
+                  return (
+                    <tr key={deal.sku} className="hover:bg-slate-850/50 transition-colors">
+                      <td className="py-3 px-3.5 font-mono font-bold text-amber-400">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span>{deal.sku}</span>
+                          {isItemNonSku && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-950/90 text-purple-300 border border-purple-800">
+                              Non-SKU
+                            </span>
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-slate-600 font-mono text-[11px]">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="py-3 px-3.5 max-w-xs">
+                        <p className="font-bold text-slate-200 line-clamp-1">{deal.productTitle}</p>
+                        <p className="text-[10px] text-slate-500 line-clamp-1">{deal.notes}</p>
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-300 font-mono text-[11px]">
+                        {deal.tanggalTerjual || '-'}
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-400 font-mono text-[11px]">
+                        {deal.durasiTerjual}
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-300">
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono font-bold text-[10px] text-indigo-300">
+                            {deal.asalGudang || 'GK'}
+                          </span>
+                          <span className="text-[11px] text-slate-300">
+                            {resolveLocationFromCode((deal.asalGudang || 'GK') as any)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3.5 text-right font-mono text-slate-400">
+                        {deal.hargaModal > 0 ? formatIDR(deal.hargaModal) : '-'}
+                      </td>
+                      <td className="py-3 px-3.5 text-right font-mono font-bold text-amber-400">
+                        {deal.hargaClosing > 0 ? formatIDR(deal.hargaClosing) : (deal.hargaModal > 0 ? formatIDR(deal.hargaModal) : '-')}
+                      </td>
+                      <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-400">
+                        {deal.realizedProfit > 0 ? (
+                          <span>
+                            +{formatIDR(deal.realizedProfit)} <span className="text-[10px] font-normal text-emerald-500/80">({deal.marginPercent}%)</span>
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="py-3 px-3.5 text-center">
+                        {deal.soldBy === 'SALES_BBK' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded text-[10px] font-bold">
+                            Sales BBK
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 bg-slate-950 text-slate-400 border border-slate-800 rounded text-[10px] font-bold">
+                            Pihak Ketiga
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3.5 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {isItemNonSku && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setResolveItem({
+                                  invoiceId: '',
+                                  invoiceNumber: deal.sku.replace('BBK-CUSTOM-', '').replace('INV-', '').split('_')[0],
+                                  customSku: deal.sku,
+                                  productTitle: deal.productTitle,
+                                  sellingPrice: deal.hargaClosing,
+                                  quantity: 1,
+                                  currentModal: deal.hargaModal,
+                                  isNonSku: true,
+                                });
+                                setIsResolveModalOpen(true);
+                              }}
+                              title="Rekonsiliasi / Resolve SKU Unit ini"
+                              className="p-1.5 rounded-lg bg-indigo-950/80 hover:bg-indigo-800 text-indigo-300 border border-indigo-800 transition-colors"
+                            >
+                              <Link2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {deal.soldBy === 'SALES_BBK' ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenDocFromDeal(deal, 'INVOICE')}
+                                title="Cetak Faktur Tagihan (Invoice)"
+                                className="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-800 text-amber-300 border border-amber-800 transition-colors"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenDocFromDeal(deal, 'DELIVERY_NOTE')}
+                                title="Cetak Surat Jalan Pengiriman"
+                                className="p-1.5 rounded-lg bg-orange-950/80 hover:bg-orange-800 text-orange-300 border border-orange-800 transition-colors"
+                              >
+                                <Truck className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            !isItemNonSku && <span className="text-slate-600 font-mono text-[11px]">-</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -1913,6 +1951,21 @@ export function FinanceDashboard() {
           isOpen={isDocModalOpen}
           initialType={documentModalType}
           onClose={() => setIsDocModalOpen(false)}
+        />
+      )}
+
+      {/* RESOLVE NON-SKU MODAL */}
+      {resolveItem && (
+        <ResolveNonSkuModal
+          isOpen={isResolveModalOpen}
+          item={resolveItem}
+          onClose={() => {
+            setIsResolveModalOpen(false);
+            setResolveItem(null);
+          }}
+          onSuccess={() => {
+            loadData();
+          }}
         />
       )}
     </div>

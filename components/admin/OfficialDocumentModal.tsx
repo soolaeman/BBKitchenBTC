@@ -28,6 +28,8 @@ interface OfficialDocumentModalProps {
   initialType?: DocumentType;
 }
 
+import { parseToISODate } from '@/lib/repositories/google-sheets-invoices';
+
 export function OfficialDocumentModal({
   invoice,
   isOpen,
@@ -51,6 +53,18 @@ export function OfficialDocumentModal({
     month: 'long',
     year: 'numeric',
   });
+
+  const rawIssue = parseToISODate(invoice.issueDate) || invoice.issueDate;
+  const issueDateObj = rawIssue ? new Date(rawIssue) : now;
+  const formattedIssueDate = (!isNaN(issueDateObj.getTime()))
+    ? issueDateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+    : todayFormatted;
+
+  const rawDue = parseToISODate(invoice.dueDate);
+  const dueDateObj = rawDue ? new Date(rawDue) : null;
+  const formattedDueDate = (dueDateObj && !isNaN(dueDateObj.getTime()))
+    ? dueDateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+    : '3 Hari Kerja';
 
   // Calculate numbers
   const subtotal = invoice.subtotal || invoice.totalAmount;
@@ -330,11 +344,11 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                 {docNumber}
               </p>
               <p className="text-xs text-slate-600">
-                Tanggal: <strong className="text-slate-900">{todayFormatted}</strong>
+                Tanggal: <strong className="text-slate-900">{formattedIssueDate}</strong>
               </p>
               {activeType === 'INVOICE' && (
                 <p className="text-xs text-slate-600">
-                  Jatuh Tempo: <strong className="text-red-600">{invoice.dueDate || '3 Hari Kerja'}</strong>
+                  Jatuh Tempo: <strong className="text-red-600">{formattedDueDate}</strong>
                 </p>
               )}
               {activeType === 'QUOTATION' && (

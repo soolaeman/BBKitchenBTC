@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { Invoice, InvoiceItem, InvoiceStatus, DocumentType, PaymentRecord } from '@/lib/types/finance';
 import { MasterInventoryItem } from '@/lib/types/inventory';
 import { formatIDR } from '@/lib/repositories/warehouse-utils';
+import { parseToISODate } from '@/lib/repositories/google-sheets-invoices';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
 import {
   FileText,
@@ -67,6 +68,7 @@ export function InvoiceManager() {
 
   // New Document Form States
   const [formDocType, setFormDocType] = useState<DocumentType>('INVOICE');
+  const [formIssueDate, setFormIssueDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
@@ -167,6 +169,7 @@ export function InvoiceManager() {
   const handleConvertQuotationToInvoice = (quotation: Invoice) => {
     setEditingInvoice(null);
     setFormDocType('INVOICE');
+    setFormIssueDate(new Date().toISOString().split('T')[0]);
     setCustomerName(quotation.customerName || '');
     setCustomerPhone(quotation.customerPhone || '');
     setCustomerAddress(quotation.customerAddress || '');
@@ -208,6 +211,7 @@ export function InvoiceManager() {
   const handleOpenEditModal = (inv: Invoice) => {
     setEditingInvoice(inv);
     setFormDocType(inv.documentType === 'QUOTATION' ? 'QUOTATION' : 'INVOICE');
+    setFormIssueDate(parseToISODate(inv.issueDate) || inv.issueDate || new Date().toISOString().split('T')[0]);
     setCustomerName(inv.customerName || '');
     setCustomerPhone(inv.customerPhone || '');
     setCustomerAddress(inv.customerAddress || '');
@@ -767,7 +771,9 @@ export function InvoiceManager() {
                           {inv.items.map((i) => `${i.sku} (${i.quantity} unit)`).join(', ')}
                         </p>
                       </td>
-                      <td className="py-3 px-3.5 font-mono text-slate-300">{inv.issueDate}</td>
+                      <td className="py-3 px-3.5 font-mono text-slate-300">
+                        {parseToISODate(inv.issueDate) || inv.issueDate}
+                      </td>
                       <td className="py-3 px-3.5 text-right font-mono font-bold text-white">
                         {formatIDR(inv.totalAmount)}
                       </td>
@@ -986,7 +992,19 @@ export function InvoiceManager() {
                 <span className="font-bold text-slate-300 uppercase tracking-wider text-[10px] block">
                   👤 Informasi Pembeli & Alamat Pengiriman
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">
+                      📅 Tanggal Dokumen *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={formIssueDate}
+                      onChange={(e) => setFormIssueDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:ring-1 focus:ring-amber-500 font-mono text-xs"
+                    />
+                  </div>
                   <div>
                     <label className="block text-slate-400 font-semibold mb-1">
                       Nama Pembeli / Owner Resto *
@@ -1076,7 +1094,7 @@ export function InvoiceManager() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                         {/* Product Title Input */}
-                        <div className="sm:col-span-5">
+                        <div className="sm:col-span-6">
                           <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
                             Nama Unit / Deskripsi Barang *
                           </label>
@@ -1091,7 +1109,7 @@ export function InvoiceManager() {
                         </div>
 
                         {/* SKU Search Input */}
-                        <div className="sm:col-span-2 relative">
+                        <div className="sm:col-span-3 relative">
                           <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
                             Kode SKU (Opsional)
                           </label>
@@ -1160,25 +1178,6 @@ export function InvoiceManager() {
                             value={row.unitPrice || ''}
                             onChange={(e) => updateItemRow(row.id, 'unitPrice', Number(e.target.value))}
                             className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-emerald-400 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500 text-right"
-                          />
-                        </div>
-
-                        {/* Internal Modal / HPP Satuan */}
-                        <div className="sm:col-span-2">
-                          <div className="flex items-center justify-between mb-0.5">
-                            <label className="block text-[10px] text-amber-300/90 font-semibold">
-                              🔒 HPP Modal
-                            </label>
-                            <span className="text-[9px] text-slate-500 font-mono" title="Harga modal bersifat internal dan tidak tercetak di surat resmi/WA">
-                              (Internal)
-                            </span>
-                          </div>
-                          <input
-                            type="number"
-                            placeholder="0 (Opsional)"
-                            value={row.unitCost || ''}
-                            onChange={(e) => updateItemRow(row.id, 'unitCost', Number(e.target.value))}
-                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-amber-900/40 rounded-lg text-amber-300 font-mono text-xs focus:ring-1 focus:ring-amber-500 text-right"
                           />
                         </div>
                       </div>

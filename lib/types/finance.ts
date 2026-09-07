@@ -88,6 +88,7 @@ export interface ClosingDealItem {
   durasiTerjual?: string | number;
   lokasiGudang: string;
   asalGudang?: string;
+  quantity?: number; // Real physical unit count
   hargaModal: number;
   hargaClosing: number;
   realizedProfit: number;
@@ -95,6 +96,27 @@ export interface ClosingDealItem {
   soldBy: 'SALES_BBK' | 'THIRD_PARTY';
   customerName?: string;
   notes?: string;
+  isNonSku?: boolean;
+  invoiceNumber?: string;
+  invoiceId?: string;
+}
+
+export interface NonSkuTransaction {
+  id: string;
+  invoiceNumber: string;
+  invoiceId?: string;
+  tanggal: string; // YYYY-MM-DD
+  itemTitle: string;
+  skuTemp: string; // e.g. BBK-CUSTOM-3
+  quantity: number;
+  hppModal: number;
+  hargaJual: number;
+  realizedProfit: number;
+  vendorBengkel?: string;
+  customerName?: string;
+  notes?: string;
+  resolvedAt: string;
+  resolvedBy: string;
 }
 
 export interface FinancialKPIs {

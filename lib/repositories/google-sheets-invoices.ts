@@ -1,5 +1,48 @@
-import { Invoice, InvoiceStatus, InvoiceItem, DocumentType, PaymentRecord } from '@/lib/types/finance';
+import { Invoice, InvoiceStatus, InvoiceItem, DocumentType, PaymentRecord, NonSkuTransaction } from '@/lib/types/finance';
 import { getSheetsClient, updateGoogleSheetsStockStatus } from './google-sheets-inventory';
+
+// Bulletproof Date Normalizer for Excel Serials, ISO Strings, Timestamps
+export function parseToISODate(raw: any): string | undefined {
+  if (!raw) return undefined;
+  const str = String(raw).trim();
+  if (!str) return undefined;
+
+  // 1. Check if numeric serial (e.g. 45918 or 46272)
+  const num = Number(str);
+  if (!isNaN(num) && num > 30000 && num < 60000) {
+    // Excel base date is Dec 30, 1899 (25569 days from Jan 1 1970)
+    const jsDate = new Date((num - 25569) * 86400 * 1000);
+    if (!isNaN(jsDate.getTime())) {
+      return jsDate.toISOString().split('T')[0];
+    }
+  }
+
+  // 2. Check standard ISO or YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    const y = isoMatch[1];
+    const m = isoMatch[2].padStart(2, '0');
+    const d = isoMatch[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 3. Check DD-MM-YYYY or DD/MM/YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    const d = dmyMatch[1].padStart(2, '0');
+    const m = dmyMatch[2].padStart(2, '0');
+    const y = dmyMatch[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // 4. Try native Date constructor
+  const d = new Date(str.replace(/\./g, ':'));
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0];
+  }
+
+  return str;
+}
 
 const INVOICE_SHEET_NAME = 'INVOICE_ARCHIVE';
 const INVOICE_RANGE = `${INVOICE_SHEET_NAME}!A:AB`;
@@ -35,7 +78,27 @@ const INVOICE_HEADERS = [
   'PAYMENTS_JSON',
 ];
 
+const NON_SKU_SHEET_NAME = 'TRANSAKSI_NON_SKU';
+const NON_SKU_RANGE = `${NON_SKU_SHEET_NAME}!A:N`;
+const NON_SKU_HEADERS = [
+  'ID',
+  'INVOICE_NUMBER',
+  'INVOICE_ID',
+  'TANGGAL',
+  'NAMA_BARANG_CUSTOM',
+  'SKU_TEMP',
+  'QTY',
+  'HPP_MODAL',
+  'HARGA_JUAL',
+  'LABA_BERSIH',
+  'VENDOR_BENGKEL',
+  'NAMA_PEMBELI',
+  'CATATAN',
+  'RESOLVED_AT',
+];
+
 let sheetEnsured = false;
+let nonSkuSheetEnsured = false;
 
 async function ensureInvoiceSheetExists(spreadsheetId: string) {
   if (sheetEnsured) return;
@@ -83,6 +146,52 @@ async function ensureInvoiceSheetExists(spreadsheetId: string) {
   }
 }
 
+async function ensureNonSkuSheetExists(spreadsheetId: string) {
+  if (nonSkuSheetEnsured) return;
+  try {
+    const sheets = getSheetsClient();
+    const metadata = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'sheets.properties.title',
+    });
+
+    const sheetTitles = (metadata.data.sheets || []).map((s) => s.properties?.title);
+    if (!sheetTitles.includes(NON_SKU_SHEET_NAME)) {
+      // Create TRANSAKSI_NON_SKU tab
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: NON_SKU_SHEET_NAME,
+                  gridProperties: {
+                    frozenRowCount: 1,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      // Write Header Row
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${NON_SKU_SHEET_NAME}!A1:N1`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [NON_SKU_HEADERS],
+        },
+      });
+    }
+    nonSkuSheetEnsured = true;
+  } catch (err) {
+    console.warn('Could not auto-create TRANSAKSI_NON_SKU sheet tab:', err);
+  }
+}
+
 function parseItemsJson(raw: string): InvoiceItem[] {
   if (!raw) return [];
   try {
@@ -126,19 +235,23 @@ function rowToInvoice(row: any[]): Invoice {
   const items = parseItemsJson(v(8));
   const subtotal = num(9);
   const totalAmount = num(13) || subtotal;
-  const rawDate = v(3) || new Date().toISOString().split('T')[0];
+  const rawDate = v(3);
+  const cleanDate = parseToISODate(rawDate) || new Date().toISOString().split('T')[0];
   const dpVal = num(14);
-  const payments = parsePaymentsJson(v(27), dpVal, rawDate);
+  const payments = parsePaymentsJson(v(27), dpVal, cleanDate);
   const totalPaid = payments.length > 0
     ? payments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
     : dpVal;
+
+  const rawPaidDate = v(17);
+  const cleanPaidDate = parseToISODate(rawPaidDate) || (v(16) === 'PAID' ? cleanDate : undefined);
 
   return {
     id: v(0),
     invoiceNumber: v(1),
     documentType: (v(2) || 'INVOICE') as DocumentType,
-    issueDate: rawDate,
-    dueDate: rawDate,
+    issueDate: cleanDate,
+    dueDate: parseToISODate(v(3)) || cleanDate,
     customerName: v(4),
     customerPhone: v(5),
     customerAddress: v(6),
@@ -164,7 +277,7 @@ function rowToInvoice(row: any[]): Invoice {
     remainingAmount: Math.max(0, totalAmount - totalPaid),
     payments,
     status: (v(16) || 'ISSUED') as InvoiceStatus,
-    paidDate: v(17) || undefined,
+    paidDate: cleanPaidDate,
     paymentMethod: (v(18) || 'TRANSFER_JAGO_SYARIAH') as any,
     deliveryExpedition: v(19) || undefined,
     deliveryDriver: v(20) || undefined,
@@ -504,6 +617,184 @@ export async function deleteGoogleSheetsInvoice(idOrNumber: string): Promise<boo
     return true;
   } catch (err) {
     console.error('Failed to delete invoice from Google Sheets:', err);
+    return false;
+  }
+}
+
+function rowToNonSkuTransaction(row: any[]): NonSkuTransaction {
+  const v = (idx: number) => String(row[idx] ?? '').trim();
+  const num = (idx: number) => {
+    const raw = String(row[idx] ?? '').replace(/[^0-9.-]/g, '');
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const rawDate = v(3);
+  const cleanDate = parseToISODate(rawDate) || new Date().toISOString().split('T')[0];
+
+  return {
+    id: v(0),
+    invoiceNumber: v(1),
+    invoiceId: v(2) || undefined,
+    tanggal: cleanDate,
+    itemTitle: v(4),
+    skuTemp: v(5) || 'BBK-CUSTOM',
+    quantity: num(6) || 1,
+    hppModal: num(7),
+    hargaJual: num(8),
+    realizedProfit: num(9) || Math.max(0, num(8) - num(7)),
+    vendorBengkel: v(10) || undefined,
+    customerName: v(11) || undefined,
+    notes: v(12) || undefined,
+    resolvedAt: parseToISODate(v(13)) || new Date().toISOString().split('T')[0],
+    resolvedBy: 'ADMIN',
+  };
+}
+
+function nonSkuTransactionToRow(tx: NonSkuTransaction): any[] {
+  return [
+    tx.id,
+    tx.invoiceNumber,
+    tx.invoiceId || '',
+    tx.tanggal || new Date().toISOString().split('T')[0],
+    tx.itemTitle,
+    tx.skuTemp || 'BBK-CUSTOM',
+    tx.quantity || 1,
+    tx.hppModal || 0,
+    tx.hargaJual || 0,
+    tx.realizedProfit ?? Math.max(0, (tx.hargaJual || 0) - (tx.hppModal || 0)),
+    tx.vendorBengkel || '',
+    tx.customerName || '',
+    tx.notes || '',
+    tx.resolvedAt || new Date().toISOString().split('T')[0],
+  ];
+}
+
+export async function fetchGoogleSheetsNonSkuTransactions(): Promise<NonSkuTransaction[]> {
+  const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
+  if (!spreadsheetId) return [];
+
+  try {
+    await ensureNonSkuSheetExists(spreadsheetId);
+    const sheets = getSheetsClient();
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${NON_SKU_SHEET_NAME}!A2:N`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    });
+
+    const rows = res.data.values || [];
+    return rows
+      .filter((r) => Boolean(r[0]))
+      .map((r) => rowToNonSkuTransaction(r))
+      .reverse();
+  } catch (err) {
+    console.warn('Failed to fetch Non-SKU transactions from Google Sheets:', err);
+    return [];
+  }
+}
+
+export async function saveGoogleSheetsNonSkuTransaction(tx: NonSkuTransaction): Promise<boolean> {
+  const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
+  if (!spreadsheetId) return false;
+
+  try {
+    await ensureNonSkuSheetExists(spreadsheetId);
+    const sheets = getSheetsClient();
+
+    // Check if ID or invoiceNumber + skuTemp exists to update or append
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${NON_SKU_SHEET_NAME}!A:F`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    });
+
+    const rows = res.data.values || [];
+    const targetIdx = rows.findIndex(
+      (r, idx) =>
+        idx > 0 &&
+        (String(r[0]).trim() === tx.id ||
+          (String(r[1]).trim() === tx.invoiceNumber && String(r[5]).trim() === tx.skuTemp))
+    );
+
+    const row = nonSkuTransactionToRow(tx);
+
+    if (targetIdx !== -1) {
+      const sheetRowNumber = targetIdx + 1;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${NON_SKU_SHEET_NAME}!A${sheetRowNumber}:N${sheetRowNumber}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [row] },
+      });
+    } else {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: NON_SKU_RANGE,
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: { values: [row] },
+      });
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Failed to save Non-SKU transaction to Google Sheets:', err);
+    return false;
+  }
+}
+
+export async function deleteGoogleSheetsNonSkuTransaction(id: string): Promise<boolean> {
+  const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
+  if (!spreadsheetId) return false;
+
+  try {
+    await ensureNonSkuSheetExists(spreadsheetId);
+    const sheets = getSheetsClient();
+
+    const metadata = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'sheets.properties',
+    });
+    const sheetObj = (metadata.data.sheets || []).find(
+      (s) => s.properties?.title === NON_SKU_SHEET_NAME
+    );
+    const sheetId = sheetObj?.properties?.sheetId;
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${NON_SKU_SHEET_NAME}!A2:N`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    });
+
+    const rows = res.data.values || [];
+    const targetIdx = rows.findIndex((r) => String(r[0]).trim() === id);
+
+    if (targetIdx === -1) return false;
+
+    if (sheetId !== undefined && sheetId !== null) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId,
+                  dimension: 'ROWS',
+                  startIndex: targetIdx + 1,
+                  endIndex: targetIdx + 2,
+                },
+              },
+            },
+          ],
+        },
+      });
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Failed to delete Non-SKU transaction from Google Sheets:', err);
     return false;
   }
 }
