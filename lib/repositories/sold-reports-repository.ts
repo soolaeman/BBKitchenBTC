@@ -140,12 +140,8 @@ export async function getPendingSoldReports(forceRefresh = false): Promise<Pendi
     cachedSoldReports = { data: pending, timestamp: now };
     return pending;
   } catch (err: any) {
-    if (cachedSoldReports && (err?.message?.includes('Quota exceeded') || err?.status === 429 || err?.code === 429)) {
-      console.warn('Google Sheets quota exceeded, serving cached sold reports gracefully');
-      return cachedSoldReports.data;
-    }
-    console.warn('Failed to get pending sold reports from Google Sheets:', err);
-    return cachedSoldReports?.data || [];
+    console.error('Failed to get pending sold reports from Google Sheets:', err);
+    throw err;
   }
 }
 

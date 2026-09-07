@@ -218,11 +218,7 @@ export async function getGoogleSheetsInventory(forceRefresh = false): Promise<Ma
     lastInventoryFetchTime = now;
     return items;
   } catch (err: any) {
-    // If rate limited by Google Sheets (Quota Exceeded / 429), gracefully serve cache
-    if (cachedInventory && (err?.message?.includes("Quota exceeded") || err?.status === 429 || err?.code === 429)) {
-      console.warn("Google Sheets quota exceeded, serving cached inventory gracefully");
-      return cachedInventory;
-    }
+    console.error("Google Sheets inventory fetch error:", err);
     throw err;
   }
 }

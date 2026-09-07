@@ -325,12 +325,8 @@ export async function fetchGoogleSheetsInvoices(forceRefresh = false): Promise<I
     cachedInvoicesList = { data: invoices, timestamp: now };
     return invoices;
   } catch (err: any) {
-    if (cachedInvoicesList && (err?.message?.includes('Quota exceeded') || err?.status === 429 || err?.code === 429)) {
-      console.warn('Google Sheets quota exceeded, serving cached invoices gracefully');
-      return cachedInvoicesList.data;
-    }
-    console.warn('Failed to fetch invoices from Google Sheets:', err);
-    return cachedInvoicesList?.data || [];
+    console.error('Failed to fetch invoices from Google Sheets:', err);
+    throw err;
   }
 }
 
@@ -700,12 +696,8 @@ export async function fetchGoogleSheetsNonSkuTransactions(forceRefresh = false):
     cachedNonSkuList = { data: txs, timestamp: now };
     return txs;
   } catch (err: any) {
-    if (cachedNonSkuList && (err?.message?.includes('Quota exceeded') || err?.status === 429 || err?.code === 429)) {
-      console.warn('Google Sheets quota exceeded, serving cached non-sku transactions gracefully');
-      return cachedNonSkuList.data;
-    }
-    console.warn('Failed to fetch Non-SKU transactions from Google Sheets:', err);
-    return cachedNonSkuList?.data || [];
+    console.error('Failed to fetch Non-SKU transactions from Google Sheets:', err);
+    throw err;
   }
 }
 
