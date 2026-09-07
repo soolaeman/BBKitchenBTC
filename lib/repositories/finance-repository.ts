@@ -136,13 +136,6 @@ export async function getLiveClosingDealLedger(): Promise<{
   try {
     const rawItems = await getGoogleSheetsInventory();
     const soldItems = rawItems.filter((i) => i.STATUS_UNIT === 'SOLD');
-
-    let totalRevenue = 0;
-    let totalProfit = 0;
-    let totalAging = 0;
-    let bbkSalesCount = 0;
-    let thirdPartyCount = 0;
-
     // 1. Fetch Google Sheets Inventory and Paid Invoices
     const matchedSkusSet = new Set<string>();
     const bbkInvoiceDeals: ClosingDealItem[] = [];
@@ -245,7 +238,7 @@ export async function getLiveClosingDealLedger(): Promise<{
     }
 
     // 2. Add remaining Third-Party sold items (excluding SKUs already sold via BBKitchen invoices)
-    totalAging = 0;
+    let totalAging = 0;
     const thirdPartyDeals: ClosingDealItem[] = soldItems
       .filter((item) => !matchedSkusSet.has(item.SKU.trim().toUpperCase()))
       .map((item) => {
