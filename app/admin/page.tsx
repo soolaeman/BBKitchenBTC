@@ -137,9 +137,9 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0c0c0e] text-white flex flex-col font-sans">
+    <div className="h-screen bg-[#0c0c0e] text-white flex flex-col font-sans overflow-hidden">
       {/* Top Bar for Role Switching & System Status */}
-      <div className="bg-[#141417] border-b border-white/[0.08] px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="shrink-0 bg-[#141417] border-b border-white/[0.08] px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs z-30">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 font-bold text-white tracking-wider font-mono text-[11px]">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -164,9 +164,9 @@ export default function AdminPage() {
       </div>
 
       {/* Main App Container with Responsive Layout */}
-      <div className="flex-1 flex flex-col lg:flex-row">
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
         {/* Mobile Dropdown Navigation (Visible ONLY on Mobile & Tablet) */}
-        <div className="lg:hidden bg-[#141417] border-b border-white/[0.08] p-3.5 sticky top-0 z-30 shadow-xl space-y-2">
+        <div className="lg:hidden shrink-0 bg-[#141417] border-b border-white/[0.08] p-3.5 z-30 shadow-xl space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[10px] uppercase tracking-widest text-[#3b82f6] font-bold">
               PILIH MODUL DASHBOARD:
@@ -198,7 +198,7 @@ export default function AdminPage() {
         </div>
 
         {/* Executive Sidebar (Visible ONLY on Desktop) */}
-        <aside className="hidden lg:flex w-72 bg-[#141417] border-r border-white/[0.08] flex-col justify-between shrink-0 p-6">
+        <aside className="hidden lg:flex w-72 bg-[#141417] border-r border-white/[0.08] flex-col justify-between shrink-0 p-6 h-full overflow-y-auto">
           <div className="space-y-6">
             {/* Brand Header */}
             <div className="brand mb-6">
@@ -257,9 +257,9 @@ export default function AdminPage() {
         </aside>
 
         {/* Content Area */}
-        <main className="flex-1 flex flex-col bg-[#0c0c0e] min-w-0">
+        <main className="flex-1 flex flex-col bg-[#0c0c0e] min-w-0 h-full overflow-hidden">
           {/* Header Bar */}
-          <header className="h-20 bg-[#0c0c0e] border-b border-white/[0.08] flex items-center justify-between px-6 sm:px-10">
+          <header className="h-20 bg-[#0c0c0e] border-b border-white/[0.08] flex items-center justify-between px-6 sm:px-10 shrink-0 z-20">
             <div>
               <h1 className="text-base sm:text-lg font-bold text-white tracking-tight uppercase">
                 {navItems.find((n) => n.id === activeTab)?.label}
@@ -285,7 +285,7 @@ export default function AdminPage() {
           </header>
 
           {/* Body Content Scrollable Container */}
-          <div className="flex-1 p-6 sm:p-10 space-y-6 overflow-y-auto">
+          <div className="flex-1 p-6 sm:p-10 space-y-6 overflow-y-auto min-h-0">
             {activeTab === 'OVERVIEW' && <FinanceDashboard />}
             {activeTab === 'INVENTORY' && <InventoryTable />}
             {activeTab === 'PIPELINE' && <PipelineMonitor />}
