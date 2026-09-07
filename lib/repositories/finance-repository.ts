@@ -1,4 +1,4 @@
-import { Invoice, FinancialKPIs, ClosingDealItem, InvoiceStatus, NonSkuTransaction } from '@/lib/types/finance';
+import { Invoice, InvoiceItem, FinancialKPIs, ClosingDealItem, InvoiceStatus, NonSkuTransaction } from '@/lib/types/finance';
 import { getRawMasterInventory } from './inventory-repository';
 import { getGoogleSheetsInventory, updateGoogleSheetsStockStatus } from './google-sheets-inventory';
 
