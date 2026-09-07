@@ -118,7 +118,7 @@ export function ResolveNonSkuModal({
         const q = searchSku.toLowerCase().trim();
         const matchesSku = inv.SKU.toLowerCase().includes(q);
         const matchesTitle = inv.PRODUCT_TITLE.toLowerCase().includes(q);
-        const matchesNotes = (inv.SPESIFIKASI_RINGKAS || '').toLowerCase().includes(q);
+        const matchesNotes = (inv.SHORT_DESCRIPTION || inv.CATEGORY_NAME || '').toLowerCase().includes(q);
         return matchesSku || matchesTitle || matchesNotes;
       }
 
