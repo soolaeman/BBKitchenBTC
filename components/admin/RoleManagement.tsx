@@ -22,18 +22,20 @@ const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   VIEWER: 'Read-only dashboard access.',
 };
 
-const CAPABILITIES: Array<[keyof RolePermissions, string]> = [
-  ['canViewFinanceReports', 'Finance reports'],
-  ['canManageInvoices', 'Manage invoices'],
-  ['canEditInventory', 'Edit inventory'],
-  ['canMarkAsSold', 'Mark inventory as sold'],
-  ['canEditSEO', 'Edit SEO'],
-  ['canManageSocialMedia', 'Manage social media'],
-  ['canViewInternalCost', 'Internal cost'],
-  ['canViewSupplierData', 'Supplier data'],
+const CAPABILITIES: Array<{
+  label: string;
+  viewKey: keyof RolePermissions;
+  editKey?: keyof RolePermissions;
+}> = [
+  { label: 'Finance reports', viewKey: 'canViewFinanceReports' },
+  { label: 'Manage invoices', viewKey: 'canManageInvoices', editKey: 'canManageInvoices' },
+  { label: 'Edit inventory', viewKey: 'canEditInventory', editKey: 'canEditInventory' },
+  { label: 'Mark inventory as sold', viewKey: 'canMarkAsSold', editKey: 'canMarkAsSold' },
+  { label: 'Edit SEO', viewKey: 'canEditSEO', editKey: 'canEditSEO' },
+  { label: 'Manage social media', viewKey: 'canManageSocialMedia', editKey: 'canManageSocialMedia' },
+  { label: 'Internal cost', viewKey: 'canViewInternalCost' },
+  { label: 'Supplier data', viewKey: 'canViewSupplierData' },
 ];
-
-const STORAGE_KEY = 'bbk_role_permissions_overrides';
 
 type Overrides = Partial<Record<UserRole, Partial<RolePermissions>>>;
 
@@ -60,9 +62,23 @@ export function RoleManagement() {
   const updatePermission = (role: UserRole, key: keyof RolePermissions, value: boolean) => {
     setOverrides((current) => ({
       ...current,
-      [role]: { ...(current[role] || {}), [key]: value },
+      [role]: {
+        ...(current[role] || {}),
+        [key]: value,
+      },
     }));
     setSaved(false);
+  };
+
+  const toggleView = (role: UserRole, key: keyof RolePermissions, value: boolean) => {
+    updatePermission(role, key, value);
+  };
+
+  const toggleEdit = (role: UserRole, viewKey: keyof RolePermissions, editKey: keyof RolePermissions, value: boolean) => {
+    // Edit cannot exist without View.
+    const next = value ? true : false;
+    updatePermission(role, editKey, next);
+    if (value) updatePermission(role, viewKey, true);
   };
 
   const save = () => {
@@ -116,13 +132,22 @@ export function RoleManagement() {
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#141417]">
-        <table className="w-full min-w-[900px] text-left">
+        <table className="w-full min-w-[1100px] text-left">
           <thead className="border-b border-white/[0.08] bg-white/[0.02]">
             <tr>
               <th className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/40">Role</th>
-              {CAPABILITIES.map(([, label]) => (
-                <th key={label} className="px-3 py-3 text-[10px] uppercase tracking-wider text-white/40">{label}</th>
+              {CAPABILITIES.map((cap) => (
+                <th key={cap.label} colSpan={2} className="border-l border-white/[0.06] px-3 py-3 text-center text-[10px] uppercase tracking-wider text-white/40">
+                  {cap.label}
+                </th>
               ))}
+            </tr>
+            <tr className="border-b border-white/[0.05] bg-white/[0.015]">
+              <th />
+              {CAPABILITIES.flatMap((cap) => [
+                <th key={cap.label + '-view'} className="border-l border-white/[0.06] px-2 py-2 text-[9px] text-white/30">Lihat</th>,
+                <th key={cap.label + '-edit'} className="px-2 py-2 text-[9px] text-white/30">Edit</th>,
+              ])}
             </tr>
           </thead>
           <tbody>
@@ -137,33 +162,46 @@ export function RoleManagement() {
                     <div className="mt-1 max-w-[180px] text-[11px] leading-4 text-white/40">{ROLE_DESCRIPTIONS[role]}</div>
                     {ownerRow && <div className="mt-2 inline-block rounded bg-emerald-950/60 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-emerald-300">Owner</div>}
                   </td>
-                  {CAPABILITIES.map(([key]) => (
-                    <td key={key} className="px-3 py-4 align-top">
-                      <button
-                        type="button"
-                        disabled={ownerRow}
-                        onClick={() => updatePermission(role, key, !permissions[key])}
-                        className={`rounded-md p-1.5 transition-colors ${ownerRow ? 'cursor-not-allowed opacity-40' : 'hover:bg-white/[0.06]'}`}
-                        aria-label={`${role}: ${key}`}
-                        title={ownerRow ? 'Owner selalu full access' : `Toggle ${key}`}
-                      >
-                        {permissions[key] ? (
-                          <Check className="h-4 w-4 text-emerald-400" />
+                  {CAPABILITIES.flatMap((cap) => {
+                    const canView = permissions[cap.viewKey];
+                    const canEdit = cap.editKey ? permissions[cap.editKey] : false;
+                    return [
+                      <td key={cap.label + '-view'} className="border-l border-white/[0.06] px-2 py-4 text-center">
+                        <button
+                          type="button"
+                          disabled={ownerRow}
+                          onClick={() => toggleView(role, cap.viewKey, !canView)}
+                          className={`rounded-md px-2 py-1 text-[10px] font-bold ${ownerRow ? 'cursor-not-allowed opacity-40' : 'hover:bg-white/[0.06]'}`}
+                          title={ownerRow ? 'Owner selalu full access' : 'Toggle hak lihat'}
+                        >
+                          {canView ? <Check className="mx-auto h-4 w-4 text-emerald-400" /> : <X className="mx-auto h-4 w-4 text-white/20" />}
+                        </button>
+                      </td>,
+                      <td key={cap.label + '-edit'} className="px-2 py-4 text-center">
+                        {cap.editKey ? (
+                          <button
+                            type="button"
+                            disabled={ownerRow}
+                            onClick={() => toggleEdit(role, cap.viewKey, cap.editKey!, !canEdit)}
+                            className={`rounded-md px-2 py-1 text-[10px] font-bold ${ownerRow ? 'cursor-not-allowed opacity-40' : 'hover:bg-white/[0.06]'}`}
+                            title={ownerRow ? 'Owner selalu full access' : 'Toggle hak edit'}
+                          >
+                            {canEdit ? <Check className="mx-auto h-4 w-4 text-emerald-400" /> : <X className="mx-auto h-4 w-4 text-white/20" />}
+                          </button>
                         ) : (
-                          <X className="h-4 w-4 text-white/20" />
+                          <span className="text-[10px] text-white/15">—</span>
                         )}
-                      </button>
-                    </td>
-                  ))}
+                      </td>,
+                    ];
+                  })}
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-
       <p className="text-[10px] font-mono uppercase tracking-wider text-white/30">
-        Perubahan disimpan di browser ini. API/server authorization tetap menjadi pengaman utama.
+        Edit otomatis mengaktifkan Lihat. Mematikan Lihat juga mematikan Edit. Pengaturan saat ini tersimpan di browser ini; server authorization tetap menjadi pengaman utama.
       </p>
     </section>
   );
