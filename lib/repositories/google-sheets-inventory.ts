@@ -634,6 +634,9 @@ export async function updateGoogleSheetsStockStatus(input: {
     dealPrice: input.dealPrice,
   }).catch((e) => console.warn("Stock sync trigger warning:", e));
 
+  // Invalidate in-memory cache so next read returns fresh mutated state immediately
+  invalidateInventoryCache();
+
   return { success: true };
 }
 
@@ -671,6 +674,8 @@ export async function updateGoogleSheetsPipelineStatus(input: {
     });
   }
 
+  invalidateInventoryCache();
+
   return { success: true };
 }
 
@@ -696,6 +701,8 @@ export async function updateGoogleSheetsTelegramAudit(
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [[timestampStr]] },
   });
+
+  invalidateInventoryCache();
 
   return { success: true };
 }

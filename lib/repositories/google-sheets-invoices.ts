@@ -396,6 +396,8 @@ export async function appendGoogleSheetsInvoice(invoice: Invoice): Promise<boole
       );
     }
 
+    invalidateInvoicesCache();
+
     return true;
   } catch (err) {
     console.error('Failed to append invoice to Google Sheets:', err);
@@ -444,6 +446,8 @@ export async function updateGoogleSheetsInvoiceStatus(
         values: [[status, finalPaidDate]],
       },
     });
+
+    invalidateInvoicesCache();
 
     return true;
   } catch (err) {
@@ -527,6 +531,8 @@ export async function updateGoogleSheetsInvoice(invoice: Invoice): Promise<boole
       }
     }
 
+    invalidateInvoicesCache();
+
     return true;
   } catch (err) {
     console.error('Failed to update full invoice in Google Sheets:', err);
@@ -595,6 +601,8 @@ export async function deleteGoogleSheetsInvoice(idOrNumber: string): Promise<boo
         },
       });
     }
+
+    invalidateInvoicesCache();
 
     return true;
   } catch (err) {
@@ -744,6 +752,8 @@ export async function saveGoogleSheetsNonSkuTransaction(tx: NonSkuTransaction): 
       });
     }
 
+    invalidateNonSkuCache();
+
     return true;
   } catch (err) {
     console.error('Failed to save Non-SKU transaction to Google Sheets:', err);
@@ -798,6 +808,8 @@ export async function deleteGoogleSheetsNonSkuTransaction(id: string): Promise<b
         },
       });
     }
+
+    invalidateNonSkuCache();
 
     return true;
   } catch (err) {
