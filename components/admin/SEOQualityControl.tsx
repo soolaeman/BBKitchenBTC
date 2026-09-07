@@ -22,6 +22,7 @@ import {
   initialRankings,
   initialOffPageSignals,
 } from '@/lib/repositories/seo-repository';
+import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import {
   SearchCode,
   CheckCircle2,
@@ -91,7 +92,7 @@ export function SEOQualityControl() {
   const [batchFixSuccessMsg, setBatchFixSuccessMsg] = useState('');
 
   // Pillar 1: Keywords state
-  const [keywordQuery, setKeywordQuery] = useState('combi oven bekas');
+  const [keywordQuery, setKeywordQuery] = useState('chiller stainless bekas');
   const [keywordSuggestions, setKeywordSuggestions] = useState<SEOKeywordItem[]>([]);
   const [isLoadingKeywords, setIsLoadingKeywords] = useState(false);
 
@@ -128,11 +129,26 @@ export function SEOQualityControl() {
   const [newArtTitle, setNewArtTitle] = useState('');
   const [newArtKeyword, setNewArtKeyword] = useState('');
   const [newArtIntent, setNewArtIntent] = useState<'COMMERCIAL' | 'INFORMATIONAL' | 'TRANSACTIONAL' | 'NAVIGATIONAL'>('COMMERCIAL');
-  const [newArtCategory, setNewArtCategory] = useState('combi-oven');
+  const [newArtCategory, setNewArtCategory] = useState('meja-stainless');
   const [newArtAuthor, setNewArtAuthor] = useState('Tim Editorial BBKitchen');
   const [newArtExcerpt, setNewArtExcerpt] = useState('');
   const [newArtContent, setNewArtContent] = useState('');
-  const [newArtSkus, setNewArtSkus] = useState('BBK-GK-COM-0007');
+  const [newArtSkus, setNewArtSkus] = useState('');
+
+  // Smart Contextual Product Link Injector State
+  const [injectedProducts, setInjectedProducts] = useState<Array<{
+    sku: string;
+    title: string;
+    price: string;
+    hub: string;
+    condition: string;
+    photo: string;
+    productUrl: string;
+    waLink: string;
+    markdownLink: string;
+  }>>([]);
+  const [isLoadingInjector, setIsLoadingInjector] = useState(false);
+  const [injectorMsg, setInjectorMsg] = useState('');
 
   const stages: ArticlePipelineStage[] = [
     'IDEA',
@@ -318,6 +334,57 @@ export function SEOQualityControl() {
     setNewArtKeyword('');
     setNewArtExcerpt('');
     setNewArtContent('');
+    setInjectedProducts([]);
+    setInjectorMsg('');
+  };
+
+  // Handle Smart Contextual Product Link Injector
+  const handleFetchProductLinks = async (categorySlug: string, keyword: string) => {
+    setIsLoadingInjector(true);
+    setInjectorMsg('');
+    try {
+      const res = await fetch('/api/seo/link-injector', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categorySlug, keyword, limit: 4 }),
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.recommendations) && data.recommendations.length > 0) {
+        setInjectedProducts(data.recommendations);
+        setInjectorMsg(`✓ Ditemukan ${data.recommendations.length} produk ready stock relevan di inventori!`);
+      } else {
+        setInjectedProducts([]);
+        setInjectorMsg('Tidak ada unit ready stock aktif yang cocok dengan kriteria ini.');
+      }
+    } catch (err) {
+      console.error('Error fetching product links', err);
+      setInjectorMsg('Gagal menghubungkan ke live inventori.');
+    } finally {
+      setIsLoadingInjector(false);
+    }
+  };
+
+  const handleInsertMarkdownLink = (markdownLink: string, sku: string) => {
+    setNewArtContent((prev) => (prev ? `${prev}\n\n${markdownLink}` : markdownLink));
+    setNewArtSkus((prev) => {
+      const existing = prev ? prev.split(',').map((s) => s.trim()) : [];
+      if (!existing.includes(sku)) {
+        return existing.length > 0 ? `${prev}, ${sku}` : sku;
+      }
+      return prev;
+    });
+  };
+
+  const handleInsertProductWidget = (prod: any) => {
+    const widgetSnippet = `\n\n> 📦 **Unit Rekomendasi Siap Pakai:**\n> **${prod.title}**\n> - **Harga:** ${prod.price}\n> - **Kondisi:** ${prod.condition}\n> - **Lokasi Hub:** ${prod.hub}\n> - **Lihat Produk:** [Buka Halaman Produk](${prod.productUrl})\n> - **Tanya Admin:** [Chat WhatsApp Langsung](${prod.waLink})\n`;
+    setNewArtContent((prev) => `${prev}${widgetSnippet}`);
+    setNewArtSkus((prev) => {
+      const existing = prev ? prev.split(',').map((s) => s.trim()) : [];
+      if (!existing.includes(prod.sku)) {
+        return existing.length > 0 ? `${prev}, ${prod.sku}` : prod.sku;
+      }
+      return prev;
+    });
   };
 
   // Schema generation
@@ -1347,7 +1414,7 @@ Sitemap: https://bukanbarukitchen.com/sitemap.xml`}
 
               <div className="flex items-center gap-2 text-xs font-mono">
                 <span className="px-2.5 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-lg">
-                  Target: 6 Klaster Utama
+                  Target: 10 Kategori Resmi & Landing Page
                 </span>
               </div>
             </div>
@@ -1356,21 +1423,25 @@ Sitemap: https://bukanbarukitchen.com/sitemap.xml`}
               <table className="w-full text-left text-xs border-collapse font-mono">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
-                    <th className="py-3 px-4">Kata Kunci Fokus Komersial</th>
-                    <th className="py-3 px-3">Target Klaster Kategori</th>
-                    <th className="py-3 px-3">Landing Page Terpetakan</th>
+                    <th className="py-3 px-4">Kata Kunci Pencarian Google Indonesia</th>
+                    <th className="py-3 px-3">Kategori Resmi</th>
+                    <th className="py-3 px-3">Landing Page URL</th>
                     <th className="py-3 px-3 text-right">Verifikasi SERP Live</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-sans">
                   {[
-                    { keyword: 'combi oven bekas restoran', category: 'Combi Oven & Steamer', path: '/category/combi-oven' },
-                    { keyword: 'chiller stainless 304 bekas', category: 'Commercial Refrigeration', path: '/category/refrigeration' },
-                    { keyword: 'kompor resto heavy duty bekas jakarta', category: 'Gas Range & Wok Burner', path: '/category/cooking-range' },
-                    { keyword: 'mesin espresso 2 group bekas cafe', category: 'Coffee & Beverage Machine', path: '/category/coffee-beverage' },
-                    { keyword: 'deep fryer gas bekas restoran', category: 'Commercial Deep Fryer', path: '/category/deep-fryer' },
-                    { keyword: 'ice maker scotsman bekas bergaransi', category: 'Commercial Ice Machine', path: '/category/ice-machine' },
-                    { keyword: 'meja stainless bekas restoran', category: 'Stainless Worktable & Sink', path: '/category/stainless-fabrication' },
+                    { keyword: 'meja stainless bekas restoran jabodetabek', category: 'Meja Stainless', path: '/product-category/meja-stainless' },
+                    { keyword: 'sink stainless cuci piring restoran bekas', category: 'Sink Stainless', path: '/product-category/sink-stainless' },
+                    { keyword: 'kompor resto heavy duty kwali range bekas', category: 'Kompor & Cooking', path: '/product-category/kompor' },
+                    { keyword: 'chiller undercounter upright bekas restoran', category: 'Chiller', path: '/product-category/chiller' },
+                    { keyword: 'chest freezer upright freezer bekas restoran', category: 'Freezer', path: '/product-category/freezer' },
+                    { keyword: 'showcase cake display 2 pintu bekas cafe', category: 'Showcase', path: '/product-category/showcase' },
+                    { keyword: 'rak stainless susun 4 tier bekas resto', category: 'Rak Stainless', path: '/product-category/rak-stainless' },
+                    { keyword: 'exhaust hood stainless ducting resto bekas', category: 'Hood Stainless & Ventilasi', path: '/product-category/hood-stainless' },
+                    { keyword: 'mesin ice maker bekas scotsman bergaransi', category: 'Ice System', path: '/product-category/ice-system' },
+                    { keyword: 'peralatan dapur restoran bekas lelang', category: 'Lelang Restoran', path: '/jual-barang-bekas-restoran' },
+                    { keyword: 'solusi paket peralatan dapur mbg spm', category: 'Program Dapur MBG', path: '/solusi-peralatan-dapur-mbg' },
                   ].map((rk, idx) => (
                     <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
                       <td className="py-3 px-4 text-white font-medium flex items-center gap-2 font-mono">
@@ -1568,18 +1639,17 @@ Sitemap: https://bukanbarukitchen.com/sitemap.xml`}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Pilar Kategori</label>
+                  <label className="block text-slate-300 font-bold mb-1">Pilar Kategori Resmi *</label>
                   <select
                     value={newArtCategory}
                     onChange={(e) => setNewArtCategory(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-amber-300 font-medium focus:outline-none focus:ring-1 focus:ring-amber-500"
                   >
-                    <option value="combi-oven">Combi Oven</option>
-                    <option value="refrigeration">Commercial Refrigeration</option>
-                    <option value="cooking-range">Cooking Range & Deep Fryer</option>
-                    <option value="coffee-beverage">Coffee & Beverage</option>
-                    <option value="bakery-pizza">Bakery & Pizza</option>
-                    <option value="ice-maker">Ice Maker</option>
+                    {OFFICIAL_CATEGORIES.map((g) => (
+                      <option key={g.slug} value={g.slug}>
+                        {g.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1595,13 +1665,90 @@ Sitemap: https://bukanbarukitchen.com/sitemap.xml`}
                 </div>
               </div>
 
+              {/* SMART CONTEXTUAL PRODUCT LINK INJECTOR */}
+              <div className="p-4 bg-slate-950/80 rounded-2xl border border-amber-500/30 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span className="font-bold text-white text-xs">
+                      ⚡ Smart Contextual Product Link Injector (Live Ready Stock)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleFetchProductLinks(newArtCategory, newArtKeyword)}
+                    disabled={isLoadingInjector}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[11px] shadow transition-colors disabled:opacity-50"
+                  >
+                    {isLoadingInjector ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        <span>Mencari Stok...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-3 h-3" />
+                        <span>Cari Unit Ready Terkait</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {injectorMsg && (
+                  <div className={`text-[11px] font-medium ${injectorMsg.startsWith('✓') ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    {injectorMsg}
+                  </div>
+                )}
+
+                {injectedProducts.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    {injectedProducts.map((prod) => (
+                      <div
+                        key={prod.sku}
+                        className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col justify-between gap-2"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] font-mono">
+                            <span className="text-amber-400 font-bold">{prod.sku}</span>
+                            <span className="text-slate-400">Hub {prod.hub}</span>
+                          </div>
+                          <div className="text-xs font-semibold text-white mt-1 line-clamp-1">
+                            {prod.title}
+                          </div>
+                          <div className="text-[11px] text-emerald-400 font-bold mt-0.5">
+                            {prod.price}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 pt-2 border-t border-slate-800/80">
+                          <button
+                            type="button"
+                            onClick={() => handleInsertMarkdownLink(prod.markdownLink, prod.sku)}
+                            className="flex-1 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold rounded-lg transition-colors text-center"
+                          >
+                            + Link Teks
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleInsertProductWidget(prod)}
+                            className="flex-1 py-1 bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold rounded-lg transition-colors text-center"
+                          >
+                            + Kartu & WA
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Related SKUs (Pisahkan Koma untuk Internal Link)</label>
+                <label className="block text-slate-300 font-bold mb-1">Related SKUs (Otomatis Terisi saat Sisipkan Produk)</label>
                 <input
                   type="text"
                   value={newArtSkus}
                   onChange={(e) => setNewArtSkus(e.target.value)}
-                  placeholder="BBK-GK-COM-0007, BBK-ML-REF-0021"
+                  placeholder="BBK-GK-MEJ-0001, BBK-PE-MEJ-0004"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:ring-1 focus:ring-amber-500"
                 />
               </div>
@@ -1620,11 +1767,11 @@ Sitemap: https://bukanbarukitchen.com/sitemap.xml`}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">Konten / Kerangka Artikel</label>
                 <textarea
-                  rows={4}
+                  rows={5}
                   value={newArtContent}
                   onChange={(e) => setNewArtContent(e.target.value)}
                   placeholder="Tulis draf atau outline artikel di sini..."
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
                 />
               </div>
 

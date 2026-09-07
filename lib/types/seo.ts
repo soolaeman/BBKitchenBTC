@@ -94,7 +94,7 @@ export interface TechnicalSEOAudit {
 export interface OffPageSignal {
   id: string;
   sourceDomain: string;
-  sourceType: 'MEDIA_CULINARY' | 'FORUM_RESTO' | 'DIRECTORY' | 'SOCIAL_SIGNAL';
+  sourceType: 'MEDIA_CULINARY' | 'FORUM_RESTO' | 'DIRECTORY' | 'SOCIAL_SIGNAL' | 'CITATIONS_LOCAL';
   targetUrl: string;
   anchorText: string;
   domainAuthority: number;

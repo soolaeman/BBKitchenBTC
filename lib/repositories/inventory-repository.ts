@@ -10,18 +10,18 @@ import {
 import { UserRole, ROLE_PERMISSIONS } from '@/lib/types/auth';
 import { resolveLocationFromCode } from './warehouse-utils';
 
-// Commercial kitchen equipment catalogs in Indonesia
+// Official commercial kitchen equipment categories in Bukan Baru Kitchen
 const CATEGORIES = [
-  { slug: 'combi-oven', name: 'Combi Oven & Steamer', keyword: 'combi oven bekas resto' },
-  { slug: 'refrigeration', name: 'Commercial Chiller & Freezer', keyword: 'chiller stainless bekas' },
-  { slug: 'cooking-range', name: 'Gas Range & Wok Burner', keyword: 'kompor resto heavy duty' },
-  { slug: 'bakery-equipment', name: 'Mixer & Bakery Deck Oven', keyword: 'mixer planetary bekas bakery' },
-  { slug: 'coffee-beverage', name: 'Commercial Espresso Machine', keyword: 'mesin kopi espresso bekas cafe' },
-  { slug: 'prep-machinery', name: 'Meat Slicer & Food Processor', keyword: 'meat slicer bekas restoran' },
-  { slug: 'stainless-fabrication', name: 'Stainless Worktable & Sink', keyword: 'meja stainless bekas resto' },
-  { slug: 'warewashing', name: 'Commercial Dishwasher', keyword: 'dishwasher resto under counter' },
-  { slug: 'deep-fryer', name: 'Commercial Deep Fryer Gas/Elec', keyword: 'deep fryer gas bekas' },
-  { slug: 'ice-machine', name: 'Commercial Ice Maker', keyword: 'mesin es batu cube bekas' },
+  { slug: 'meja-stainless', name: 'Meja Stainless', keyword: 'meja stainless bekas restoran' },
+  { slug: 'sink-stainless', name: 'Sink Stainless', keyword: 'sink cuci piring stainless bekas' },
+  { slug: 'kompor', name: 'Kompor & Cooking', keyword: 'kompor resto heavy duty bekas' },
+  { slug: 'chiller', name: 'Chiller', keyword: 'chiller stainless bekas restoran' },
+  { slug: 'freezer', name: 'Freezer', keyword: 'upright freezer bekas resto' },
+  { slug: 'showcase', name: 'Showcase', keyword: 'showcase display cake bekas' },
+  { slug: 'rak-stainless', name: 'Rak Stainless', keyword: 'rak stainless susun bekas' },
+  { slug: 'hood-stainless', name: 'Hood Stainless & Exhaust', keyword: 'exhaust hood stainless resto' },
+  { slug: 'ice-system', name: 'Ice System & Maker', keyword: 'mesin ice maker bekas resto' },
+  { slug: 'peralatan-dapur-bekas-lainnya', name: 'Peralatan Dapur Lainnya', keyword: 'peralatan dapur bekas restoran' },
 ];
 
 const BRANDS = [
@@ -204,6 +204,10 @@ export function getRawMasterInventory(): MasterInventoryItem[] {
     cachedInventory = generateMasterInventory(2750);
   }
   return cachedInventory;
+}
+
+export function getMasterInventory(): MasterInventoryItem[] {
+  return getRawMasterInventory();
 }
 
 /**
