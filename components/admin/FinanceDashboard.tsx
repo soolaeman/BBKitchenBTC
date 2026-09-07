@@ -1734,16 +1734,8 @@ export function FinanceDashboard() {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           type="button"
-                          onClick={() => handleOpenDocFromDeal(deal, 'RECEIPT')}
-                          title="Cetak Kuitansi Lunas"
-                          className="p-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-800 text-emerald-300 border border-emerald-800 transition-colors"
-                        >
-                          <Receipt className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => handleOpenDocFromDeal(deal, 'INVOICE')}
-                          title="Cetak Invoice"
+                          title="Cetak Faktur Tagihan (Invoice)"
                           className="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-800 text-amber-300 border border-amber-800 transition-colors"
                         >
                           <FileText className="w-3.5 h-3.5" />
@@ -1751,7 +1743,7 @@ export function FinanceDashboard() {
                         <button
                           type="button"
                           onClick={() => handleOpenDocFromDeal(deal, 'DELIVERY_NOTE')}
-                          title="Cetak Surat Jalan"
+                          title="Cetak Surat Jalan Pengiriman"
                           className="p-1.5 rounded-lg bg-orange-950/80 hover:bg-orange-800 text-orange-300 border border-orange-800 transition-colors"
                         >
                           <Truck className="w-3.5 h-3.5" />

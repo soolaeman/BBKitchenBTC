@@ -318,14 +318,11 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
               <span className={`inline-block px-3 py-1 border rounded text-xs font-black tracking-widest uppercase ${
                 activeType === 'INVOICE'
                   ? 'bg-amber-100 border-amber-300 text-amber-950'
-                  : activeType === 'RECEIPT'
-                  ? 'bg-emerald-100 border-emerald-300 text-emerald-950'
                   : activeType === 'QUOTATION'
                   ? 'bg-blue-100 border-blue-300 text-blue-950'
                   : 'bg-orange-100 border-orange-300 text-orange-950'
               }`}>
                 {activeType === 'INVOICE' && 'FAKTUR TAGIHAN RESMI (INVOICE)'}
-                {activeType === 'RECEIPT' && (dp >= total ? 'KUITANSI PEMBAYARAN LUNAS' : 'KUITANSI PEMBAYARAN BERKALA (DP)')}
                 {activeType === 'QUOTATION' && 'SURAT PENAWARAN HARGA (QUOTATION)'}
                 {activeType === 'DELIVERY_NOTE' && 'SURAT JALAN PENGIRIMAN UNIT'}
               </span>
@@ -338,11 +335,6 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
               {activeType === 'INVOICE' && (
                 <p className="text-xs text-slate-600">
                   Jatuh Tempo: <strong className="text-red-600">{invoice.dueDate || '3 Hari Kerja'}</strong>
-                </p>
-              )}
-              {activeType === 'RECEIPT' && (
-                <p className="text-xs text-emerald-800 font-bold">
-                  Ref. Faktur: <span>{invoice.invoiceNumber}</span>
                 </p>
               )}
               {activeType === 'QUOTATION' && (
@@ -398,17 +390,17 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                   <span className="inline-block px-3 py-1 bg-orange-100 text-orange-800 border border-orange-300 rounded font-black text-xs uppercase tracking-widest">
                     SIAP KIRIM • LOLOS QC
                   </span>
-                ) : activeType === 'RECEIPT' || invoice.status === 'PAID' || dp >= total ? (
+                ) : isFullyPaid ? (
                   <span className="inline-block px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded font-black text-xs uppercase tracking-widest">
                     ✓ LUNAS / PAID IN FULL
                   </span>
-                ) : dp > 0 ? (
+                ) : totalPaid > 0 ? (
                   <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 border border-blue-300 rounded font-black text-xs uppercase tracking-widest">
-                    DP DITERIMA ({Math.round((dp / total) * 100)}%)
+                    DP DITERIMA ({total > 0 ? Math.round((totalPaid / total) * 100) : 0}%)
                   </span>
                 ) : (
                   <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 border border-amber-300 rounded font-black text-xs uppercase tracking-widest">
-                    MENUNGGU DP (&gt;50%)
+                    MENUNGGU DP / PEMBAYARAN
                   </span>
                 )}
               </div>
