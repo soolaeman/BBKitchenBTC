@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getRawMasterInventory } from '@/lib/repositories/inventory-repository';
+import { getLiveMasterInventory } from '@/lib/repositories/inventory-repository';
+import { matchOfficialCategory, OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { auditProductSEO } from '@/lib/repositories/seo-repository';
 
 export async function GET() {
   try {
-    const allItems = getRawMasterInventory();
+    const allItems = await getLiveMasterInventory();
     const totalCount = allItems.length;
 
     let healthyCount = 0;
@@ -15,7 +16,16 @@ export async function GET() {
     let missingKeywordCount = 0;
     let totalScoreSum = 0;
 
+    // Initialize map for all 10 official categories
     const categoryMap = new Map<string, { name: string; count: number; totalScore: number }>();
+    for (const cat of OFFICIAL_CATEGORIES) {
+      categoryMap.set(cat.slug, {
+        name: cat.name,
+        count: 0,
+        totalScore: 0,
+      });
+    }
+
     const problemItems: Array<{
       sku: string;
       title: string;
@@ -35,28 +45,28 @@ export async function GET() {
       else problemCount++;
 
       if (!report.imageAltPresent) missingAltCount++;
-      if (!report.metaDescription || report.metaDescription.length < 50) missingYoastDescCount++;
+      if (!report.metaDescription || report.metaDescription.length < 30) missingYoastDescCount++;
       if (!report.focusKeyword) missingKeywordCount++;
 
-      // Category aggregation
-      const catKey = item.CATEGORY_SLUG || 'other';
-      const existingCat = categoryMap.get(catKey) || {
-        name: item.CATEGORY_NAME || 'Other Equipment',
+      // Real category matching to the 10 official categories
+      const official = matchOfficialCategory(item.CATEGORY_NAME || item.PRODUCT_TITLE || '');
+      const existingCat = categoryMap.get(official.slug) || {
+        name: official.name,
         count: 0,
         totalScore: 0,
       };
       existingCat.count++;
       existingCat.totalScore += report.overallScore;
-      categoryMap.set(catKey, existingCat);
+      categoryMap.set(official.slug, existingCat);
 
-      // Collect top problem items for the first 50
+      // Collect real problem items for the first 50
       if (report.healthStatus !== 'HEALTHY' && problemItems.length < 50) {
         const failedChecks = report.checks.filter((c) => !c.passed).map((c) => c.label);
         problemItems.push({
           sku: item.SKU,
           title: item.PRODUCT_TITLE,
-          category: item.CATEGORY_NAME,
-          location: item.LOKASI_UNIT,
+          category: official.name,
+          location: item.LOKASI_UNIT || item.asal_gudang || 'Jabodetabek',
           score: report.overallScore,
           issues: failedChecks,
         });

@@ -120,3 +120,71 @@ export const OFFICIAL_CATEGORIES: CategoryGroup[] = [
     children: [],
   },
 ];
+
+export function matchOfficialCategory(text: string): { slug: string; name: string } {
+  const t = (text || '').toLowerCase();
+
+  // 1. Ice Maker / Ice System
+  if (t.includes('ice maker') || t.includes('ice machine') || t.includes('ice bin') || t.includes('es batu') || t.includes('ice-system')) {
+    return { slug: 'ice-system', name: 'Ice System' };
+  }
+
+  // 2. Showcase / Display Cooler
+  if (t.includes('showcase') || t.includes('display cooler') || t.includes('cake showcase') || t.includes('cake display')) {
+    return { slug: 'showcase', name: 'Showcase' };
+  }
+
+  // 3. Freezer
+  if (t.includes('freezer') || t.includes('chest freezer') || t.includes('deep freeze') || t.includes('upright freezer')) {
+    return { slug: 'freezer', name: 'Freezer' };
+  }
+
+  // 4. Chiller
+  if (t.includes('chiller') || t.includes('undercounter') || t.includes('upright chiller') || t.includes('kulkas resto')) {
+    return { slug: 'chiller', name: 'Chiller' };
+  }
+
+  // 5. Hood & Exhaust
+  if (t.includes('hood') || t.includes('exhaust') || t.includes('blower') || t.includes('axial') || t.includes('ducting')) {
+    return { slug: 'hood-stainless', name: 'Hood Stainless & Exhaust' };
+  }
+
+  // 6. Sink Stainless
+  if (t.includes('sink') || t.includes('bak cuci') || t.includes('cuci piring') || t.includes('wastafel')) {
+    return { slug: 'sink-stainless', name: 'Sink Stainless' };
+  }
+
+  // 7. Rak Stainless / Troli
+  if (t.includes('rak') || t.includes('rack') || t.includes('tier') || t.includes('wallshelf') || t.includes('troli') || t.includes('trolley')) {
+    return { slug: 'rak-stainless', name: 'Rak Stainless' };
+  }
+
+  // 8. Meja Stainless
+  if (t.includes('meja') || t.includes('worktable') || t.includes('prep table') || t.includes('table')) {
+    return { slug: 'meja-stainless', name: 'Meja Stainless' };
+  }
+
+  // 9. Kompor & Cooking (Stove, Oven, Fryer, Griddle, Steamer, Noodle Boiler, Kwali)
+  if (
+    t.includes('kompor') ||
+    t.includes('stove') ||
+    t.includes('burner') ||
+    t.includes('kwali') ||
+    t.includes('wok') ||
+    t.includes('fryer') ||
+    t.includes('oven') ||
+    t.includes('griddle') ||
+    t.includes('grill') ||
+    t.includes('teppan') ||
+    t.includes('salamander') ||
+    t.includes('boiler') ||
+    t.includes('steamer') ||
+    t.includes('cooking')
+  ) {
+    return { slug: 'kompor', name: 'Kompor & Cooking' };
+  }
+
+  // 10. Fallback: Peralatan Lainnya
+  return { slug: 'peralatan-dapur-bekas-lainnya', name: 'Peralatan Dapur Lainnya' };
+}
+

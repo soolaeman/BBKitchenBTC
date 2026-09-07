@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRawMasterInventory, updateItemSEOMetadata } from '@/lib/repositories/inventory-repository';
+import { getLiveMasterInventory, updateItemSEOMetadata } from '@/lib/repositories/inventory-repository';
 import { generateAutoFixMetadata } from '@/lib/repositories/seo-repository';
 
 export async function POST(request: NextRequest) {
@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { sku, batch } = body;
 
-    const allItems = getRawMasterInventory();
+    const allItems = await getLiveMasterInventory();
 
     if (sku) {
       const item = allItems.find((i) => i.SKU.toLowerCase() === String(sku).toLowerCase());
