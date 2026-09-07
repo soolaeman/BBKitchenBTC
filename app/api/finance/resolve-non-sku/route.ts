@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { resolveNonSkuItem } from '@/lib/repositories/finance-repository';
 import { auth } from '@/auth';
 
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { invoiceNumber, skuTemp, itemTitle, action, targetSku, hppModal, vendorBengkel, notes } = body;
+    const { invoiceNumber, skuTemp, itemTitle, action, targetSku, hppModal, vendorBengkel, notes, hubLocation, warehouseCode, category } = body;
 
     if (!invoiceNumber || !skuTemp || !action) {
       return NextResponse.json({ error: 'Missing required resolution parameters' }, { status: 400 });
@@ -27,6 +27,9 @@ export async function POST(request: NextRequest) {
       hppModal: Number(hppModal) || 0,
       vendorBengkel,
       notes,
+      hubLocation,
+      warehouseCode,
+      category,
     });
 
     return NextResponse.json({ success });

@@ -437,6 +437,9 @@ export async function resolveNonSkuItem(params: {
   hppModal?: number;
   vendorBengkel?: string;
   notes?: string;
+  hubLocation?: string;
+  warehouseCode?: string;
+  category?: string;
 }): Promise<boolean> {
   const invoices = await getInvoices();
   const targetInv = invoices.find((i) => i.invoiceNumber === params.invoiceNumber);
@@ -466,6 +469,9 @@ export async function resolveNonSkuItem(params: {
   if (params.action === 'SET_CUSTOM_MODAL') {
     const cleanModal = Number(params.hppModal) || 0;
     targetItem.unitCost = cleanModal;
+    if (params.hubLocation) {
+      targetItem.warehouseLocation = params.hubLocation;
+    }
     await updateInvoice(targetInv);
 
     // Save to TRANSAKSI_NON_SKU sheet
@@ -483,6 +489,9 @@ export async function resolveNonSkuItem(params: {
       vendorBengkel: params.vendorBengkel || 'Bengkel Fabrikasi Las',
       customerName: targetInv.customerName,
       notes: params.notes,
+      hubLocation: params.hubLocation,
+      warehouseCode: params.warehouseCode,
+      category: params.category,
       resolvedAt: new Date().toISOString().split('T')[0],
       resolvedBy: 'ADMIN',
     };

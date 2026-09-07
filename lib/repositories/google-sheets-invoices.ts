@@ -607,6 +607,9 @@ function rowToNonSkuTransaction(row: any[]): NonSkuTransaction {
     customerName: v(11) || undefined,
     notes: v(12) || undefined,
     resolvedAt: parseToISODate(v(13)) || new Date().toISOString().split('T')[0],
+    hubLocation: v(14) || undefined,
+    warehouseCode: v(15) || undefined,
+    category: v(16) || undefined,
     resolvedBy: 'ADMIN',
   };
 }
@@ -627,6 +630,9 @@ function nonSkuTransactionToRow(tx: NonSkuTransaction): any[] {
     tx.customerName || '',
     tx.notes || '',
     tx.resolvedAt || new Date().toISOString().split('T')[0],
+    tx.hubLocation || '',
+    tx.warehouseCode || '',
+    tx.category || '',
   ];
 }
 

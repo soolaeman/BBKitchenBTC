@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { ClosingDealItem, Invoice, DocumentType } from '@/lib/types/finance';
-import { formatIDR, resolveLocationFromCode } from '@/lib/repositories/warehouse-utils';
+import { formatIDR, resolveLocationFromCode, WAREHOUSE_13_HUBS } from '@/lib/repositories/warehouse-utils';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
 import { ResolveNonSkuModal, NonSkuResolveItem } from './ResolveNonSkuModal';
@@ -241,6 +241,18 @@ export function FinanceDashboard() {
         if (!token) return false;
         return cleanCat.includes(token) || token.includes(cleanCat) || cleanTitle.includes(token);
       });
+    }
+
+    // Find in child subcategories
+    for (const g of OFFICIAL_CATEGORIES) {
+      const child = g.children.find(
+        (c) => c.name.toLowerCase() === cleanFilter || c.slug.toLowerCase() === cleanFilter
+      );
+      if (child) {
+        const childTokens = [child.name.toLowerCase(), child.slug.toLowerCase(), ...child.name.toLowerCase().split(' ')];
+        const hasMatch = childTokens.some((t) => t.length > 2 && (cleanCat.includes(t) || cleanTitle.includes(t)));
+        if (hasMatch) return true;
+      }
     }
 
     // Fallback: word token matching
@@ -888,10 +900,15 @@ export function FinanceDashboard() {
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold text-xs"
             >
               <option value="ALL">Semua Kategori</option>
-              {OFFICIAL_CATEGORIES.map((cat) => (
-                <option key={cat.slug} value={cat.name}>
-                  {cat.name}
-                </option>
+              {OFFICIAL_CATEGORIES.map((group) => (
+                <optgroup key={group.slug} label={group.name}>
+                  <option value={group.name}>{group.name} (Semua)</option>
+                  {group.children.map((child) => (
+                    <option key={child.slug} value={child.name}>
+                      &nbsp;&nbsp;↳ {child.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -904,20 +921,12 @@ export function FinanceDashboard() {
               onChange={(e) => setWarehouseFilter(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold text-xs"
             >
-              <option value="ALL">Semua Hub Rekanan</option>
-              <option value="GK">GK - Pamulang 2</option>
-              <option value="BB">BB - Pamulang 2</option>
-              <option value="SM">SM - Pamulang 2</option>
-              <option value="BL">BL - Pamulang 2</option>
-              <option value="ML">ML - Pamulang Barat</option>
-              <option value="RB">RB - Pamulang Barat</option>
-              <option value="KG">KG - Kitchen Gembel (Pamulang Barat)</option>
-              <option value="PY">PY - Setu Tangsel</option>
-              <option value="PE">PE - Sawangan Depok</option>
-              <option value="SK">SK - Sanjaya Kitchen (Sawangan Depok)</option>
-              <option value="WT">WT - Kedaung Tangsel</option>
-              <option value="ON">ON - Kedaung Tangsel</option>
-              <option value="RK">RK - Rizki Kitchen (Rawakalong Bogor)</option>
+              <option value="ALL">Semua Hub Rekanan (13 Hub)</option>
+              {WAREHOUSE_13_HUBS.map((hub) => (
+                <option key={hub.code} value={hub.code}>
+                  {hub.code} - {hub.name} ({hub.hubLocation})
+                </option>
+              ))}
             </select>
           </div>
 

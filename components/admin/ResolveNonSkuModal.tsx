@@ -15,7 +15,8 @@ import {
   Layers,
   ArrowRight,
 } from 'lucide-react';
-import { formatIDR, resolveLocationFromCode, WAREHOUSE_HUB_DETAILS } from '@/lib/repositories/warehouse-utils';
+import { formatIDR, resolveLocationFromCode, WAREHOUSE_13_HUBS } from '@/lib/repositories/warehouse-utils';
+import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { MasterInventoryItem } from '@/lib/types/inventory';
 
 export interface NonSkuResolveItem {
@@ -53,6 +54,8 @@ export function ResolveNonSkuModal({
 
   // Custom Modal state
   const [customHppModal, setCustomHppModal] = useState<string>('');
+  const [customHub, setCustomHub] = useState<string>('ML');
+  const [customCategory, setCustomCategory] = useState<string>('MEJA STAINLESS');
   const [vendorBengkel, setVendorBengkel] = useState<string>('Bengkel Fabrikasi Stainless');
   const [customNotes, setCustomNotes] = useState<string>('');
 
@@ -60,6 +63,22 @@ export function ResolveNonSkuModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Auto-detect category & default hub from item when opened
+  useEffect(() => {
+    if (item?.productTitle) {
+      const title = item.productTitle.toLowerCase();
+      if (/showcase/i.test(title)) setCustomCategory('SHOWCASE');
+      else if (/chiller/i.test(title)) setCustomCategory('CHILLER');
+      else if (/freezer/i.test(title)) setCustomCategory('FREEZER');
+      else if (/fryer|kompor|wok|kwali|oven/i.test(title)) setCustomCategory('KOMPOR & COOKING');
+      else if (/meja/i.test(title)) setCustomCategory('MEJA STAINLESS');
+      else if (/sink|wastafel/i.test(title)) setCustomCategory('SINK STAINLESS');
+      else if (/rak|wallshelf|troli/i.test(title)) setCustomCategory('RAK STAINLESS');
+      else if (/hood|exhaust|blower/i.test(title)) setCustomCategory('HOOD STAINLESS & VENTILASI');
+      else if (/ice/i.test(title)) setCustomCategory('ICE SYSTEM');
+    }
+  }, [item]);
 
   // Fetch inventory items when modal opens
   useEffect(() => {
@@ -96,21 +115,27 @@ export function ResolveNonSkuModal({
     };
   }, [isOpen]);
 
-  // Filter inventory candidates
+  // Filter inventory candidates based on 13 Hubs & Search query
   const filteredInventory = useMemo(() => {
     return inventoryList.filter((inv) => {
-      // Hub filter
+      // 13 Hub filter
       if (selectedHub !== 'ALL') {
-        const targetCodes = WAREHOUSE_HUB_DETAILS.find((h) => h.hubId === selectedHub)?.codes || [selectedHub];
-        const itemCode = (inv.asal_gudang || '').toUpperCase();
-        const itemLoc = (inv.LOKASI_UNIT || '').toUpperCase();
-        
-        const matchesCode = targetCodes.some(
-          (c) => itemCode === c || inv.SKU.toUpperCase().startsWith(`${c}-`) || inv.SKU.toUpperCase().startsWith(`BBK-${c}-`)
-        );
-        const matchesLoc = itemLoc.includes(selectedHub.replace('_', ' '));
+        const code = (inv.asal_gudang || '').toUpperCase().trim();
+        const sku = (inv.SKU || '').toUpperCase().trim();
+        const loc = (inv.LOKASI_UNIT || '').toUpperCase().trim();
 
-        if (!matchesCode && !matchesLoc) return false;
+        const hubObj = WAREHOUSE_13_HUBS.find((h) => h.code === selectedHub);
+        const hubGroup = (hubObj?.hubGroup || '').toUpperCase();
+
+        const matchesHubCode =
+          code === selectedHub ||
+          sku.startsWith(`${selectedHub}-`) ||
+          sku.startsWith(`BBK-${selectedHub}-`) ||
+          sku.includes(`-${selectedHub}-`);
+
+        const matchesLoc = hubGroup && loc.includes(hubGroup);
+
+        if (!matchesHubCode && !matchesLoc) return false;
       }
 
       // Search text filter
@@ -165,6 +190,9 @@ export function ResolveNonSkuModal({
           throw new Error('Masukkan nominal HPP Modal / Biaya Bengkel yang valid (lebih dari Rp 0).');
         }
 
+        const selectedHubObj = WAREHOUSE_13_HUBS.find((h) => h.code === customHub);
+        const hubLocationName = selectedHubObj ? selectedHubObj.hubLocation : 'BENGKEL FABRIKASI EKSTERNAL';
+
         const res = await fetch('/api/finance/resolve-non-sku', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -174,8 +202,11 @@ export function ResolveNonSkuModal({
             itemTitle: item.productTitle,
             action: 'SET_CUSTOM_MODAL',
             hppModal: cleanModalNum,
-            vendorBengkel: vendorBengkel.trim() || 'Bengkel Fabrikasi Las',
+            vendorBengkel: vendorBengkel.trim() || 'Bengkel Fabrikasi Stainless',
             notes: customNotes.trim(),
+            warehouseCode: customHub,
+            hubLocation: hubLocationName,
+            category: customCategory,
           }),
         });
 
@@ -184,7 +215,7 @@ export function ResolveNonSkuModal({
           throw new Error(data.error || 'Gagal menyimpan transaksi Non-SKU.');
         }
 
-        setSuccessMessage('HPP Modal riil berhasil disimpan ke sheet TRANSAKSI_NON_SKU & Financials diperbarui.');
+        setSuccessMessage('HPP Modal, Hub Gudang & Kategori WooCommerce berhasil disimpan ke TRANSAKSI_NON_SKU.');
       }
 
       setTimeout(() => {
@@ -288,36 +319,40 @@ export function ResolveNonSkuModal({
                 <span className="font-bold">💡 Petunjuk:</span> Jika pesanan ini sebenarnya adalah unit fisik yang sudah ada di gudang, pilih SKU di bawah. Invoice akan diperbarui dan status unit di <code>MASTER_INVENTORY</code> otomatis berubah menjadi <strong>SOLD</strong>.
               </div>
 
-              {/* Warehouse Hub Filter Buttons */}
+              {/* Warehouse Hub Filter Buttons: 13 Hubs */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                  <Building className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Filter Gudang Asal:</span>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Building className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Filter 13 Hub Gudang Asal:</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal">Pilih hub untuk mempersempit stok</span>
                 </label>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-950/80 border border-slate-800/80 rounded-xl max-h-24 overflow-y-auto">
                   <button
                     type="button"
                     onClick={() => setSelectedHub('ALL')}
                     className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
                       selectedHub === 'ALL'
-                        ? 'bg-indigo-600 border-indigo-500 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-sm'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                     }`}
                   >
                     Semua Gudang
                   </button>
-                  {WAREHOUSE_HUB_DETAILS.map((hub) => (
+                  {WAREHOUSE_13_HUBS.map((hub) => (
                     <button
-                      key={hub.hubId}
+                      key={hub.code}
                       type="button"
-                      onClick={() => setSelectedHub(hub.hubId)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
-                        selectedHub === hub.hubId
-                          ? 'bg-indigo-600 border-indigo-500 text-white'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                      onClick={() => setSelectedHub(hub.code)}
+                      className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                        selectedHub === hub.code
+                          ? 'bg-indigo-600 border-indigo-500 text-white shadow-sm'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                       }`}
+                      title={`${hub.name} (${hub.hubLocation})`}
                     >
-                      {hub.name}
+                      {hub.code} - {hub.partnerName}
                     </button>
                   ))}
                 </div>
@@ -328,7 +363,7 @@ export function ResolveNonSkuModal({
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Ketik SKU (misal: GK-012, BB-045) atau nama mesin..."
+                  placeholder="Ketik SKU (misal: GK-012, BB-045, ML-001) atau nama mesin..."
                   value={searchSku}
                   onChange={(e) => setSearchSku(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs"
@@ -340,7 +375,7 @@ export function ResolveNonSkuModal({
                 {isLoadingInventory ? (
                   <div className="p-6 text-center text-slate-500 flex items-center justify-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-                    <span>Memuat stok katalog unit gudang...</span>
+                    <span>Memuat stok katalog unit 13 gudang...</span>
                   </div>
                 ) : filteredInventory.length === 0 ? (
                   <div className="p-6 text-center text-slate-500">
@@ -409,7 +444,7 @@ export function ResolveNonSkuModal({
           {resolveMode === 'CUSTOM_MODAL' && (
             <div className="space-y-3.5">
               <div className="p-3 bg-emerald-950/30 border border-emerald-900/50 rounded-xl text-emerald-300 text-[11px] leading-relaxed">
-                <span className="font-bold">💡 Petunjuk:</span> Untuk barang custom/fabrikasi las/order khusus yang tidak mengambil stok gudang fisik, masukkan estimasi atau realisasi biaya bengkel di sini. Data akan disimpan ke Sheet <code>TRANSAKSI_NON_SKU</code> dan laba langsung tercatat di Financials.
+                <span className="font-bold">💡 Petunjuk:</span> Untuk barang custom/fabrikasi las/order khusus yang tidak mengambil stok gudang fisik, masukkan estimasi atau realisasi biaya bengkel, asal Hub dan kategori WooCommerce di sini. Data akan disimpan ke Sheet <code>TRANSAKSI_NON_SKU</code> dan laba langsung tercatat di Financials.
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -446,6 +481,50 @@ export function ResolveNonSkuModal({
                     onChange={(e) => setVendorBengkel(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs"
                   />
+                </div>
+
+                {/* Hub Asal Gudang */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                    <Building className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Hub / Gudang Asal: <span className="text-rose-400">*</span></span>
+                  </label>
+                  <select
+                    value={customHub}
+                    onChange={(e) => setCustomHub(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs font-semibold"
+                  >
+                    {WAREHOUSE_13_HUBS.map((hub) => (
+                      <option key={hub.code} value={hub.code}>
+                        {hub.code} - {hub.name} ({hub.hubLocation})
+                      </option>
+                    ))}
+                    <option value="BENGKEL_CUSTOM">BENGKEL EKSTERNAL / FABRIKASI KHUSUS</option>
+                  </select>
+                </div>
+
+                {/* Kategori Unit WooCommerce */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Kategori Unit WooCommerce: <span className="text-rose-400">*</span></span>
+                  </label>
+                  <select
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs font-semibold"
+                  >
+                    {OFFICIAL_CATEGORIES.map((group) => (
+                      <optgroup key={group.slug} label={group.name}>
+                        <option value={group.name}>{group.name} (Utama)</option>
+                        {group.children.map((child) => (
+                          <option key={child.slug} value={child.name}>
+                            &nbsp;&nbsp;↳ {child.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
                 </div>
               </div>
 

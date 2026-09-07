@@ -118,6 +118,9 @@ export interface NonSkuTransaction {
   vendorBengkel?: string;
   customerName?: string;
   notes?: string;
+  hubLocation?: string;
+  warehouseCode?: string;
+  category?: string;
   resolvedAt: string;
   resolvedBy: string;
 }
