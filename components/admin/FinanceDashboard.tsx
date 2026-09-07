@@ -10,6 +10,7 @@ import {
   matchCategory,
 } from '@/lib/repositories/warehouse-utils';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
+import { ClosingDealItem, Invoice, DocumentType } from '@/lib/types/finance';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
 import { ResolveNonSkuModal, NonSkuResolveItem } from './ResolveNonSkuModal';
 import {
