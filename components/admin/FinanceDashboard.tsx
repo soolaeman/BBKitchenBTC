@@ -121,6 +121,17 @@ export function FinanceDashboard() {
     loadData();
   }, [loadData]);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setDealPage(1);
+    setDealPageInput('1');
+  }, [channelFilter, categoryFilter, warehouseFilter, datePreset, searchQuery, startDate, endDate]);
+
+  // Keep page input in sync
+  useEffect(() => {
+    setDealPageInput(String(dealPage));
+  }, [dealPage]);
+
   // Helper to match official 13 Warehouse Hub codes (GK, BB, SM, BL, ML, RB, KG, PY, PE, SK, WT, ON, RK)
   const matchWarehouseHub = (itemLocation: string, itemAsalGudang?: string, skuStr?: string, hubFilter: string = 'ALL') => {
     if (!hubFilter || hubFilter === 'ALL') return true;
