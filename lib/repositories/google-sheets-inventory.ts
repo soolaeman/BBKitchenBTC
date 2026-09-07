@@ -166,7 +166,7 @@ function toItem(row: string[]): MasterInventoryItem {
     MARGIN_FLOOR: numberOrNull(value(row, 29)) ?? undefined,
     STATUS_GUARDRAIL: (value(row, 31) || "SAFE") as MasterInventoryItem["STATUS_GUARDRAIL"],
     LAST_CHECKED_TELEGRAM: parseRawDateString(value(row, 32)) || undefined,
-    HARGA_CLOSING: numberOrNull(value(row, 32)) ?? undefined,
+    HARGA_CLOSING: numberOrNull(value(row, 27)) ?? undefined,
     LINK_UNIT: formatCleanProductUrl(value(row, 1), value(row, 33)),
   };
 }

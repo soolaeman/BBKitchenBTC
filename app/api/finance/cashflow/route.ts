@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     const financeData = await getLiveClosingDealLedger();
     const deals = financeData.deals || [];
 
-    // Filter deals by date if specified
+    // Filter deals by date if specified (Only deals sold in the active period)
     const filteredDeals = deals.filter((d) => {
       const dDate = (d.tanggalTerjual || d.tanggalMasuk || '').split('T')[0];
       if (startDate && dDate && dDate < startDate) return false;
@@ -46,8 +46,9 @@ export async function GET(req: NextRequest) {
       return true;
     });
 
-    const totalDealsRevenue = filteredDeals.reduce((sum, d) => sum + (d.hargaClosing || 0), 0);
-    const totalDealsGrossProfit = filteredDeals.reduce((sum, d) => sum + (d.realizedProfit || 0), 0);
+    const bbkDeals = filteredDeals.filter((d) => d.soldBy === 'SALES_BBK');
+    const totalDealsRevenue = bbkDeals.reduce((sum, d) => sum + (d.hargaClosing || 0), 0);
+    const totalDealsGrossProfit = bbkDeals.reduce((sum, d) => sum + (d.realizedProfit || 0), 0);
 
     let totalExpenses = 0;
     let totalCommissions = 0;
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
         totalInvestorInflow,
         totalInvestorOutflow,
         netInvestorPosition,
-        totalDealsCount: filteredDeals.length,
+        totalDealsCount: bbkDeals.length,
       },
     });
   } catch (error: any) {
