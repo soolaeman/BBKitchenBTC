@@ -620,6 +620,55 @@ export function InventoryTable() {
               </select>
             </div>
 
+            {/* Sort Order Selector (Termurah -> Termahal) */}
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 font-medium">Urutkan:</span>
+              <select
+                value={
+                  sortBy === 'HARGA_MODAL' && sortOrder === 'asc'
+                    ? 'MODAL_ASC'
+                    : sortBy === 'HARGA_MODAL' && sortOrder === 'desc'
+                    ? 'MODAL_DESC'
+                    : sortBy === 'HARGA_BUKA_WA' && sortOrder === 'asc'
+                    ? 'PRICE_ASC'
+                    : sortBy === 'HARGA_BUKA_WA' && sortOrder === 'desc'
+                    ? 'PRICE_DESC'
+                    : 'NEWEST'
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'MODAL_ASC') {
+                    setSortBy('HARGA_MODAL');
+                    setSortOrder('asc');
+                  } else if (val === 'MODAL_DESC') {
+                    setSortBy('HARGA_MODAL');
+                    setSortOrder('desc');
+                  } else if (val === 'PRICE_ASC') {
+                    setSortBy('HARGA_BUKA_WA');
+                    setSortOrder('asc');
+                  } else if (val === 'PRICE_DESC') {
+                    setSortBy('HARGA_BUKA_WA');
+                    setSortOrder('desc');
+                  } else {
+                    setSortBy('TANGGAL_MASUK');
+                    setSortOrder('desc');
+                  }
+                  setPage(1);
+                }}
+                className="px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500"
+              >
+                <option value="NEWEST">🔥 Terbaru Masuk (Default)</option>
+                {permissions.canViewHpp && (
+                  <>
+                    <option value="MODAL_ASC">💰 Harga Modal: Termurah → Termahal</option>
+                    <option value="MODAL_DESC">💰 Harga Modal: Termahal → Termurah</option>
+                  </>
+                )}
+                <option value="PRICE_ASC">🏷️ Harga Jual (Buka WA): Termurah → Termahal</option>
+                <option value="PRICE_DESC">🏷️ Harga Jual (Buka WA): Termahal → Termurah</option>
+              </select>
+            </div>
+
             <label className="flex items-center gap-2 cursor-pointer bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-slate-300 hover:text-white">
               <input
                 type="checkbox"

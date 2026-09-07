@@ -80,6 +80,7 @@ export function SalesHelperView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('ALL');
   const [warehouse, setWarehouse] = useState('ALL');
+  const [sortOption, setSortOption] = useState<'NEWEST' | 'PRICE_ASC' | 'PRICE_DESC'>('NEWEST');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(16);
   const [totalItems, setTotalItems] = useState(0);
@@ -220,12 +221,13 @@ export function SalesHelperView() {
   const fetchItems = useCallback(async () => {
     setIsLoading(true);
     try {
+      const isPriceSort = sortOption === 'PRICE_ASC' || sortOption === 'PRICE_DESC';
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(pageSize),
         statusUnit: 'READY',
-        sortBy: 'TANGGAL_MASUK',
-        sortOrder: 'desc',
+        sortBy: isPriceSort ? 'HARGA_BUKA_WA' : 'TANGGAL_MASUK',
+        sortOrder: sortOption === 'PRICE_ASC' ? 'asc' : 'desc',
       });
 
       if (debouncedSearch.trim()) params.append('search', debouncedSearch.trim());
@@ -259,11 +261,11 @@ export function SalesHelperView() {
         }
       }
     } catch (err) {
-      console.error('Failed to fetch items in SalesHelper', err);
+      console.error('Failed to load items for sales pitch', err);
     } finally {
       setIsLoading(false);
     }
-  }, [page, pageSize, debouncedSearch, category, warehouse, role]);
+  }, [page, pageSize, debouncedSearch, category, warehouse, sortOption, role, searchedItem?.SKU, selectItem]);
 
   useEffect(() => {
     fetchItems();
@@ -426,7 +428,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
       <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-xl space-y-3">
         <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-3">
           {/* Keyword Search */}
-          <div className="md:col-span-6 relative flex items-center">
+          <div className="md:col-span-4 relative flex items-center">
             <Search className="w-4 h-4 absolute left-3 text-slate-500 pointer-events-none" />
             <input
               type="text"
@@ -490,6 +492,22 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                   {hub.code} - {hub.partnerName} ({hub.hubGroup})
                 </option>
               ))}
+            </select>
+          </div>
+
+          {/* Sort Filter (Buka WA Price & Newest) */}
+          <div className="md:col-span-2">
+            <select
+              value={sortOption}
+              onChange={(e) => {
+                setSortOption(e.target.value as any);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            >
+              <option value="NEWEST">🔥 Terbaru Masuk</option>
+              <option value="PRICE_ASC">🏷️ Buka WA: Termurah → Termahal</option>
+              <option value="PRICE_DESC">🏷️ Buka WA: Termahal → Termurah</option>
             </select>
           </div>
 

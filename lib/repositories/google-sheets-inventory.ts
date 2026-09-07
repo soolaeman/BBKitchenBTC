@@ -327,11 +327,25 @@ export async function queryGoogleSheetsInventory(
   // Default: Sort by SKU number descending (Newest BBK at the top)
   filtered.sort((a, b) => {
     if (options.sortBy && options.sortBy !== "TANGGAL_MASUK" && options.sortBy !== "SKU") {
+      const dir = options.sortOrder === "asc" ? 1 : -1;
+      if (
+        options.sortBy === "HARGA_MODAL" ||
+        options.sortBy === "HARGA_BUKA_WA" ||
+        options.sortBy === "HARGA_ESTIMASI_PUBLIK" ||
+        options.sortBy === "HARGA_DEAL_AKHIR" ||
+        options.sortBy === "DURASI_TERJUAL"
+      ) {
+        const rawA = a[options.sortBy as keyof MasterInventoryItem];
+        const rawB = b[options.sortBy as keyof MasterInventoryItem];
+        const numA = typeof rawA === "number" ? rawA : (Number(String(rawA || "").replace(/[^0-9.-]/g, "")) || 0);
+        const numB = typeof rawB === "number" ? rawB : (Number(String(rawB || "").replace(/[^0-9.-]/g, "")) || 0);
+        return (numA - numB) * dir;
+      }
+
       const av = a[options.sortBy as keyof MasterInventoryItem];
       const bv = b[options.sortBy as keyof MasterInventoryItem];
       if (av == null) return 1;
       if (bv == null) return -1;
-      const dir = options.sortOrder === "asc" ? 1 : -1;
       return String(av).localeCompare(String(bv), undefined, { numeric: true }) * dir;
     }
 
