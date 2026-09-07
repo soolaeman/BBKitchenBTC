@@ -648,6 +648,34 @@ export function InventoryTable() {
         </div>
       </div>
 
+      {/* Active SKU Cross-Device Sync Banner */}
+      {activeClickedSku && (
+        <div className="bg-amber-950/80 border border-amber-500/50 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 shadow-lg">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+            <span className="text-xs text-amber-200">
+              📍 Baris Aktif Sedang Dicek: <strong className="text-amber-300 font-mono font-black">{activeClickedSku}</strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById(`row-${activeClickedSku}`);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } else {
+                setSearch(activeClickedSku);
+                setDebouncedSearch(activeClickedSku);
+                setPage(1);
+              }
+            }}
+            className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg font-black text-xs transition-colors shadow flex items-center gap-1"
+          >
+            <span>⚡ Lompat ke Baris Ini</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Responsive Table */}
       <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
@@ -714,6 +742,7 @@ export function InventoryTable() {
                   return (
                     <tr
                       key={item.SKU}
+                      id={`row-${item.SKU}`}
                       className={`transition-all duration-200 group ${
                         isActive
                           ? 'bg-amber-950/50 border-l-4 border-l-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)] ring-1 ring-amber-500/40'
