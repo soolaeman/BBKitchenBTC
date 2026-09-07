@@ -245,7 +245,7 @@ export async function getLiveClosingDealLedger(): Promise<{
     }
 
     // 2. Add remaining Third-Party sold items (excluding SKUs already sold via BBKitchen invoices)
-    let totalAging = 0;
+    totalAging = 0;
     const thirdPartyDeals: ClosingDealItem[] = soldItems
       .filter((item) => !matchedSkusSet.has(item.SKU.trim().toUpperCase()))
       .map((item) => {

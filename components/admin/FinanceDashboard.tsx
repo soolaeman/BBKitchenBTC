@@ -764,60 +764,6 @@ export function FinanceDashboard() {
     };
   }, [categoryEconomics, allHubsSupply]);
 
-  // Handle Document Modal Trigger
-  const handleOpenDocFromDeal = (deal: ClosingDealItem, type: DocumentType = 'INVOICE') => {
-    const issueDate = now.toISOString().split('T')[0];
-    const dueDateObj = new Date(now);
-    dueDateObj.setDate(dueDateObj.getDate() + 3);
-    const dueDate = dueDateObj.toISOString().split('T')[0];
-
-    const tempInvoice: Invoice = {
-      id: `deal_${deal.sku}_${Date.now()}`,
-      invoiceNumber: `INV-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${deal.sku.replace(/\D/g, '').slice(-4) || '1024'}`,
-      kuitansiNumber: `KWT-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${deal.sku.replace(/\D/g, '').slice(-4) || '1024'}`,
-      quotationNumber: `QUO-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${deal.sku.replace(/\D/g, '').slice(-4) || '1024'}`,
-      suratJalanNumber: `SJ-BBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${deal.sku.replace(/\D/g, '').slice(-4) || '1024'}`,
-      documentType: type,
-      customerName: deal.customerName || 'Bpk/Ibu Pembeli (Resto Partner)',
-      customerPhone: '0851 2200 1051',
-      customerAddress: deal.lokasiGudang || 'Jabodetabek',
-      orderReference: `ORD-DEAL-${deal.sku}`,
-      items: [
-        {
-          id: `item_${deal.sku}`,
-          sku: deal.sku,
-          description: deal.productTitle,
-          quantity: 1,
-          unitPrice: deal.hargaClosing || deal.hargaModal || 0,
-          total: deal.hargaClosing || deal.hargaModal || 0,
-          warehouseLocation: deal.lokasiGudang,
-          condition: 'Bekas Terkurasi (Lolos QC Siap Pakai)',
-        },
-      ],
-      subtotal: deal.hargaClosing || deal.hargaModal || 0,
-      discount: 0,
-      tax: 0,
-      totalAmount: deal.hargaClosing || deal.hargaModal || 0,
-      dpAmount: deal.hargaClosing || deal.hargaModal || 0,
-      remainingAmount: 0,
-      issueDate: deal.tanggalTerjual || issueDate,
-      dueDate,
-      status: 'PAID',
-      paidDate: deal.tanggalTerjual || issueDate,
-      paymentMethod: 'TRANSFER_BCA',
-      deliveryDriver: 'Pak Ujang (Lalamove)',
-      driverPhone: '0812-9876-5432',
-      deliveryVehiclePlate: 'B 9482 SXZ',
-      deliveryExpedition: 'LALAMOVE',
-      createdBy: deal.soldBy === 'SALES_BBK' ? 'Tim Sales WhatsApp BBKitchen' : 'Pihak Ketiga / Rekanan Gudang',
-      notes: deal.notes,
-    };
-
-    setSelectedInvoice(tempInvoice);
-    setDocumentModalType(type);
-    setIsDocModalOpen(true);
-  };
-
   if (!permissions?.canViewFinanceReports && role !== 'ADMIN' && role !== 'INVESTOR') {
     return (
       <div className="p-8 bg-slate-900/80 border border-slate-800 rounded-2xl text-center space-y-3">
