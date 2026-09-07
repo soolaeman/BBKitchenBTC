@@ -658,7 +658,7 @@ export function InventoryTable() {
                 className="px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500"
               >
                 <option value="NEWEST">🔥 Terbaru Masuk (Default)</option>
-                {permissions.canViewHpp && (
+                {permissions.canViewInternalCost && (
                   <>
                     <option value="MODAL_ASC">💰 Harga Modal: Termurah → Termahal</option>
                     <option value="MODAL_DESC">💰 Harga Modal: Termahal → Termurah</option>
