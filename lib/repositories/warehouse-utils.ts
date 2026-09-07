@@ -313,60 +313,74 @@ export function matchCategory(itemTitle: string = '', itemCat: string = '', filt
 
     if (validSlugs.includes(cleanCat) || validNames.includes(cleanCat)) return true;
 
-    // Check by root keyword in title
-    if (parentGroup.slug === 'meja-stainless' && cleanTitle.includes('meja')) return true;
+    const combined = `${cleanTitle} ${cleanCat}`;
+
+    // Check by root keywords in title or category/slug
+    if (parentGroup.slug === 'meja-stainless' && combined.includes('meja')) return true;
     if (
       parentGroup.slug === 'sink-stainless' &&
-      (cleanTitle.includes('sink') || cleanTitle.includes('wastafel') || cleanTitle.includes('bak cuci'))
+      (combined.includes('sink') || combined.includes('wastafel') || combined.includes('bak cuci') || combined.includes('cuci'))
     )
       return true;
     if (
       parentGroup.slug === 'kompor' &&
-      (cleanTitle.includes('kompor') ||
-        cleanTitle.includes('kwali') ||
-        cleanTitle.includes('wok') ||
-        cleanTitle.includes('stove') ||
-        cleanTitle.includes('fryer') ||
-        cleanTitle.includes('boiler') ||
-        cleanTitle.includes('oven') ||
-        cleanTitle.includes('grill') ||
-        cleanTitle.includes('teppanyaki'))
+      (combined.includes('kompor') ||
+        combined.includes('kwali') ||
+        combined.includes('wok') ||
+        combined.includes('stove') ||
+        combined.includes('fryer') ||
+        combined.includes('boiler') ||
+        combined.includes('oven') ||
+        combined.includes('grill') ||
+        combined.includes('teppanyaki') ||
+        combined.includes('cooking') ||
+        combined.includes('tungku') ||
+        combined.includes('burner') ||
+        combined.includes('steamer') ||
+        combined.includes('dimsum') ||
+        combined.includes('batu lava'))
     )
       return true;
-    if (parentGroup.slug === 'chiller' && cleanTitle.includes('chiller')) return true;
-    if (parentGroup.slug === 'freezer' && cleanTitle.includes('freezer')) return true;
-    if (parentGroup.slug === 'showcase' && cleanTitle.includes('showcase')) return true;
+    if (parentGroup.slug === 'chiller' && combined.includes('chiller')) return true;
+    if (parentGroup.slug === 'freezer' && combined.includes('freezer')) return true;
+    if (parentGroup.slug === 'showcase' && combined.includes('showcase')) return true;
     if (
       parentGroup.slug === 'rak-stainless' &&
-      (cleanTitle.includes('rak') ||
-        cleanTitle.includes('wallshelf') ||
-        cleanTitle.includes('troli') ||
-        cleanTitle.includes('trolley'))
+      (combined.includes('rak') ||
+        combined.includes('wallshelf') ||
+        combined.includes('wall shelf') ||
+        combined.includes('troli') ||
+        combined.includes('trolley') ||
+        combined.includes('pan rack'))
     )
       return true;
     if (
       parentGroup.slug === 'hood-stainless' &&
-      (cleanTitle.includes('hood') ||
-        cleanTitle.includes('exhaust') ||
-        cleanTitle.includes('blower') ||
-        cleanTitle.includes('ducting'))
+      (combined.includes('hood') ||
+        combined.includes('exhaust') ||
+        combined.includes('blower') ||
+        combined.includes('ducting') ||
+        combined.includes('axial') ||
+        combined.includes('ventilasi'))
     )
       return true;
     if (
       parentGroup.slug === 'ice-system' &&
-      (cleanTitle.includes('ice maker') ||
-        cleanTitle.includes('ice bin') ||
-        cleanTitle.includes('ice machine') ||
-        cleanTitle.includes('es batu'))
+      (combined.includes('ice') ||
+        combined.includes('es batu') ||
+        combined.includes('ice maker') ||
+        combined.includes('ice bin') ||
+        combined.includes('ice machine'))
     )
       return true;
     if (
-      parentGroup.slug === 'food-processing' &&
-      (cleanTitle.includes('blender') ||
-        cleanTitle.includes('mixer') ||
-        cleanTitle.includes('slicer') ||
-        cleanTitle.includes('sealer') ||
-        cleanTitle.includes('cutter'))
+      parentGroup.slug === 'peralatan-dapur-bekas-lainnya' &&
+      (combined.includes('blender') ||
+        combined.includes('mixer') ||
+        combined.includes('slicer') ||
+        combined.includes('sealer') ||
+        combined.includes('cutter') ||
+        combined.includes('lainnya'))
     )
       return true;
 

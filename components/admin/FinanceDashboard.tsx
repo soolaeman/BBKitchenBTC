@@ -491,22 +491,23 @@ export function FinanceDashboard() {
     if (activeParent && activeParent.children.length > 0) {
       // DRILL-DOWN MODE: Match item into one of the official child subcategories
       for (const child of activeParent.children) {
-        if (matchCategory(itemTitle, itemCat, child.name)) {
+        if (!child.name.toLowerCase().includes('lainnya') && matchCategory(itemTitle, itemCat, child.name)) {
           return child.name;
         }
       }
-      return `${activeParent.name} (Lainnya)`;
+      const otherChild = activeParent.children.find((c) => c.name.toLowerCase().includes('lainnya'));
+      return otherChild ? otherChild.name : `${activeParent.name} (Lainnya)`;
     }
 
     // 2. If filter is ALL or not a parent group, match into official Parent Groups
     for (const group of OFFICIAL_CATEGORIES) {
-      if (matchCategory(itemTitle, itemCat, group.name)) {
+      if (group.name !== 'PERALATAN LAINNYA' && matchCategory(itemTitle, itemCat, group.name)) {
         return group.name;
       }
     }
 
-    // Fallback: clean category or title
-    return itemCat || 'Peralatan Dapur Lainnya';
+    // Fallback: strictly official PERALATAN LAINNYA
+    return 'PERALATAN LAINNYA';
   }, [categoryFilter]);
 
   // 6. UNIT ECONOMICS METRICS & TOP CATEGORIES BREAKDOWN (ITEMIZED)
