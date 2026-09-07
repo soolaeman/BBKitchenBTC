@@ -450,6 +450,30 @@ export function updatePipelineStatus(
 }
 
 /**
+ * Update SEO metadata for a specific SKU
+ */
+export function updateItemSEOMetadata(
+  sku: string,
+  metadata: {
+    yoastKeyword?: string;
+    seoTitle?: string;
+    yoastDescription?: string;
+    imageAlt?: string;
+  }
+): boolean {
+  const inventory = getRawMasterInventory();
+  const item = inventory.find((i) => i.SKU.toLowerCase() === sku.toLowerCase());
+  if (!item) return false;
+
+  if (metadata.yoastKeyword) item.YOAST_KEYWORD = metadata.yoastKeyword;
+  if (metadata.seoTitle) item.SEO_TITLE = metadata.seoTitle;
+  if (metadata.yoastDescription) item.YOAST_DESCRIPTION = metadata.yoastDescription;
+  if (metadata.imageAlt) item.image_alt = metadata.imageAlt;
+  item.last_pipeline_update = new Date().toISOString();
+  return true;
+}
+
+/**
  * Public & Server helper alias
  */
 export const getMasterInventoryItems = queryInventory;

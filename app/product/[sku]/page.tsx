@@ -7,6 +7,7 @@ import { PublicFooter } from '@/components/public/PublicFooter';
 import { ProductCard } from '@/components/public/ProductCard';
 import { getMasterInventoryItems } from '@/lib/repositories/inventory-repository';
 import { formatIDR } from '@/lib/repositories/warehouse-utils';
+import type { Metadata } from 'next';
 import {
   ShieldCheck,
   MapPin,
@@ -18,6 +19,56 @@ import {
 
 interface PageProps {
   params: Promise<{ sku: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { sku } = await params;
+  const decodedSku = decodeURIComponent(sku);
+  const { items } = await getMasterInventoryItems({ search: decodedSku, pageSize: 1 }, 'VIEWER');
+  const product = items.find((i) => i.SKU.toLowerCase() === decodedSku.toLowerCase()) || items[0];
+
+  if (!product) {
+    return {
+      title: 'Produk Tidak Ditemukan | Bukan Baru Kitchen',
+      description: 'Peralatan dapur restoran dan cafe bekas berkualitas bergaransi.',
+    };
+  }
+
+  const title = product.SEO_TITLE || `${product.PRODUCT_TITLE} | Bukan Baru Kitchen`;
+  const description =
+    product.YOAST_DESCRIPTION ||
+    product.SHORT_DESCRIPTION ||
+    `Jual ${product.PRODUCT_TITLE} bekas siap pakai bergaransi di Hub ${product.LOKASI_UNIT}.`;
+  const canonical = `https://bukanbarukitchen.com/product/${product.SKU.toLowerCase()}`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      siteName: 'Bukan Baru Kitchen',
+      images: [
+        {
+          url: product.FEATURED_IMAGE || 'https://bukanbarukitchen.com/og-image.jpg',
+          width: 800,
+          height: 600,
+          alt: product.image_alt || product.PRODUCT_TITLE,
+        },
+      ],
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [product.FEATURED_IMAGE || 'https://bukanbarukitchen.com/og-image.jpg'],
+    },
+  };
 }
 
 export default async function ProductDetailPage({ params }: PageProps) {
