@@ -7,6 +7,7 @@ import {
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
 } from '@/lib/types/cashflow';
+import { parseToISODate } from '@/lib/repositories/warehouse-utils';
 
 export * from '@/lib/types/cashflow';
 
@@ -69,7 +70,7 @@ export async function getCashflowEntries(): Promise<CashflowEntry[]> {
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
       const id = cleanString(r[0]);
-      const tanggal = cleanString(r[1]);
+      const tanggal = parseToISODate(r[1]) || cleanString(r[1]) || new Date().toISOString().split('T')[0];
       const jenisRaw = cleanString(r[2]).toUpperCase();
       const jenisKas: CashflowType = jenisRaw.includes('PEMASUKAN') ? 'PEMASUKAN_LAIN' : 'PENGELUARAN';
       const kategori = cleanString(r[3]) || (jenisKas === 'PENGELUARAN' ? 'BIAYA LAINNYA' : 'PEMASUKAN LAINNYA');
@@ -81,7 +82,7 @@ export async function getCashflowEntries(): Promise<CashflowEntry[]> {
       if (id || tanggal || nominal > 0) {
         entries.push({
           id: id || `TX-${tanggal.replace(/-/g, '') || 'AUTO'}-${i}`,
-          tanggal: tanggal || new Date().toISOString().split('T')[0],
+          tanggal: tanggal,
           jenisKas,
           kategori,
           nominal,

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { formatIDR, resolveLocationFromCode } from '@/lib/repositories/warehouse-utils';
+import { formatIDR, resolveLocationFromCode, parseToISODate } from '@/lib/repositories/warehouse-utils';
 import { ClosingDealItem, Invoice, DocumentType } from '@/lib/types/finance';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
 import { ResolveNonSkuModal, NonSkuResolveItem } from './ResolveNonSkuModal';
@@ -667,7 +667,7 @@ export function CashflowFinanceView() {
                           {item.id}
                         </td>
                         <td className="py-3 px-3.5 font-mono text-[11px] text-slate-300 whitespace-nowrap">
-                          {item.tanggal}
+                          {parseToISODate(item.tanggal) || item.tanggal}
                         </td>
                         <td className="py-3 px-3.5 whitespace-nowrap">
                           <span
