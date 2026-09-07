@@ -602,7 +602,7 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
               {items.map((item) => {
                 const isSelected = searchedItem?.SKU === item.SKU;
-                const rawTime = auditTimestamps[item.SKU] || item.TANGGAL_MASUK;
+                const rawTime = auditTimestamps[item.SKU] || item.LAST_CHECKED_TELEGRAM || item.TANGGAL_MASUK;
                 const displayTime = rawTime ? formatTimestampWithYear(rawTime) : null;
 
                 return (
@@ -755,10 +755,10 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                   <MapPin className="w-3 h-3 text-slate-500" />
                   <span>{searchedItem.LOKASI_UNIT}</span>
                 </div>
-                {auditTimestamps[searchedItem.SKU] && (
+                {(auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM) && (
                   <div className="text-[10px] font-mono text-emerald-400/90 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-lg inline-flex items-center gap-1 mt-1">
                     <span>🕒 Terakhir Dicek:</span>
-                    <strong>{auditTimestamps[searchedItem.SKU]}</strong>
+                    <strong>{formatTimestampWithYear(auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM)}</strong>
                   </div>
                 )}
               </div>

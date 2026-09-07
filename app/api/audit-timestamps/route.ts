@@ -4,6 +4,7 @@ import {
   savePersistentAuditState,
   SoldNotice,
 } from '@/lib/repositories/audit-repository';
+import { updateGoogleSheetsTelegramAudit } from '@/lib/repositories/google-sheets-inventory';
 
 export type { SoldNotice };
 
@@ -68,6 +69,10 @@ export async function POST(req: NextRequest) {
     }
     if (sku && timestamp) {
       newTimestamps[sku] = timestamp;
+      // Persist directly to Column AG in Google Sheets MASTER_INVENTORY
+      updateGoogleSheetsTelegramAudit(sku, timestamp).catch((err) =>
+        console.warn(`Could not update Column AG for SKU ${sku}:`, err)
+      );
     }
 
     const savedState = await savePersistentAuditState({

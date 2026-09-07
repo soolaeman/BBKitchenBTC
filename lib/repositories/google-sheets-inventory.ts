@@ -163,8 +163,8 @@ function toItem(row: string[]): MasterInventoryItem {
     HARGA_DEAL_WA: numberOrNull(value(row, 27)) ?? undefined,
     HARGA_FLOOR_WA: numberOrNull(value(row, 28)) ?? undefined,
     MARGIN_FLOOR: numberOrNull(value(row, 29)) ?? undefined,
-    MARGIN_DEAL: numberOrNull(value(row, 30)) ?? undefined,
     STATUS_GUARDRAIL: (value(row, 31) || "SAFE") as MasterInventoryItem["STATUS_GUARDRAIL"],
+    LAST_CHECKED_TELEGRAM: parseRawDateString(value(row, 32)) || undefined,
     HARGA_CLOSING: numberOrNull(value(row, 32)) ?? undefined,
     LINK_UNIT: formatCleanProductUrl(value(row, 1), value(row, 33)),
   };
@@ -614,4 +614,31 @@ export async function updateGoogleSheetsPipelineStatus(input: {
 
   return { success: true };
 }
+
+export async function updateGoogleSheetsTelegramAudit(
+  sku: string,
+  timestampStr: string
+): Promise<{ success: boolean; error?: string }> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_NOT_CONFIGURED");
+
+  const target = await findRowIndexBySku(sku);
+  if (!target) {
+    return { success: false, error: `Unit with SKU ${sku} not found in Google Sheets` };
+  }
+
+  const { rowIndex } = target;
+  const sheets = getSheetsClient();
+
+  // Update Column AG (LAST_CHECKED_TELEGRAM)
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `MASTER_INVENTORY!AG${rowIndex}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[timestampStr]] },
+  });
+
+  return { success: true };
+}
+
 

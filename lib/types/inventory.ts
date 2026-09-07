@@ -65,6 +65,7 @@ export interface MasterInventoryItem {
   image_description: string;
   asal_gudang: WarehouseCode;
   LINK_TELEGRAM?: string;
+  LAST_CHECKED_TELEGRAM?: string; // Column AG in Google Sheets MASTER_INVENTORY
   
   // Public Display Price (Estimated market/negotiable opening price)
   HARGA_ESTIMASI_PUBLIK: number | null;

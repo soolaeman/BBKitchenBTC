@@ -751,8 +751,8 @@ export function InventoryTable() {
               ) : (
                 data.items.map((item) => {
                   const isActive = activeClickedSku === item.SKU;
-                  const isAudited = Boolean(auditTimestamps[item.SKU]);
-                  const rawTime = auditTimestamps[item.SKU] || item.TANGGAL_MASUK;
+                  const isAudited = Boolean(auditTimestamps[item.SKU] || item.LAST_CHECKED_TELEGRAM);
+                  const rawTime = auditTimestamps[item.SKU] || item.LAST_CHECKED_TELEGRAM || item.TANGGAL_MASUK;
                   const displayTime = rawTime ? formatTimestampWithYear(rawTime) : null;
                   const soldNotice = soldNotices.find((n) => n.sku === item.SKU);
 
