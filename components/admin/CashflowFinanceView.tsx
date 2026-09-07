@@ -371,23 +371,25 @@ export function CashflowFinanceView() {
       )}
 
       {/* 1. EXECUTIVE CASHFLOW & NET PROFIT METRICS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1: Realized Net Operating Profit */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-emerald-500/40 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        {/* Metric 1: Total Omset / Pendapatan (Revenue) */}
+        <div
+          onClick={() => setTableTab('DEALS')}
+          className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-cyan-500/40 shadow-xl relative overflow-hidden cursor-pointer hover:border-cyan-400/70 transition-all"
+          title="Klik untuk melihat rincian transaksi penjualan / omset"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none" />
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-            <span className="uppercase tracking-wider">Laba Bersih Riil (Net Profit)</span>
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <span className="uppercase tracking-wider text-cyan-300">Total Omset (Revenue)</span>
+            <DollarSign className="w-4 h-4 text-cyan-400" />
           </div>
-          <div className={`text-2xl font-black font-mono tracking-tight mt-1 ${netProfitColor}`}>
-            {formatIDR(summary.netOperatingProfit)}
+          <div className="text-2xl font-black font-mono tracking-tight text-cyan-400 mt-1">
+            {formatIDR(summary.totalDealsRevenue + summary.totalCommissions)}
           </div>
           <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-800/60 pt-2">
-            <span>Gross Profit + Komisi - OPEX</span>
-            <span className="text-emerald-400 font-mono font-bold">
-              {summary.totalDealsRevenue > 0
-                ? `${Math.round((summary.netOperatingProfit / summary.totalDealsRevenue) * 100)}% Net Margin`
-                : '0% Net'}
+            <span>Mesin & Komisi</span>
+            <span className="text-cyan-400 font-mono font-bold underline">
+              {summary.totalDealsCount} Unit Terjual ➔
             </span>
           </p>
         </div>
@@ -404,7 +406,7 @@ export function CashflowFinanceView() {
         >
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
             <span className="uppercase tracking-wider flex items-center gap-1.5 text-amber-300">
-              <span>Laba Kotor Mesin (Deals)</span>
+              <span>Laba Kotor (Gross Profit)</span>
             </span>
             <ArrowUpRight className="w-4 h-4 text-amber-400" />
           </div>
@@ -412,9 +414,11 @@ export function CashflowFinanceView() {
             {formatIDR(summary.totalDealsGrossProfit)}
           </div>
           <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-800/60 pt-2">
-            <span>Omset: {formatIDR(summary.totalDealsRevenue)}</span>
-            <span className="text-amber-400 font-mono font-bold underline">
-              {summary.totalDealsCount} Unit Terjual ➔
+            <span>Modal: {formatIDR(Math.max(0, summary.totalDealsRevenue - summary.totalDealsGrossProfit))}</span>
+            <span className="text-amber-400 font-mono font-bold">
+              {summary.totalDealsRevenue > 0
+                ? `${Math.round((summary.totalDealsGrossProfit / summary.totalDealsRevenue) * 100)}% Margin`
+                : '0%'}
             </span>
           </p>
         </div>
@@ -422,7 +426,7 @@ export function CashflowFinanceView() {
         {/* Metric 3: Pemasukan Komisi & Referral */}
         <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-xl">
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-            <span className="uppercase tracking-wider">Komisi & Referral Masuk</span>
+            <span className="uppercase tracking-wider">Komisi & Referral</span>
             <Coins className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-black font-mono tracking-tight text-emerald-400 mt-1">
@@ -455,6 +459,26 @@ export function CashflowFinanceView() {
             <span>Kirim, IT, Gaji & Lainnya</span>
             <span className="text-rose-400 font-mono font-bold underline">
               {entries.filter((e) => e.jenisKas === 'PENGELUARAN').length} Pos Kas ➔
+            </span>
+          </p>
+        </div>
+
+        {/* Metric 5: Realized Net Operating Profit */}
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-emerald-500/40 shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+            <span className="uppercase tracking-wider">Laba Bersih Riil (Net)</span>
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className={`text-2xl font-black font-mono tracking-tight mt-1 ${netProfitColor}`}>
+            {formatIDR(summary.netOperatingProfit)}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-800/60 pt-2">
+            <span>Gross + Komisi - OPEX</span>
+            <span className="text-emerald-400 font-mono font-bold">
+              {summary.totalDealsRevenue > 0
+                ? `${Math.round((summary.netOperatingProfit / summary.totalDealsRevenue) * 100)}% Net Margin`
+                : '0% Net'}
             </span>
           </p>
         </div>
