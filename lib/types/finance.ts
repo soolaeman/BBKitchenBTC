@@ -60,7 +60,7 @@ export interface Invoice {
   validUntilDate?: string; // Untuk Quotation
   status: InvoiceStatus;
   paidDate?: string | null;
-  paymentMethod?: 'TRANSFER_JAGO_SYARIAH' | 'TRANSFER_BCA' | 'TRANSFER_MANDIRI' | 'CASH_PICKUP' | 'WOOCOMMERCE_GATEWAY';
+  paymentMethod?: 'TRANSFER_JAGO_SYARIAH' | 'TRANSFER_BCA' | 'TRANSFER_MANDIRI' | 'CASH_PICKUP' | 'WOOCOMMERCE_GATEWAY' | string;
   
   // Shipping & Delivery Details (Opsional dalam Invoice)
   hasShipping?: boolean;
