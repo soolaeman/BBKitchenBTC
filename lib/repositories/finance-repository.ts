@@ -270,7 +270,6 @@ export async function getLiveClosingDealLedger(): Promise<{
           rawInvoice: inv,
         });
       }
-      }
     } catch (invErr) {
       console.warn('Could not merge real invoices into deal ledger:', invErr);
     }
