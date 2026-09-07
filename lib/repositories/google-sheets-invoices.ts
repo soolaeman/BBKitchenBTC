@@ -70,7 +70,7 @@ async function ensureInvoiceSheetExists(spreadsheetId: string) {
       // Write Header Row
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${INVOICE_SHEET_NAME}!A1:AA1`,
+        range: `${INVOICE_SHEET_NAME}!A1:AB1`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [INVOICE_HEADERS],
@@ -224,7 +224,7 @@ export async function fetchGoogleSheetsInvoices(): Promise<Invoice[]> {
     const sheets = getSheetsClient();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${INVOICE_SHEET_NAME}!A2:AA`,
+      range: `${INVOICE_SHEET_NAME}!A2:AB`,
       valueRenderOption: 'UNFORMATTED_VALUE',
     });
 
@@ -243,7 +243,7 @@ async function syncInvoiceItemsToSold(invoice: Invoice) {
   if (invoice.status !== 'PAID' || !invoice.items || invoice.items.length === 0) return;
   for (const it of invoice.items) {
     const sku = (it.sku || '').trim().toUpperCase();
-    if (sku && !sku.startsWith('BBK-CUSTOM') && !sku.startsWith('INV-')) {
+    if (sku && sku !== 'UNIT' && !sku.startsWith('BBK-CUSTOM') && !sku.startsWith('INV-')) {
       try {
         await updateGoogleSheetsStockStatus({
           sku,
@@ -262,7 +262,7 @@ async function syncInvoiceItemsToReady(invoice: Invoice) {
   if (!invoice.items || invoice.items.length === 0) return;
   for (const it of invoice.items) {
     const sku = (it.sku || '').trim().toUpperCase();
-    if (sku && !sku.startsWith('BBK-CUSTOM') && !sku.startsWith('INV-')) {
+    if (sku && sku !== 'UNIT' && !sku.startsWith('BBK-CUSTOM') && !sku.startsWith('INV-')) {
       try {
         await updateGoogleSheetsStockStatus({
           sku,
@@ -365,10 +365,10 @@ export async function updateGoogleSheetsInvoice(invoice: Invoice): Promise<boole
     await ensureInvoiceSheetExists(spreadsheetId);
     const sheets = getSheetsClient();
 
-    // Get column A & B to find row index
+    // Get column A to AB to find row index and existing invoice details
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${INVOICE_SHEET_NAME}!A:B`,
+      range: `${INVOICE_SHEET_NAME}!A:AB`,
       valueRenderOption: 'UNFORMATTED_VALUE',
     });
 
@@ -381,27 +381,55 @@ export async function updateGoogleSheetsInvoice(invoice: Invoice): Promise<boole
       return appendGoogleSheetsInvoice(invoice);
     }
 
+    const existingRow = rows[targetIdx];
+    const existingInvoice = rowToInvoice(existingRow);
     const sheetRowNumber = targetIdx + 1;
     const row = invoiceToRow(invoice);
 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${INVOICE_SHEET_NAME}!A${sheetRowNumber}:AA${sheetRowNumber}`,
+      range: `${INVOICE_SHEET_NAME}!A${sheetRowNumber}:AB${sheetRowNumber}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [row],
       },
     });
 
+    // Handle differential stock status updates for multi-item invoices
+    const oldItems = existingInvoice.items || [];
+    const newItems = invoice.items || [];
+    const oldSkus = oldItems
+      .map((i) => (i.sku || '').trim().toUpperCase())
+      .filter((s) => s && s !== 'UNIT' && !s.startsWith('BBK-CUSTOM') && !s.startsWith('INV-'));
+    const newSkus = newItems
+      .map((i) => (i.sku || '').trim().toUpperCase())
+      .filter((s) => s && s !== 'UNIT' && !s.startsWith('BBK-CUSTOM') && !s.startsWith('INV-'));
+
     if (invoice.status === 'PAID') {
+      // 1. Revert SKUs that were in the previous invoice but REMOVED in the updated invoice
+      const removedSkus = oldSkus.filter((s) => !newSkus.includes(s));
+      for (const sku of removedSkus) {
+        updateGoogleSheetsStockStatus({
+          sku,
+          status: 'READY',
+          notes: `Reverted to READY (Removed from updated Invoice #${invoice.invoiceNumber || invoice.id})`,
+        }).catch((e) => console.warn(`Could not revert removed SKU ${sku}:`, e));
+      }
+
+      // 2. Mark ALL current SKUs in the invoice as SOLD
       syncInvoiceItemsToSold(invoice).catch((err) =>
         console.warn('Background auto-mark SOLD error:', err)
       );
     } else {
-      // If invoice was updated to unpaid / DP only, revert units back to READY
-      syncInvoiceItemsToReady(invoice).catch((err) =>
-        console.warn('Background auto-revert READY error:', err)
-      );
+      // If invoice was updated to unpaid / DP only, revert all old & new units back to READY
+      const allSkusToRevert = Array.from(new Set([...oldSkus, ...newSkus]));
+      for (const sku of allSkusToRevert) {
+        updateGoogleSheetsStockStatus({
+          sku,
+          status: 'READY',
+          notes: `Reverted to READY (Invoice #${invoice.invoiceNumber || invoice.id} reset to ${invoice.status})`,
+        }).catch((e) => console.warn(`Could not revert SKU ${sku} to READY:`, e));
+      }
     }
 
     return true;
@@ -430,7 +458,7 @@ export async function deleteGoogleSheetsInvoice(idOrNumber: string): Promise<boo
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${INVOICE_SHEET_NAME}!A2:AA`,
+      range: `${INVOICE_SHEET_NAME}!A2:AB`,
       valueRenderOption: 'UNFORMATTED_VALUE',
     });
 

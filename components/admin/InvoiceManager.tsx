@@ -174,9 +174,9 @@ export function InvoiceManager() {
     if (quotation.items && quotation.items.length > 0) {
       setItemRows(
         quotation.items.map((it, idx) => ({
-          id: `item_${Date.now()}_${idx}`,
-          sku: it.sku,
-          description: it.description,
+          id: `item_${idx + 1}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          sku: it.sku || '',
+          description: it.description || '',
           quantity: it.quantity || 1,
           unitPrice: it.unitPrice || 0,
           unitCost: it.unitCost || 0,
@@ -215,7 +215,7 @@ export function InvoiceManager() {
     if (inv.items && inv.items.length > 0) {
       setItemRows(
         inv.items.map((it, idx) => ({
-          id: it.id || `item_${Date.now()}_${idx}`,
+          id: `item_${idx + 1}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           sku: it.sku || '',
           description: it.description || '',
           quantity: it.quantity || 1,
@@ -226,7 +226,7 @@ export function InvoiceManager() {
         }))
       );
     } else {
-      setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: inv.totalAmount || 0, unitCost: 0 }]);
+      setItemRows([{ id: `item_1_${Date.now()}`, sku: '', description: '', quantity: 1, unitPrice: inv.totalAmount || 0, unitCost: 0 }]);
     }
     setDiscount(inv.discount ? String(inv.discount) : '0');
 
@@ -423,7 +423,7 @@ export function InvoiceManager() {
       const p = Number(r.unitPrice) || 0;
       const c = r.unitCost ? Number(r.unitCost) : undefined;
       return {
-        id: r.id || `item_${idx}_${Date.now()}`,
+        id: `item_${idx + 1}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         sku: r.sku.trim() || `BBK-CUSTOM-${idx + 1}`,
         description: r.description.trim() || 'Peralatan Dapur Komersial Restoran',
         quantity: q,

@@ -387,12 +387,16 @@ export async function findRowIndexBySku(sku: string): Promise<{ rowIndex: number
     }
   }
 
-  // 2. Numeric row index fallback (e.g. "BBK2766" refers to row 2766 in sheet)
-  if (numericOnly) {
+  // 2. Numeric row index fallback only for valid BBK SKU format (e.g. "BBK2766" refers to row 2766 in sheet)
+  if (numericOnly && upperSku.startsWith("BBK") && !upperSku.includes("CUSTOM")) {
     const candidateRowIndex = Number(numericOnly);
     // Row 2 is index 1, row N is index N - 1
     if (candidateRowIndex >= 2 && candidateRowIndex <= rows.length) {
-      return { rowIndex: candidateRowIndex, rowData: rows[candidateRowIndex - 1] as string[] };
+      const candidateRow = rows[candidateRowIndex - 1];
+      const candidateSku = String(candidateRow?.[0] ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (candidateSku === alphanumericSku || candidateSku.endsWith(numericOnly)) {
+        return { rowIndex: candidateRowIndex, rowData: candidateRow as string[] };
+      }
     }
   }
 
