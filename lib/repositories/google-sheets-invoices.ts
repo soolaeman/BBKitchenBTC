@@ -279,3 +279,46 @@ export async function updateGoogleSheetsInvoiceStatus(
     return false;
   }
 }
+
+export async function updateGoogleSheetsInvoice(invoice: Invoice): Promise<boolean> {
+  const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
+  if (!spreadsheetId) return false;
+
+  try {
+    await ensureInvoiceSheetExists(spreadsheetId);
+    const sheets = getSheetsClient();
+
+    // Get column A & B to find row index
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${INVOICE_SHEET_NAME}!A:B`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    });
+
+    const rows = res.data.values || [];
+    const targetIdx = rows.findIndex(
+      (r, idx) => idx > 0 && (String(r[0]).trim() === invoice.id || String(r[1]).trim() === invoice.invoiceNumber)
+    );
+
+    if (targetIdx === -1) {
+      return appendGoogleSheetsInvoice(invoice);
+    }
+
+    const sheetRowNumber = targetIdx + 1;
+    const row = invoiceToRow(invoice);
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${INVOICE_SHEET_NAME}!A${sheetRowNumber}:AA${sheetRowNumber}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [row],
+      },
+    });
+
+    return true;
+  } catch (err) {
+    console.error('Failed to update full invoice in Google Sheets:', err);
+    return false;
+  }
+}

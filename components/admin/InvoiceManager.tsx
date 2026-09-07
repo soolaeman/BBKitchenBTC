@@ -23,6 +23,7 @@ import {
   Trash2,
   X,
   ExternalLink,
+  Pencil,
 } from 'lucide-react';
 
 interface DocumentItemRow {
@@ -60,6 +61,7 @@ export function InvoiceManager() {
   const [documentModalType, setDocumentModalType] = useState<DocumentType>('INVOICE');
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
 
   // New Document Form States
   const [formDocType, setFormDocType] = useState<DocumentType>('INVOICE');
@@ -120,6 +122,51 @@ export function InvoiceManager() {
         ? `[Diambil dari ${quotation.quotationNumber || quotation.invoiceNumber}] ${quotation.notes}`
         : `Diambil dari Quotation ${quotation.quotationNumber || quotation.invoiceNumber}`
     );
+    setShowCreateModal(true);
+  };
+
+  // Open Edit Modal for Invoice / Quotation / Custom Kuitansi
+  const handleOpenEditModal = (inv: Invoice) => {
+    setEditingInvoice(inv);
+    setFormDocType(inv.documentType || 'INVOICE');
+    setCustomerName(inv.customerName || '');
+    setCustomerPhone(inv.customerPhone || '');
+    setCustomerAddress(inv.customerAddress || '');
+    setCustomerCompany(inv.customerCompany || '');
+    if (inv.items && inv.items.length > 0) {
+      setItemRows(
+        inv.items.map((it, idx) => ({
+          id: it.id || `item_${Date.now()}_${idx}`,
+          sku: it.sku || '',
+          description: it.description || '',
+          quantity: it.quantity || 1,
+          unitPrice: it.unitPrice || 0,
+          warehouseLocation: it.warehouseLocation,
+          condition: it.condition,
+        }))
+      );
+    } else {
+      setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: inv.totalAmount || 0 }]);
+    }
+    setDiscount(inv.discount ? String(inv.discount) : '0');
+    setShippingFee(inv.shippingFee ? String(inv.shippingFee) : '0');
+    setShippingFeeType(inv.shippingFeeType || 'BUYER_COD');
+    setDpAmount(inv.dpAmount ? String(inv.dpAmount) : '0');
+    setPaymentMethod(inv.paymentMethod === 'CASH_PICKUP' ? 'CASH_PICKUP' : 'TRANSFER_JAGO_SYARIAH');
+    setDeliveryDriver(inv.deliveryDriver || '');
+    setDriverPhone(inv.driverPhone || '');
+    setVehiclePlate(inv.deliveryVehiclePlate || '');
+    setNotes(inv.notes || '');
+
+    const matchExp = EXPEDITION_OPTIONS.find((o) => o.label === inv.deliveryExpedition || o.value === inv.deliveryExpedition);
+    if (matchExp) {
+      setExpeditionChoice(matchExp.value);
+      setCustomExpeditionText('');
+    } else if (inv.deliveryExpedition) {
+      setExpeditionChoice('CUSTOM');
+      setCustomExpeditionText(inv.deliveryExpedition);
+    }
+
     setShowCreateModal(true);
   };
 
@@ -292,37 +339,95 @@ export function InvoiceManager() {
     };
 
     try {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'CREATE', invoice: newInv }),
-      });
-      if (res.ok) {
-        const createdData = await res.json();
-        setShowCreateModal(false);
+      if (editingInvoice) {
+        const updatedInv: Invoice = {
+          ...editingInvoice,
+          documentType: formDocType,
+          customerName: customerName.trim() || 'Bpk/Ibu Owner Resto',
+          customerPhone: customerPhone.trim() || '08xx-xxxx-xxxx',
+          customerAddress: customerAddress.trim(),
+          customerCompany: customerCompany.trim(),
+          items: cleanItems,
+          subtotal: calculatedSubtotal,
+          discount: discNum,
+          tax: 0,
+          totalAmount: calculatedTotal,
+          dpAmount: formDocType === 'RECEIPT' ? calculatedTotal : dpNum,
+          remainingAmount: formDocType === 'RECEIPT' ? 0 : calculatedSisa,
+          status: (dpNum >= calculatedTotal && calculatedTotal > 0) || formDocType === 'RECEIPT' ? 'PAID' : editingInvoice.status,
+          paymentMethod,
+          deliveryDriver: deliveryDriver.trim() || undefined,
+          driverPhone: driverPhone.trim() || undefined,
+          deliveryVehiclePlate: vehiclePlate.trim() || undefined,
+          deliveryExpedition: resolvedExpedition,
+          shippingFeeType,
+          shippingFee: shippingNum,
+          notes: notes.trim(),
+        };
 
-        // Reset form
-        setCustomerName('');
-        setCustomerPhone('');
-        setCustomerAddress('');
-        setCustomerCompany('');
-        setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: 0 }]);
-        setDiscount('0');
-        setDpAmount('0');
-        setDeliveryDriver('');
-        setDriverPhone('');
-        setVehiclePlate('');
-        setNotes('');
-        loadInvoices();
+        const res = await fetch('/api/invoices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'UPDATE', invoice: updatedInv }),
+        });
 
-        if (createdData.invoice) {
-          setSelectedInvoice(createdData.invoice);
-          setDocumentModalType(formDocType);
-          setIsDocModalOpen(true);
+        if (res.ok) {
+          const updatedData = await res.json();
+          setShowCreateModal(false);
+          setEditingInvoice(null);
+          // Reset form
+          setCustomerName('');
+          setCustomerPhone('');
+          setCustomerAddress('');
+          setCustomerCompany('');
+          setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: 0 }]);
+          setDiscount('0');
+          setDpAmount('0');
+          setDeliveryDriver('');
+          setDriverPhone('');
+          setVehiclePlate('');
+          setNotes('');
+          loadInvoices();
+
+          if (updatedData.invoice) {
+            setSelectedInvoice(updatedData.invoice);
+            setDocumentModalType(formDocType);
+            setIsDocModalOpen(true);
+          }
+        }
+      } else {
+        const res = await fetch('/api/invoices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'CREATE', invoice: newInv }),
+        });
+        if (res.ok) {
+          const createdData = await res.json();
+          setShowCreateModal(false);
+
+          // Reset form
+          setCustomerName('');
+          setCustomerPhone('');
+          setCustomerAddress('');
+          setCustomerCompany('');
+          setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: 0 }]);
+          setDiscount('0');
+          setDpAmount('0');
+          setDeliveryDriver('');
+          setDriverPhone('');
+          setVehiclePlate('');
+          setNotes('');
+          loadInvoices();
+
+          if (createdData.invoice) {
+            setSelectedInvoice(createdData.invoice);
+            setDocumentModalType(formDocType);
+            setIsDocModalOpen(true);
+          }
         }
       }
     } catch (err) {
-      console.error('Document creation failed', err);
+      console.error('Document submission failed', err);
     }
   };
 
@@ -533,21 +638,41 @@ export function InvoiceManager() {
                               <Plus className="w-3.5 h-3.5" />
                               <span>Ambil ke Invoice</span>
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(inv)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition-colors"
+                              title="Edit rincian unit dan penawaran harga"
+                            >
+                              <Pencil className="w-3 h-3 text-amber-400" />
+                              <span>Edit</span>
+                            </button>
                           </>
                         ) : inv.documentType === 'RECEIPT' ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedInvoice(inv);
-                              setDocumentModalType('RECEIPT');
-                              setIsDocModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-colors"
-                            title="Buka & Cetak Kuitansi Pembayaran"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            <span>Kuitansi</span>
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedInvoice(inv);
+                                setDocumentModalType('RECEIPT');
+                                setIsDocModalOpen(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-colors"
+                              title="Buka & Cetak Kuitansi Pembayaran"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span>Kuitansi</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(inv)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition-colors"
+                              title="Edit rincian unit, nominal DP, atau status pelunasan"
+                            >
+                              <Pencil className="w-3 h-3 text-amber-400" />
+                              <span>Edit</span>
+                            </button>
+                          </>
                         ) : (
                           <>
                             <button
@@ -589,6 +714,15 @@ export function InvoiceManager() {
                               <Truck className="w-3 h-3" />
                               <span>Surat Jalan</span>
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(inv)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition-colors"
+                              title="Edit rincian unit, diskon, custom kuitansi DP, atau data kurir"
+                            >
+                              <Pencil className="w-3 h-3 text-amber-400" />
+                              <span>Edit</span>
+                            </button>
                           </>
                         )}
                       </div>
@@ -601,27 +735,34 @@ export function InvoiceManager() {
         </div>
       </div>
 
-      {/* CREATE NEW OFFICIAL DOCUMENT MODAL WITH MULTI-ITEM & AUTO-SEARCH */}
+      {/* CREATE / EDIT OFFICIAL DOCUMENT MODAL */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
           <div className="relative w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 space-y-5 max-h-[92vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2.5">
                 <span className="p-2 rounded-xl bg-amber-950 border border-amber-800 text-amber-400">
-                  <FileText className="w-5 h-5" />
+                  {editingInvoice ? <Pencil className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
                 </span>
                 <div>
                   <h3 className="text-base font-black text-white">
-                    Penerbitan Dokumen Legal Resmi BBKitchen
+                    {editingInvoice
+                      ? `Edit Transaksi & Custom Kuitansi: ${editingInvoice.invoiceNumber || editingInvoice.quotationNumber}`
+                      : 'Penerbitan Dokumen Legal Resmi BBKitchen'}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Mendukung multi-unit, pencarian otomatis stok live, dan surat jalan tanpa harga.
+                    {editingInvoice
+                      ? 'Sesuaikan rincian unit, harga kesepakatan, DP kuitansi, atau data ekspedisi kurir.'
+                      : 'Mendukung multi-unit, pencarian otomatis stok live, dan surat jalan tanpa harga.'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setEditingInvoice(null);
+                }}
                 className="text-slate-400 hover:text-white p-1"
               >
                 ✕
@@ -1082,16 +1223,26 @@ export function InvoiceManager() {
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setEditingInvoice(null);
+                  }}
                   className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-lg shadow-amber-950/50"
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-lg shadow-amber-950/50 flex items-center gap-1.5"
                 >
-                  Simpan & Cetak Dokumen
+                  {editingInvoice ? (
+                    <>
+                      <Pencil className="w-4 h-4" />
+                      <span>Simpan Perubahan Transaksi</span>
+                    </>
+                  ) : (
+                    <span>Simpan & Cetak Dokumen</span>
+                  )}
                 </button>
               </div>
             </form>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getInvoices,
   createInvoice,
+  updateInvoice,
   updateInvoiceStatus,
   getFinancialKPIs,
   getLiveClosingDealLedger,
@@ -59,6 +60,11 @@ export async function POST(request: NextRequest) {
     if (action === 'CREATE') {
       const created = await createInvoice(invoice);
       return NextResponse.json({ success: true, invoice: created });
+    }
+
+    if (action === 'UPDATE' || action === 'EDIT') {
+      const updated = await updateInvoice(invoice);
+      return NextResponse.json({ success: true, invoice: updated });
     }
 
     if (action === 'UPDATE_STATUS') {

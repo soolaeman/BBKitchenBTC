@@ -6,6 +6,7 @@ import {
   fetchGoogleSheetsInvoices,
   appendGoogleSheetsInvoice,
   updateGoogleSheetsInvoiceStatus,
+  updateGoogleSheetsInvoice,
 } from './google-sheets-invoices';
 
 // Clean Real Invoices store for BBKitchen (in-memory cache)
@@ -37,6 +38,24 @@ export async function createInvoice(invoiceData: Omit<Invoice, 'id'>): Promise<I
   );
 
   return newInvoice;
+}
+
+export async function updateInvoice(invoice: Invoice): Promise<Invoice> {
+  const index = cachedInvoices.findIndex(
+    (inv) => inv.id === invoice.id || inv.invoiceNumber === invoice.invoiceNumber
+  );
+  if (index !== -1) {
+    cachedInvoices[index] = { ...invoice };
+  } else {
+    cachedInvoices.unshift(invoice);
+  }
+
+  // Persist full update to Google Sheets
+  await updateGoogleSheetsInvoice(invoice).catch((e) =>
+    console.warn('Google Sheets full invoice update warning:', e)
+  );
+
+  return invoice;
 }
 
 export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<boolean> {
