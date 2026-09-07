@@ -209,22 +209,12 @@ export async function getLiveClosingDealLedger(): Promise<{
     const deals: ClosingDealItem[] = soldItems.map((item) => {
       const modal = item.HARGA_MODAL || 0;
       
-      // BBKitchen closing if HARGA_CLOSING (Column AG) is explicitly populated > 0, otherwise third party uses modal as closing value
-      const hasExplicitClosing = typeof item.HARGA_CLOSING === 'number' && item.HARGA_CLOSING > 0;
-      const isThirdParty = !hasExplicitClosing;
-      const closing = hasExplicitClosing ? item.HARGA_CLOSING! : modal;
-      const realizedProfit = hasExplicitClosing ? Math.max(0, closing - modal) : 0;
-      const marginPercent = (hasExplicitClosing && closing > 0 && modal > 0)
-        ? Math.round(((closing - modal) / closing) * 100)
-        : 0;
-
-      if (isThirdParty) {
-        thirdPartyCount++;
-      } else {
-        bbkSalesCount++;
-      }
-      totalRevenue += closing;
-      totalProfit += realizedProfit;
+      // Default: ALL sold items in Master Inventory are Third-Party / Rekanan Gudang.
+      // ONLY items with a verified PAID Invoice in INVOICE_ARCHIVE will become SALES_BBK!
+      const isThirdParty = true;
+      const closing = modal;
+      const realizedProfit = 0;
+      const marginPercent = 0;
 
       // Convert serial date or raw string to ISO YYYY-MM-DD
       const cleanInDate = parseToISODate(item.TANGGAL_MASUK);
@@ -247,10 +237,10 @@ export async function getLiveClosingDealLedger(): Promise<{
         asalGudang: item.asal_gudang || 'GK',
         hargaModal: modal,
         hargaClosing: closing,
-        realizedProfit,
-        marginPercent,
-        soldBy: isThirdParty ? 'THIRD_PARTY' : 'SALES_BBK',
-        notes: isThirdParty ? 'Terjual Rekanan Gudang / Pihak Ketiga' : 'Closing Sales WhatsApp BBKitchen',
+        realizedProfit: 0,
+        marginPercent: 0,
+        soldBy: 'THIRD_PARTY',
+        notes: 'Terjual Rekanan Gudang / Pihak Ketiga',
       };
     });
 
@@ -307,10 +297,11 @@ export async function getLiveClosingDealLedger(): Promise<{
       console.warn('Could not merge real invoices into deal ledger:', invErr);
     }
 
-    // Recalculate Totals
-    totalRevenue = deals.reduce((sum, d) => sum + d.hargaClosing, 0);
-    totalProfit = deals.reduce((sum, d) => sum + d.realizedProfit, 0);
-    bbkSalesCount = deals.filter((d) => d.soldBy === 'SALES_BBK').length;
+    // Recalculate Totals (Only direct BBKitchen sales contribute to revenue & profit)
+    const bbkDeals = deals.filter((d) => d.soldBy === 'SALES_BBK');
+    totalRevenue = bbkDeals.reduce((sum, d) => sum + d.hargaClosing, 0);
+    totalProfit = bbkDeals.reduce((sum, d) => sum + d.realizedProfit, 0);
+    bbkSalesCount = bbkDeals.length;
     thirdPartyCount = deals.filter((d) => d.soldBy === 'THIRD_PARTY').length;
 
     // Sort newest sold date first
