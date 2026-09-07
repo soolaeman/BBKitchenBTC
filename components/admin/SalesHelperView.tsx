@@ -127,12 +127,9 @@ export function SalesHelperView() {
     return {};
   });
 
-  const selectItem = useCallback((item: MasterInventoryItem, syncGlobal: boolean = true) => {
+  const selectItem = useCallback((item: MasterInventoryItem) => {
     setSearchedItem(item);
     setQuotePrice(item.HARGA_BUKA_WA || item.HARGA_ESTIMASI_PUBLIK || '');
-    if (syncGlobal) {
-      markSkuAsVisited(item.SKU);
-    }
   }, []);
 
   // Cross-device synchronization for audit timestamps ONLY (Row control strictly in Master Inventory)

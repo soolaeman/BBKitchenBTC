@@ -811,10 +811,7 @@ export function InventoryTable() {
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => {
-                              markSkuAsVisited(item.SKU);
-                              setSelectedItem(item);
-                            }}
+                            onClick={() => setSelectedItem(item)}
                             className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
                             title="Quick View & Specs"
                           >
@@ -823,10 +820,7 @@ export function InventoryTable() {
 
                           <button
                             type="button"
-                            onClick={() => {
-                              markSkuAsVisited(item.SKU);
-                              setWaModalItem(item);
-                            }}
+                            onClick={() => setWaModalItem(item)}
                             className="p-1.5 rounded-lg bg-emerald-950/80 border border-emerald-800/80 text-emerald-300 hover:bg-emerald-800 hover:text-white transition-colors"
                             title="1-Klik Format Penawaran WhatsApp"
                           >
@@ -848,7 +842,6 @@ export function InventoryTable() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  markSkuAsVisited(item.SKU);
                                   setSoldModalItem(item);
                                   setDealPriceInput(String(item.HARGA_DEAL_WA || item.HARGA_BUKA_WA || ''));
                                 }}
