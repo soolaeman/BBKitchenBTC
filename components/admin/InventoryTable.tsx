@@ -140,6 +140,23 @@ export function InventoryTable() {
 
   // Cross-device synchronization for audit timestamps & active row (Desktop <-> Mobile)
   useEffect(() => {
+    // 1. Initial push of existing desktop timestamps to backend if present
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('bbk_audit_timestamps');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            fetch('/api/audit-timestamps', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ batch: parsed }),
+            }).catch(() => {});
+          }
+        }
+      } catch {}
+    }
+
     async function syncTimestamps() {
       try {
         const res = await fetch('/api/audit-timestamps');
@@ -166,7 +183,7 @@ export function InventoryTable() {
     }
 
     syncTimestamps();
-    const interval = setInterval(syncTimestamps, 3500);
+    const interval = setInterval(syncTimestamps, 3000);
     window.addEventListener('focus', syncTimestamps);
     return () => {
       clearInterval(interval);

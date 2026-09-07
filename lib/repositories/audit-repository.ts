@@ -143,29 +143,26 @@ export async function savePersistentAuditState(
   const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
   if (!spreadsheetId) return cachedState;
 
-  // Asynchronous background write to Google Sheets
-  (async () => {
-    try {
-      await ensureAuditSheetExists(spreadsheetId);
-      const sheets = getSheetsClient();
-      const isoNow = new Date().toISOString();
+  try {
+    await ensureAuditSheetExists(spreadsheetId);
+    const sheets = getSheetsClient();
+    const isoNow = new Date().toISOString();
 
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: `${AUDIT_SHEET_NAME}!A2:C4`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [
-            ['AUDIT_TIMESTAMPS', JSON.stringify(cachedState.timestamps), isoNow],
-            ['ACTIVE_SKU', cachedState.activeSku || '', isoNow],
-            ['SOLD_NOTICES', JSON.stringify(cachedState.soldNotices), isoNow],
-          ],
-        },
-      });
-    } catch (err) {
-      console.warn('Failed to persist SYSTEM_AUDIT_STATE to Google Sheets:', err);
-    }
-  })();
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${AUDIT_SHEET_NAME}!A2:C4`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [
+          ['AUDIT_TIMESTAMPS', JSON.stringify(cachedState.timestamps), isoNow],
+          ['ACTIVE_SKU', cachedState.activeSku || '', isoNow],
+          ['SOLD_NOTICES', JSON.stringify(cachedState.soldNotices), isoNow],
+        ],
+      },
+    });
+  } catch (err) {
+    console.warn('Failed to persist SYSTEM_AUDIT_STATE to Google Sheets:', err);
+  }
 
   return cachedState;
 }
