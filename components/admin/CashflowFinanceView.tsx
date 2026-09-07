@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { formatIDR } from '@/lib/repositories/warehouse-utils';
+import { formatIDR, resolveLocationFromCode } from '@/lib/repositories/warehouse-utils';
+import { ClosingDealItem, Invoice, DocumentType } from '@/lib/types/finance';
+import { OfficialDocumentModal } from './OfficialDocumentModal';
+import { ResolveNonSkuModal, NonSkuResolveItem } from './ResolveNonSkuModal';
 import {
   CashflowEntry,
   CashflowType,
@@ -29,6 +32,11 @@ import {
   PieChart,
   Coins,
   AlertCircle,
+  FileText,
+  Link2,
+  Package,
+  Layers,
+  ExternalLink,
 } from 'lucide-react';
 
 interface SummaryData {
@@ -54,8 +62,12 @@ export function CashflowFinanceView() {
   const [kategoriFilter, setKategoriFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Table Sub-Tab Switcher (Expenses vs Deals Detail)
+  const [tableTab, setTableTab] = useState<'EXPENSES' | 'DEALS'>('EXPENSES');
+
   // Data States
   const [entries, setEntries] = useState<CashflowEntry[]>([]);
+  const [deals, setDeals] = useState<ClosingDealItem[]>([]);
   const [summary, setSummary] = useState<SummaryData>({
     totalDealsRevenue: 0,
     totalDealsGrossProfit: 0,
@@ -70,7 +82,7 @@ export function CashflowFinanceView() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionSuccessMsg, setActionSuccessMsg] = useState('');
 
-  // Modal State
+  // Modal State for Cash Transaction
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formJenisKas, setFormJenisKas] = useState<CashflowType>('PENGELUARAN');
   const [formTanggal, setFormTanggal] = useState(() => new Date().toISOString().split('T')[0]);
@@ -80,6 +92,13 @@ export function CashflowFinanceView() {
   const [formReferensiSku, setFormReferensiSku] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Modal State for Official Document & Resolve Non-SKU
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [documentModalType, setDocumentModalType] = useState<DocumentType>('INVOICE');
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+  const [resolveItem, setResolveItem] = useState<NonSkuResolveItem | null>(null);
+  const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
 
   // Sync default category when formJenisKas switches
   useEffect(() => {
@@ -119,7 +138,7 @@ export function CashflowFinanceView() {
   }, [datePreset, startDate, endDate]);
 
   // Fetch Cashflow Data from Google Sheets API
-  const fetchCashflow = async () => {
+  const fetchCashflow = useCallback(async () => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
@@ -133,6 +152,9 @@ export function CashflowFinanceView() {
 
       if (data.success) {
         setEntries(data.entries || []);
+        if (data.deals) {
+          setDeals(data.deals || []);
+        }
         if (data.summary) {
           setSummary(data.summary);
         }
@@ -142,11 +164,11 @@ export function CashflowFinanceView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [startFilter, endFilter, jenisKasFilter, kategoriFilter]);
 
   useEffect(() => {
     fetchCashflow();
-  }, [startFilter, endFilter, jenisKasFilter, kategoriFilter]);
+  }, [fetchCashflow]);
 
   // Filter entries in memory for search query
   const filteredEntries = useMemo(() => {
@@ -158,17 +180,33 @@ export function CashflowFinanceView() {
         e.kategori.toLowerCase().includes(q) ||
         e.keterangan.toLowerCase().includes(q) ||
         (e.referensiSku && e.referensiSku.toLowerCase().includes(q)) ||
-        e.dicatatOleh.toLowerCase().includes(q)
+        (e.dicatatOleh && e.dicatatOleh.toLowerCase().includes(q))
       );
     });
   }, [entries, searchQuery]);
 
-  // Handle Add Transaction Submit
+  // Filter deals in memory for search query
+  const filteredDeals = useMemo(() => {
+    return deals.filter((d) => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        d.sku.toLowerCase().includes(q) ||
+        d.productTitle.toLowerCase().includes(q) ||
+        (d.customerName && d.customerName.toLowerCase().includes(q)) ||
+        (d.notes && d.notes.toLowerCase().includes(q)) ||
+        (d.invoiceNumber && d.invoiceNumber.toLowerCase().includes(q)) ||
+        (d.asalGudang && d.asalGudang.toLowerCase().includes(q))
+      );
+    });
+  }, [deals, searchQuery]);
+
+  // Handle Form Submit (+ Catat Kas)
   const handleSubmitTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanNum = Number(formNominal.replace(/[^0-9]/g, ''));
-    if (!cleanNum || cleanNum <= 0) {
-      alert('Nominal harus lebih dari 0');
+    const cleanNominal = Number(formNominal.replace(/\D/g, ''));
+    if (!cleanNominal || cleanNominal <= 0) {
+      alert('Masukkan nominal kas yang valid (lebih dari Rp 0)');
       return;
     }
 
@@ -178,12 +216,12 @@ export function CashflowFinanceView() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tanggal: formTanggal,
           jenisKas: formJenisKas,
+          tanggal: formTanggal,
           kategori: formKategori,
-          nominal: cleanNum,
-          keterangan: formKeterangan.trim(),
-          referensiSku: formReferensiSku.trim().toUpperCase() || undefined,
+          nominal: cleanNominal,
+          keterangan: formKeterangan,
+          referensiSku: formReferensiSku ? formReferensiSku.trim().toUpperCase() : undefined,
         }),
       });
 
@@ -193,7 +231,7 @@ export function CashflowFinanceView() {
         setFormNominal('');
         setFormKeterangan('');
         setFormReferensiSku('');
-        setActionSuccessMsg(`Transaksi ${formJenisKas === 'PENGELUARAN' ? 'pengeluaran' : 'pemasukan'} berhasil dicatat ke Google Sheets!`);
+        setActionSuccessMsg('Transaksi kas berhasil dicatat ke Google Sheets!');
         setTimeout(() => setActionSuccessMsg(''), 4000);
         fetchCashflow();
       } else {
@@ -226,6 +264,35 @@ export function CashflowFinanceView() {
     }
   };
 
+  // Helper: Open Document from Deal Row
+  const handleOpenDocFromDeal = (deal: ClosingDealItem, type: DocumentType) => {
+    const dummyInv: Invoice = {
+      id: deal.invoiceId || `inv_${deal.sku}`,
+      invoiceNumber: deal.invoiceNumber || deal.sku.replace('BBK-CUSTOM-', '').replace('INV-', '').split('_')[0],
+      issueDate: deal.tanggalTerjual || new Date().toISOString().split('T')[0],
+      customerName: deal.customerName || 'Pelanggan BBKitchen',
+      status: 'PAID',
+      items: [
+        {
+          id: `it_${deal.sku}`,
+          sku: deal.sku,
+          description: deal.productTitle,
+          quantity: deal.quantity || 1,
+          unitPrice: (deal.hargaClosing || 0) / (deal.quantity || 1),
+          unitCost: (deal.hargaModal || 0) / (deal.quantity || 1),
+          totalPrice: deal.hargaClosing || 0,
+        },
+      ],
+      subtotal: deal.hargaClosing || 0,
+      totalAmount: deal.hargaClosing || 0,
+      paidAmount: deal.hargaClosing || 0,
+      remainingAmount: 0,
+    };
+    setSelectedInvoice(dummyInv);
+    setDocumentModalType(type);
+    setIsDocModalOpen(true);
+  };
+
   // Category Icon Helper
   const getCategoryIcon = (cat: string) => {
     if (cat.includes('LOGISTIK')) return <Truck className="w-3.5 h-3.5 text-blue-400" />;
@@ -255,7 +322,7 @@ export function CashflowFinanceView() {
                 </span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Pencatatan kas riil, beban operasional, komisi non-penjualan, modal investor & kalkulasi laba bersih.
+                Pencatatan kas riil, beban operasional, komisi non-penjualan, modal investor & rincian transaksi closing.
               </p>
             </div>
           </div>
@@ -313,18 +380,30 @@ export function CashflowFinanceView() {
           </p>
         </div>
 
-        {/* Metric 2: Gross Profit Penjualan Mesin */}
-        <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-xl">
+        {/* Metric 2: Gross Profit Penjualan Mesin (Clickable to view deals detail) */}
+        <div
+          onClick={() => setTableTab('DEALS')}
+          className={`p-5 rounded-2xl bg-slate-900/90 border transition-all cursor-pointer shadow-xl ${
+            tableTab === 'DEALS'
+              ? 'border-amber-500 ring-2 ring-amber-500/30 bg-amber-950/20'
+              : 'border-slate-800/80 hover:border-amber-700/80 hover:bg-slate-850/60'
+          }`}
+          title="Klik untuk melihat rincian tabel transaksi closing deals"
+        >
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-            <span className="uppercase tracking-wider">📦 Laba Kotor Mesin (Deals)</span>
-            <ArrowUpRight className="w-4 h-4 text-emerald-400" />
+            <span className="uppercase tracking-wider flex items-center gap-1.5 text-amber-300">
+              <span>📦 Laba Kotor Mesin (Deals)</span>
+            </span>
+            <ArrowUpRight className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-2xl font-black font-mono tracking-tight text-slate-100 mt-1">
+          <div className="text-2xl font-black font-mono tracking-tight text-amber-400 mt-1">
             {formatIDR(summary.totalDealsGrossProfit)}
           </div>
           <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-800/60 pt-2">
             <span>Omset: {formatIDR(summary.totalDealsRevenue)}</span>
-            <span className="text-amber-400 font-mono font-bold">{summary.totalDealsCount} Closing</span>
+            <span className="text-amber-400 font-mono font-bold underline">
+              {summary.totalDealsCount} Closing ➔
+            </span>
           </p>
         </div>
 
@@ -344,9 +423,17 @@ export function CashflowFinanceView() {
         </div>
 
         {/* Metric 4: Total Beban Operasional (OPEX) */}
-        <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-xl">
+        <div
+          onClick={() => setTableTab('EXPENSES')}
+          className={`p-5 rounded-2xl bg-slate-900/90 border transition-all cursor-pointer shadow-xl ${
+            tableTab === 'EXPENSES'
+              ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-950/20'
+              : 'border-slate-800/80 hover:border-rose-700/80 hover:bg-slate-850/60'
+          }`}
+          title="Klik untuk melihat rincian tabel buku kas pengeluaran"
+        >
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-            <span className="uppercase tracking-wider">💸 Total Beban OPEX</span>
+            <span className="uppercase tracking-wider text-rose-300">💸 Total Beban OPEX</span>
             <ArrowDownRight className="w-4 h-4 text-rose-400" />
           </div>
           <div className="text-2xl font-black font-mono tracking-tight text-rose-400 mt-1">
@@ -354,259 +441,450 @@ export function CashflowFinanceView() {
           </div>
           <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-800/60 pt-2">
             <span>Kirim, IT, Gaji & Lainnya</span>
-            <span className="text-slate-400 text-[10px]">Pengeluaran Kas</span>
+            <span className="text-rose-400 font-mono font-bold underline">
+              {entries.filter((e) => e.jenisKas === 'PENGELUARAN').length} Pos Kas ➔
+            </span>
           </p>
         </div>
       </div>
 
-      {/* 2. INVESTOR CAPITAL FLOW SUMMARY (COLLAPSIBLE CARD) */}
-      {(summary.totalInvestorInflow > 0 || summary.totalInvestorOutflow > 0) && (
-        <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-900/60 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <Building className="w-5 h-5 text-indigo-400 shrink-0" />
-            <div>
-              <span className="font-bold text-indigo-200">Arus Kas Modal Investor:</span>
-              <span className="text-slate-400 block text-[11px]">
-                Suntikan Modal Masuk: <strong className="text-emerald-400 font-mono">+{formatIDR(summary.totalInvestorInflow)}</strong> • Bagi Hasil / Dividen Keluar: <strong className="text-rose-400 font-mono">-{formatIDR(summary.totalInvestorOutflow)}</strong>
-              </span>
-            </div>
-          </div>
-          <div className="font-mono font-bold text-indigo-300 text-sm">
-            Posisi Kas Investor: {formatIDR(summary.netInvestorPosition)}
-          </div>
-        </div>
-      )}
-
-      {/* 3. FILTERS & SEARCH BAR */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          {/* Periode */}
+      {/* 2. FILTER & SEARCH BAR */}
+      <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 space-y-3 shadow-xl">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Periode Preset */}
           <div>
-            <label className="block text-slate-400 font-bold mb-1">📅 Periode:</label>
+            <label className="block text-[11px] font-bold text-slate-400 mb-1 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Periode:</span>
+            </label>
             <select
               value={datePreset}
               onChange={(e) => setDatePreset(e.target.value as any)}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold text-xs"
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs font-semibold"
             >
-              <option value="ALL">Semua Waktu</option>
+              <option value="ALL">Semua Periode</option>
               <option value="THIS_MONTH">Bulan Ini</option>
               <option value="LAST_MONTH">Bulan Lalu</option>
               <option value="THIS_YEAR">Tahun Ini</option>
-              <option value="CUSTOM">Kustom Tanggal</option>
+              <option value="CUSTOM">Custom Rentang Tanggal</option>
             </select>
           </div>
 
           {/* Jenis Kas */}
           <div>
-            <label className="block text-slate-400 font-bold mb-1">🔄 Jenis Kas:</label>
+            <label className="block text-[11px] font-bold text-slate-400 mb-1 flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Jenis Kas:</span>
+            </label>
             <select
               value={jenisKasFilter}
               onChange={(e) => setJenisKasFilter(e.target.value as any)}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold text-xs"
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs font-semibold"
             >
               <option value="ALL">Semua Jenis Transaksi</option>
-              <option value="PENGELUARAN">💸 Pengeluaran Saja (Beban OPEX)</option>
-              <option value="PEMASUKAN_LAIN">💵 Pemasukan Lain Saja (Komisi/Modal)</option>
+              <option value="PENGELUARAN">Pengeluaran (Beban OPEX)</option>
+              <option value="PEMASUKAN_LAIN">Pemasukan (Komisi & Modal)</option>
             </select>
           </div>
 
           {/* Kategori */}
           <div>
-            <label className="block text-slate-400 font-bold mb-1">📁 Kategori:</label>
+            <label className="block text-[11px] font-bold text-slate-400 mb-1 flex items-center gap-1.5">
+              <Building className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Kategori:</span>
+            </label>
             <select
               value={kategoriFilter}
               onChange={(e) => setKategoriFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold text-xs"
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs font-semibold"
             >
               <option value="ALL">Semua Kategori</option>
-              <optgroup label="💸 Pengeluaran">
-                {EXPENSE_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
+              <optgroup label="Pengeluaran (Beban Operasional)">
+                {EXPENSE_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
                   </option>
                 ))}
               </optgroup>
-              <optgroup label="💵 Pemasukan">
-                {INCOME_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
+              <optgroup label="Pemasukan Non-Inventory">
+                {INCOME_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
                   </option>
                 ))}
               </optgroup>
             </select>
           </div>
 
-          {/* Search Keterangan / SKU */}
+          {/* Search Query */}
           <div>
-            <label className="block text-slate-400 font-bold mb-1">🔍 Cari Transaksi:</label>
+            <label className="block text-[11px] font-bold text-slate-400 mb-1 flex items-center gap-1.5">
+              <span>🔍 Cari Transaksi:</span>
+            </label>
             <input
               type="text"
+              placeholder="Cari ID, keterangan, SKU, customer..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari ID, keterangan, SKU..."
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs"
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs"
             />
           </div>
         </div>
 
+        {/* Custom Date Range Pickers */}
         {datePreset === 'CUSTOM' && (
-          <div className="pt-2 border-t border-slate-800/80 flex items-center gap-3 text-xs">
-            <div>
-              <span className="text-slate-400 mr-2">Dari:</span>
+          <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">Dari:</span>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200"
+                className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono text-xs"
               />
             </div>
-            <div>
-              <span className="text-slate-400 mr-2">Sampai:</span>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">Sampai:</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200"
+                className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono text-xs"
               />
             </div>
           </div>
         )}
       </div>
 
-      {/* 4. CASHFLOW ENTRIES TABLE (BUKU KAS) */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
-        <div className="p-4 border-b border-slate-800/80 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">
-              BUKU KAS & JURNAL TRANSAKSI ({filteredEntries.length} Baris)
-            </h3>
-          </div>
-          <span className="text-[11px] text-slate-400 font-mono">
-            Sheet: <strong className="text-slate-200">CASHFLOW_EXPENSES</strong>
+      {/* 3. SUB-TAB SWITCHER: BUKU KAS vs RINCIAN TRANSAKSI PENJUALAN */}
+      <div className="p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-wrap sm:flex-nowrap gap-1 shadow-md">
+        <button
+          type="button"
+          onClick={() => setTableTab('EXPENSES')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all ${
+            tableTab === 'EXPENSES'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/50'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+          }`}
+        >
+          <Wallet className="w-4 h-4" />
+          <span>1. Buku Kas & Jurnal Pengeluaran (CASHFLOW_EXPENSES)</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-950 text-emerald-300 border border-emerald-800 font-mono font-bold">
+            {filteredEntries.length} Baris
           </span>
-        </div>
+        </button>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead>
-              <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 font-bold uppercase text-[10px] tracking-wider">
-                <th className="py-3 px-3.5">ID Transaksi</th>
-                <th className="py-3 px-3.5">Tanggal</th>
-                <th className="py-3 px-3.5">Jenis</th>
-                <th className="py-3 px-3.5">Kategori</th>
-                <th className="py-3 px-3.5">Keterangan & Rincian</th>
-                <th className="py-3 px-3.5 text-center">Ref SKU</th>
-                <th className="py-3 px-3.5 text-right">Nominal (Rp)</th>
-                <th className="py-3 px-3.5 text-center">Dicatat Oleh</th>
-                <th className="py-3 px-3.5 text-center">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-500">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-500 mb-2" />
-                    Memuat data kas dari Google Sheets...
-                  </td>
-                </tr>
-              ) : filteredEntries.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-500">
-                    <AlertCircle className="w-6 h-6 mx-auto mb-2 text-slate-600" />
-                    Belum ada catatan transaksi kas pada filter yang dipilih.
-                    <div className="mt-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsModalOpen(true)}
-                        className="text-xs text-emerald-400 hover:text-emerald-300 underline font-bold"
-                      >
-                        + Catat transaksi kas pertama sekarang
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filteredEntries.map((item) => {
-                  const isExpense = item.jenisKas === 'PENGELUARAN';
-                  const isInvestor = item.kategori.includes('INVESTOR');
+        <button
+          type="button"
+          onClick={() => setTableTab('DEALS')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all ${
+            tableTab === 'DEALS'
+              ? 'bg-amber-600 text-white shadow-md shadow-amber-950/50'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          <span>2. Rincian Penjualan Mesin & Invoice Closing (Deals)</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-950 text-amber-300 border border-amber-800 font-mono font-bold">
+            {filteredDeals.length} Transaksi
+          </span>
+        </button>
+      </div>
 
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-850/50 transition-colors">
-                      <td className="py-3 px-3.5 font-mono text-[11px] text-slate-400 font-bold">
-                        {item.id}
-                      </td>
-                      <td className="py-3 px-3.5 font-mono text-[11px] text-slate-300 whitespace-nowrap">
-                        {item.tanggal}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
-                            isExpense
-                              ? 'bg-rose-950/80 text-rose-300 border border-rose-800/80'
-                              : 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/80'
-                          }`}
+      {/* 4A. TAB 1: CASHFLOW ENTRIES TABLE (BUKU KAS OPERASIONAL) */}
+      {tableTab === 'EXPENSES' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+          <div className="p-4 border-b border-slate-800/80 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">
+                BUKU KAS & JURNAL TRANSAKSI ({filteredEntries.length} Baris)
+              </h3>
+            </div>
+            <span className="text-[11px] text-slate-400 font-mono">
+              Sheet: <strong className="text-slate-200">CASHFLOW_EXPENSES</strong>
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 font-bold uppercase text-[10px] tracking-wider">
+                  <th className="py-3 px-3.5">ID Transaksi</th>
+                  <th className="py-3 px-3.5">Tanggal</th>
+                  <th className="py-3 px-3.5">Jenis</th>
+                  <th className="py-3 px-3.5">Kategori</th>
+                  <th className="py-3 px-3.5">Keterangan & Rincian</th>
+                  <th className="py-3 px-3.5 text-center">Ref SKU</th>
+                  <th className="py-3 px-3.5 text-right">Nominal (Rp)</th>
+                  <th className="py-3 px-3.5 text-center">Dicatat Oleh</th>
+                  <th className="py-3 px-3.5 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
+                      <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-500 mb-2" />
+                      Memuat data kas dari Google Sheets...
+                    </td>
+                  </tr>
+                ) : filteredEntries.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
+                      <AlertCircle className="w-6 h-6 mx-auto mb-2 text-slate-600" />
+                      Belum ada catatan transaksi kas pada filter yang dipilih.
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsModalOpen(true)}
+                          className="text-xs text-emerald-400 hover:text-emerald-300 underline font-bold"
                         >
-                          {isExpense ? <ArrowDownRight className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
-                          {isExpense ? 'Pengeluaran' : 'Pemasukan'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          {getCategoryIcon(item.kategori)}
-                          <span className={`font-semibold text-[11px] ${isInvestor ? 'text-indigo-300' : 'text-slate-200'}`}>
-                            {item.kategori}
+                          + Catat transaksi kas pertama sekarang
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredEntries.map((item) => {
+                    const isExpense = item.jenisKas === 'PENGELUARAN';
+                    const isInvestor = item.kategori.includes('INVESTOR');
+
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-850/50 transition-colors">
+                        <td className="py-3 px-3.5 font-mono text-[11px] text-slate-400 font-bold">
+                          {item.id}
+                        </td>
+                        <td className="py-3 px-3.5 font-mono text-[11px] text-slate-300 whitespace-nowrap">
+                          {item.tanggal}
+                        </td>
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                              isExpense
+                                ? 'bg-rose-950/80 text-rose-300 border border-rose-800/80'
+                                : 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/80'
+                            }`}
+                          >
+                            {isExpense ? <ArrowDownRight className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
+                            {isExpense ? 'Pengeluaran' : 'Pemasukan'}
                           </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3.5 max-w-sm text-slate-300">
-                        <span className="line-clamp-2">{item.keterangan || '-'}</span>
-                      </td>
-                      <td className="py-3 px-3.5 text-center font-mono text-amber-400 font-bold text-[11px] whitespace-nowrap">
-                        {item.referensiSku || '-'}
-                      </td>
-                      <td className={`py-3 px-3.5 text-right font-mono font-bold text-xs whitespace-nowrap ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`}>
-                        {isExpense ? '-' : '+'}{formatIDR(item.nominal)}
-                      </td>
-                      <td className="py-3 px-3.5 text-center text-slate-400 text-[11px] whitespace-nowrap">
-                        {item.dicatatOleh || 'Admin'}
-                      </td>
-                      <td className="py-3 px-3.5 text-center whitespace-nowrap">
-                        {deleteConfirmId === item.id ? (
-                          <div className="flex items-center justify-center gap-1">
+                        </td>
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            {getCategoryIcon(item.kategori)}
+                            <span className={`font-semibold text-[11px] ${isInvestor ? 'text-indigo-300' : 'text-slate-200'}`}>
+                              {item.kategori}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3.5 max-w-sm text-slate-300">
+                          <span className="line-clamp-2">{item.keterangan || '-'}</span>
+                        </td>
+                        <td className="py-3 px-3.5 text-center font-mono text-amber-400 font-bold text-[11px] whitespace-nowrap">
+                          {item.referensiSku || '-'}
+                        </td>
+                        <td className={`py-3 px-3.5 text-right font-mono font-bold text-xs whitespace-nowrap ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          {isExpense ? '-' : '+'}{formatIDR(item.nominal)}
+                        </td>
+                        <td className="py-3 px-3.5 text-center text-slate-400 text-[11px] whitespace-nowrap">
+                          {item.dicatatOleh || 'Admin'}
+                        </td>
+                        <td className="py-3 px-3.5 text-center whitespace-nowrap">
+                          {deleteConfirmId === item.id ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTransaction(item.id)}
+                                className="px-2 py-0.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-[10px] font-bold"
+                              >
+                                Ya, Hapus
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteConfirmId(null)}
+                                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]"
+                              >
+                                Batal
+                              </button>
+                            </div>
+                          ) : (
                             <button
                               type="button"
-                              onClick={() => handleDeleteTransaction(item.id)}
-                              className="px-2 py-0.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-[10px] font-bold"
+                              onClick={() => setDeleteConfirmId(item.id)}
+                              className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
+                              title="Hapus Transaksi"
                             >
-                              Ya, Hapus
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 4B. TAB 2: CLOSING DEALS DETAIL TABLE (RINCIAN PENJUALAN & INVOICE) */}
+      {tableTab === 'DEALS' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+          <div className="p-4 border-b border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                <Package className="w-4 h-4 text-amber-400" />
+                <span>Rincian Transaksi Penjualan & Invoice Closing ({filteredDeals.length} Transaksi)</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Daftar unit mesin yang telah lunas dan menyumbang ke Total Omset & Laba Kotor periode ini.
+              </p>
+            </div>
+            <span className="text-[11px] text-slate-400 font-mono">
+              Sumber: <strong className="text-slate-200">INVOICE_ARCHIVE & MASTER_INVENTORY</strong>
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 font-bold uppercase text-[10px] tracking-wider">
+                  <th className="py-3 px-3.5">SKU Unit</th>
+                  <th className="py-3 px-3.5">Nama Mesin & Deskripsi</th>
+                  <th className="py-3 px-3.5">Tanggal Terjual</th>
+                  <th className="py-3 px-3.5">Lokasi Gudang</th>
+                  <th className="py-3 px-3.5 text-right">Modal (HPP)</th>
+                  <th className="py-3 px-3.5 text-right text-amber-400">Harga Closing</th>
+                  <th className="py-3 px-3.5 text-right text-emerald-400">Realized Profit</th>
+                  <th className="py-3 px-3.5 text-center">Pelanggan / Faktur</th>
+                  <th className="py-3 px-3.5 text-center">Dokumen & Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
+                      <RefreshCw className="w-6 h-6 animate-spin mx-auto text-amber-500 mb-2" />
+                      Memuat rincian transaksi closing...
+                    </td>
+                  </tr>
+                ) : filteredDeals.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
+                      <AlertCircle className="w-6 h-6 mx-auto mb-2 text-slate-600" />
+                      Tidak ada transaksi closing deal pada filter periode yang dipilih.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredDeals.map((deal) => {
+                    const isItemNonSku = deal.isNonSku || deal.sku.startsWith('BBK-CUSTOM') || deal.sku.startsWith('INV-');
+                    return (
+                      <tr key={deal.sku} className="hover:bg-slate-850/50 transition-colors">
+                        <td className="py-3 px-3.5 font-mono font-bold text-amber-400">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{deal.sku}</span>
+                            {isItemNonSku && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-950/90 text-purple-300 border border-purple-800">
+                                Non-SKU
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3.5 max-w-xs">
+                          <p className="font-bold text-slate-200 line-clamp-1">{deal.productTitle}</p>
+                          <p className="text-[10px] text-slate-500 line-clamp-1">{deal.notes}</p>
+                        </td>
+                        <td className="py-3 px-3.5 text-slate-300 font-mono text-[11px]">
+                          {deal.tanggalTerjual || '-'}
+                        </td>
+                        <td className="py-3 px-3.5 text-slate-300">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono font-bold text-[10px] text-indigo-300">
+                              {deal.asalGudang || 'GK'}
+                            </span>
+                            <span className="text-[11px] text-slate-300">
+                              {resolveLocationFromCode((deal.asalGudang || 'GK') as any)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3.5 text-right font-mono text-slate-400">
+                          {deal.hargaModal > 0 ? formatIDR(deal.hargaModal) : '-'}
+                        </td>
+                        <td className="py-3 px-3.5 text-right font-mono font-bold text-amber-400">
+                          {deal.hargaClosing > 0 ? formatIDR(deal.hargaClosing) : '-'}
+                        </td>
+                        <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-400">
+                          {deal.realizedProfit > 0 ? (
+                            <span>
+                              +{formatIDR(deal.realizedProfit)}{' '}
+                              <span className="text-[10px] font-normal text-emerald-500/80">
+                                ({deal.marginPercent}%)
+                              </span>
+                            </span>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                        <td className="py-3 px-3.5 text-center text-slate-300">
+                          <div className="space-y-0.5">
+                            <div className="font-semibold text-slate-200">{deal.customerName || 'Pelanggan'}</div>
+                            {deal.invoiceNumber && (
+                              <div className="text-[10px] font-mono text-slate-400">#{deal.invoiceNumber}</div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3.5 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {isItemNonSku && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setResolveItem({
+                                    invoiceId: '',
+                                    invoiceNumber: deal.sku.replace('BBK-CUSTOM-', '').replace('INV-', '').split('_')[0],
+                                    customSku: deal.sku,
+                                    productTitle: deal.productTitle,
+                                    sellingPrice: deal.hargaClosing,
+                                    quantity: 1,
+                                    currentModal: deal.hargaModal,
+                                    isNonSku: true,
+                                  });
+                                  setIsResolveModalOpen(true);
+                                }}
+                                title="Rekonsiliasi / Resolve SKU Unit ini"
+                                className="p-1.5 rounded-lg bg-indigo-950/80 hover:bg-indigo-800 text-indigo-300 border border-indigo-800 transition-colors"
+                              >
+                                <Link2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDocFromDeal(deal, 'INVOICE')}
+                              title="Cetak Faktur Tagihan (Invoice)"
+                              className="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-800 text-amber-300 border border-amber-800 transition-colors"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
-                              onClick={() => setDeleteConfirmId(null)}
-                              className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]"
+                              onClick={() => handleOpenDocFromDeal(deal, 'DELIVERY_NOTE')}
+                              title="Cetak Surat Jalan Pengiriman"
+                              className="p-1.5 rounded-lg bg-orange-950/80 hover:bg-orange-800 text-orange-300 border border-orange-800 transition-colors"
                             >
-                              Batal
+                              <Truck className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setDeleteConfirmId(item.id)}
-                            className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
-                            title="Hapus Transaksi"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 5. MODAL FORM: + CATAT TRANSAKSI KAS */}
       {isModalOpen && (
@@ -785,6 +1063,31 @@ export function CashflowFinanceView() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* 6. OFFICIAL DOCUMENT PRINT & PREVIEW MODAL */}
+      {selectedInvoice && (
+        <OfficialDocumentModal
+          invoice={selectedInvoice}
+          isOpen={isDocModalOpen}
+          initialType={documentModalType}
+          onClose={() => setIsDocModalOpen(false)}
+        />
+      )}
+
+      {/* 7. RESOLVE NON-SKU MODAL */}
+      {resolveItem && (
+        <ResolveNonSkuModal
+          isOpen={isResolveModalOpen}
+          item={resolveItem}
+          onClose={() => {
+            setIsResolveModalOpen(false);
+            setResolveItem(null);
+          }}
+          onSuccess={() => {
+            fetchCashflow();
+          }}
+        />
       )}
     </div>
   );

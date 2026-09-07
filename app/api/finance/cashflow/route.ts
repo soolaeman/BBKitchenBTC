@@ -81,6 +81,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       entries,
+      deals: bbkDeals,
       summary: {
         totalDealsRevenue,
         totalDealsGrossProfit,
