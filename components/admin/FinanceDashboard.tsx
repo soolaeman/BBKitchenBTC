@@ -48,6 +48,7 @@ import {
   ChevronRight,
   CheckCircle2,
   Link2,
+  ArrowUp,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -88,6 +89,7 @@ export function FinanceDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // 1. PRIMARY FILTERS
+  const filterBarRef = React.useRef<HTMLDivElement>(null);
   const [datePreset, setDatePreset] = useState<DatePreset>('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -1022,8 +1024,8 @@ export function FinanceDashboard() {
         </button>
       </div>
 
-      {/* 2. FILTER UTAMA (PERIODE, CHANNEL, KATEGORI, HUB) - STICKY FLOATING */}
-      <div className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border border-slate-800/90 rounded-2xl p-4.5 space-y-3 shadow-2xl transition-all">
+      {/* 2. FILTER UTAMA (PERIODE, CHANNEL, KATEGORI, HUB) */}
+      <div ref={filterBarRef} className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4.5 space-y-3 shadow-xl transition-all">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
           <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-200">
             <Filter className="w-4 h-4 text-emerald-400" />
@@ -2421,6 +2423,18 @@ export function FinanceDashboard() {
           }}
         />
       )}
+
+      {/* FLOATING ACTION BUTTON (QUICK FILTER & SCROLL TO TOP FILTER) */}
+      <button
+        type="button"
+        onClick={() => filterBarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        className="fixed bottom-6 right-6 z-40 px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-[0_8px_30px_rgb(5,150,105,0.4)] border border-emerald-400/50 backdrop-blur-md flex items-center gap-2 hover:scale-105 active:scale-95 transition-all group"
+        title="Scroll cepat ke Filter Utama Bisnis"
+      >
+        <Filter className="w-3.5 h-3.5 text-emerald-200 group-hover:rotate-12 transition-transform" />
+        <span className="font-sans tracking-wide">Ubah Filter</span>
+        <ArrowUp className="w-3.5 h-3.5 text-emerald-200 group-hover:-translate-y-0.5 transition-transform" />
+      </button>
     </div>
   );
 }
