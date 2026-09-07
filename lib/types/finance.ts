@@ -99,6 +99,9 @@ export interface ClosingDealItem {
   isNonSku?: boolean;
   invoiceNumber?: string;
   invoiceId?: string;
+  items?: InvoiceItem[];
+  itemsCount?: number;
+  rawInvoice?: Invoice;
 }
 
 export interface NonSkuTransaction {

@@ -266,6 +266,13 @@ export function CashflowFinanceView() {
 
   // Helper: Open Document from Deal Row
   const handleOpenDocFromDeal = (deal: ClosingDealItem, type: DocumentType) => {
+    if (deal.rawInvoice) {
+      setSelectedInvoice(deal.rawInvoice);
+      setDocumentModalType(type);
+      setIsDocModalOpen(true);
+      return;
+    }
+
     const dummyInv: Invoice = {
       id: deal.invoiceId || `inv_${deal.sku}`,
       invoiceNumber: deal.invoiceNumber || deal.sku.replace('BBK-CUSTOM-', '').replace('INV-', '').split('_')[0],
@@ -783,12 +790,19 @@ export function CashflowFinanceView() {
                 ) : (
                   filteredDeals.map((deal) => {
                     const isItemNonSku = deal.isNonSku || deal.sku.startsWith('BBK-CUSTOM') || deal.sku.startsWith('INV-');
+                    const isMultiItem = (deal.itemsCount && deal.itemsCount > 1) || (deal.items && deal.items.length > 1);
+                    const rowKey = `${deal.sku}_${deal.invoiceNumber || ''}_${deal.tanggalTerjual || ''}`;
                     return (
-                      <tr key={deal.sku} className="hover:bg-slate-850/50 transition-colors">
+                      <tr key={rowKey} className="hover:bg-slate-850/50 transition-colors">
                         <td className="py-3 px-3.5 font-mono font-bold text-amber-400">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span>{deal.sku}</span>
-                            {isItemNonSku && (
+                            {isMultiItem && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950/90 text-amber-300 border border-amber-800">
+                                {deal.itemsCount} Item ({deal.quantity || 1} Unit)
+                              </span>
+                            )}
+                            {isItemNonSku && !isMultiItem && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-950/90 text-purple-300 border border-purple-800">
                                 Non-SKU
                               </span>
@@ -796,7 +810,7 @@ export function CashflowFinanceView() {
                           </div>
                         </td>
                         <td className="py-3 px-3.5 max-w-xs">
-                          <p className="font-bold text-slate-200 line-clamp-1">{deal.productTitle}</p>
+                          <p className="font-bold text-slate-200 line-clamp-2">{deal.productTitle}</p>
                           <p className="text-[10px] text-slate-500 line-clamp-1">{deal.notes}</p>
                         </td>
                         <td className="py-3 px-3.5 text-slate-300 font-mono text-[11px]">

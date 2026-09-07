@@ -143,46 +143,11 @@ export async function getLiveClosingDealLedger(): Promise<{
     let bbkSalesCount = 0;
     let thirdPartyCount = 0;
 
-    const deals: ClosingDealItem[] = soldItems.map((item) => {
-      const modal = item.HARGA_MODAL || 0;
-      
-      // Default: ALL sold items in Master Inventory are Third-Party / Rekanan Gudang.
-      // ONLY items with a verified PAID Invoice in INVOICE_ARCHIVE will become SALES_BBK!
-      const isThirdParty = true;
-      const closing = modal;
-      const realizedProfit = 0;
-      const marginPercent = 0;
-
-      // Convert serial date or raw string to ISO YYYY-MM-DD
-      const cleanInDate = parseToISODate(item.TANGGAL_MASUK);
-      const cleanSoldDate = parseToISODate(item.TANGGAL_TERJUAL) || cleanInDate;
-
-      const agingNum = typeof item.DURASI_TERJUAL === 'number' 
-        ? Math.round(item.DURASI_TERJUAL) 
-        : (parseInt(String(item.DURASI_TERJUAL || '0').replace(/\D/g, ''), 10) || 0);
-        
-      totalAging += agingNum;
-
-      return {
-        sku: item.SKU,
-        productTitle: item.PRODUCT_TITLE,
-        category: item.CATEGORY_NAME || item.CATEGORY_SLUG || '',
-        tanggalMasuk: cleanInDate || item.TANGGAL_MASUK,
-        tanggalTerjual: cleanSoldDate || cleanInDate || undefined,
-        durasiTerjual: `${agingNum} hari`,
-        lokasiGudang: item.LOKASI_UNIT,
-        asalGudang: item.asal_gudang || 'GK',
-        hargaModal: modal,
-        hargaClosing: closing,
-        realizedProfit: 0,
-        marginPercent: 0,
-        soldBy: 'THIRD_PARTY',
-        notes: 'Terjual Rekanan Gudang / Pihak Ketiga',
-      };
-    });
-
-    // 2. Incorporate Real Paid Invoices from INVOICE_ARCHIVE and TRANSAKSI_NON_SKU
+    // 1. Fetch Google Sheets Inventory and Paid Invoices
+    const matchedSkusSet = new Set<string>();
+    const bbkInvoiceDeals: ClosingDealItem[] = [];
     let totalPhysicalUnitsSold = 0;
+
     try {
       const realInvoices = await getInvoices();
       const paidInvoices = (realInvoices || []).filter((inv) => inv.status === 'PAID');
@@ -192,75 +157,140 @@ export async function getLiveClosingDealLedger(): Promise<{
         if (!inv.items || inv.items.length === 0) continue;
         const invDate = parseToISODate(inv.paidDate || inv.issueDate) || inv.issueDate;
 
+        let invoiceModal = 0;
+        let invoiceClosing = inv.totalAmount || 0;
+        let totalQty = 0;
+        let hasNonSku = false;
+
         for (const it of inv.items) {
+          const qty = it.quantity || 1;
+          totalQty += qty;
           const itemSku = (it.sku || '').trim().toUpperCase();
           const isCustomSku = !itemSku || itemSku.startsWith('BBK-CUSTOM') || itemSku.startsWith('INV-') || itemSku === 'UNIT';
-          const matchedDeal = !isCustomSku ? deals.find((d) => d.sku.toUpperCase() === itemSku) : undefined;
-          const qty = it.quantity || 1;
 
-          if (matchedDeal) {
-            if (it.unitPrice > 0) {
-              matchedDeal.hargaClosing = it.unitPrice * qty;
-              matchedDeal.realizedProfit = Math.max(0, matchedDeal.hargaClosing - (matchedDeal.hargaModal * qty));
-              matchedDeal.marginPercent = matchedDeal.hargaClosing > 0 ? Math.round((matchedDeal.realizedProfit / matchedDeal.hargaClosing) * 100) : 0;
-            }
-            matchedDeal.quantity = qty;
-            if (inv.customerName) matchedDeal.customerName = inv.customerName;
-            matchedDeal.soldBy = 'SALES_BBK';
-            matchedDeal.notes = `Faktur Resmi ${inv.invoiceNumber}`;
-            matchedDeal.invoiceNumber = inv.invoiceNumber;
-            matchedDeal.invoiceId = inv.id;
-            matchedDeal.tanggalTerjual = invDate;
+          if (isCustomSku) {
+            hasNonSku = true;
+          }
+
+          // Check if SKU exists in master inventory
+          const rawMatch = !isCustomSku ? rawItems.find((r) => r.SKU.trim().toUpperCase() === itemSku) : undefined;
+          if (rawMatch) {
+            matchedSkusSet.add(itemSku);
+            invoiceModal += (rawMatch.HARGA_MODAL || 0) * qty;
           } else {
             // Check if resolved in TRANSAKSI_NON_SKU
             const resolvedNonSku = nonSkuRecords.find(
               (r) =>
                 r.invoiceNumber === inv.invoiceNumber &&
-                (r.skuTemp === itemSku || r.itemTitle.toLowerCase() === it.description.toLowerCase())
+                (r.skuTemp === itemSku || r.itemTitle.toLowerCase() === (it.description || '').toLowerCase())
             );
 
-            const closingPrice = (it.unitPrice || 0) * qty;
-            const modalPrice = resolvedNonSku ? resolvedNonSku.hppModal : ((it.unitCost || 0) * qty);
-            const realizedProfit = Math.max(0, closingPrice - modalPrice);
-            const marginPercent = closingPrice > 0 ? Math.round((realizedProfit / closingPrice) * 100) : 0;
-
-            deals.push({
-              sku: it.sku || `INV-${inv.invoiceNumber}`,
-              productTitle: it.description || 'Peralatan Dapur Komersial',
-              category: resolvedNonSku ? 'Pesanan Khusus (Custom / Fabrikasi)' : 'Transaksi Non-SKU (Perlu Resolusi)',
-              tanggalMasuk: invDate,
-              tanggalTerjual: invDate,
-              durasiTerjual: '1 hari',
-              lokasiGudang: it.warehouseLocation || 'Pamulang 2',
-              asalGudang: it.warehouseLocation || 'Pamulang 2',
-              quantity: qty,
-              hargaModal: modalPrice,
-              hargaClosing: closingPrice,
-              realizedProfit,
-              marginPercent,
-              soldBy: 'SALES_BBK',
-              customerName: inv.customerName,
-              notes: resolvedNonSku
-                ? `Custom Order (Resolved: ${resolvedNonSku.vendorBengkel || 'Bengkel Rekanan'})`
-                : `Faktur Resmi ${inv.invoiceNumber}`,
-              isNonSku: true,
-              invoiceNumber: inv.invoiceNumber,
-              invoiceId: inv.id,
-            });
+            if (resolvedNonSku) {
+              invoiceModal += resolvedNonSku.hppModal;
+            } else {
+              invoiceModal += (it.unitCost || 0) * qty;
+            }
           }
         }
+
+        // If totalAmount was not preset or 0, sum from items
+        if (!invoiceClosing || invoiceClosing === 0) {
+          invoiceClosing = inv.items.reduce((s, it) => s + (it.unitPrice || 0) * (it.quantity || 1), 0);
+        }
+
+        const realizedProfit = Math.max(0, invoiceClosing - invoiceModal);
+        const marginPercent = invoiceClosing > 0 ? Math.round((realizedProfit / invoiceClosing) * 100) : 0;
+
+        // Build Title & SKU representation for the unified invoice
+        const isMultiItem = inv.items.length > 1;
+        const primarySku = !isMultiItem && inv.items[0].sku && !inv.items[0].sku.startsWith('BBK-CUSTOM')
+          ? inv.items[0].sku
+          : `#${inv.invoiceNumber}`;
+
+        const productTitle = isMultiItem
+          ? inv.items.map((it) => `${it.quantity > 1 ? `${it.quantity}x ` : ''}${it.description || it.sku}`).join(' • ')
+          : (inv.items[0].description || inv.items[0].sku || 'Peralatan Dapur Komersial');
+
+        const category = isMultiItem
+          ? `Paket Pesanan (${inv.items.length} Item)`
+          : (inv.items[0].condition || 'Peralatan Dapur Komersial');
+
+        bbkInvoiceDeals.push({
+          sku: primarySku,
+          productTitle,
+          category,
+          tanggalMasuk: invDate,
+          tanggalTerjual: invDate,
+          durasiTerjual: '1 hari',
+          lokasiGudang: inv.items[0]?.warehouseLocation || 'Pamulang 2',
+          asalGudang: inv.items[0]?.warehouseLocation || 'GK',
+          quantity: totalQty,
+          hargaModal: invoiceModal,
+          hargaClosing: invoiceClosing,
+          realizedProfit,
+          marginPercent,
+          soldBy: 'SALES_BBK',
+          customerName: inv.customerName,
+          notes: `Faktur Resmi #${inv.invoiceNumber} (${totalQty} Unit)`,
+          isNonSku: hasNonSku,
+          invoiceNumber: inv.invoiceNumber,
+          invoiceId: inv.id,
+          items: inv.items,
+          itemsCount: inv.items.length,
+          rawInvoice: inv,
+        });
       }
     } catch (invErr) {
       console.warn('Could not merge real invoices into deal ledger:', invErr);
     }
 
+    // 2. Add remaining Third-Party sold items (excluding SKUs already sold via BBKitchen invoices)
+    let totalAging = 0;
+    const thirdPartyDeals: ClosingDealItem[] = soldItems
+      .filter((item) => !matchedSkusSet.has(item.SKU.trim().toUpperCase()))
+      .map((item) => {
+        const modal = item.HARGA_MODAL || 0;
+        const closing = modal;
+
+        // Convert serial date or raw string to ISO YYYY-MM-DD
+        const cleanInDate = parseToISODate(item.TANGGAL_MASUK);
+        const cleanSoldDate = parseToISODate(item.TANGGAL_TERJUAL) || cleanInDate;
+
+        const agingNum = typeof item.DURASI_TERJUAL === 'number'
+          ? Math.round(item.DURASI_TERJUAL)
+          : (parseInt(String(item.DURASI_TERJUAL || '0').replace(/\D/g, ''), 10) || 0);
+
+        totalAging += agingNum;
+
+        return {
+          sku: item.SKU,
+          productTitle: item.PRODUCT_TITLE,
+          category: item.CATEGORY_NAME || item.CATEGORY_SLUG || '',
+          tanggalMasuk: cleanInDate || item.TANGGAL_MASUK,
+          tanggalTerjual: cleanSoldDate || cleanInDate || undefined,
+          durasiTerjual: `${agingNum} hari`,
+          lokasiGudang: item.LOKASI_UNIT,
+          asalGudang: item.asal_gudang || 'GK',
+          quantity: 1,
+          hargaModal: modal,
+          hargaClosing: closing,
+          realizedProfit: 0,
+          marginPercent: 0,
+          soldBy: 'THIRD_PARTY',
+          notes: 'Terjual Rekanan Gudang / Pihak Ketiga',
+        };
+      });
+
+    // 3. Combine All Deals (BBKitchen Invoice Deals + Third Party Deals)
+    const deals: ClosingDealItem[] = [...bbkInvoiceDeals, ...thirdPartyDeals];
+
     // Recalculate Totals (Only direct BBKitchen sales contribute to revenue & profit)
     const bbkDeals = deals.filter((d) => d.soldBy === 'SALES_BBK');
-    totalRevenue = bbkDeals.reduce((sum, d) => sum + d.hargaClosing, 0);
-    totalProfit = bbkDeals.reduce((sum, d) => sum + d.realizedProfit, 0);
+    const totalRevenue = bbkDeals.reduce((sum, d) => sum + d.hargaClosing, 0);
+    const totalProfit = bbkDeals.reduce((sum, d) => sum + d.realizedProfit, 0);
     totalPhysicalUnitsSold = bbkDeals.reduce((sum, d) => sum + (d.quantity || 1), 0);
-    bbkSalesCount = bbkDeals.length;
-    thirdPartyCount = deals.filter((d) => d.soldBy === 'THIRD_PARTY').length;
+    const bbkSalesCount = bbkDeals.length;
+    const thirdPartyCount = deals.filter((d) => d.soldBy === 'THIRD_PARTY').length;
 
     // Sort newest sold date first
     deals.sort((a, b) => {
