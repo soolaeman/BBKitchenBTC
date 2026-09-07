@@ -13,7 +13,7 @@ import {
   deleteGoogleSheetsNonSkuTransaction,
   parseToISODate,
 } from './google-sheets-invoices';
-import { resolveLocationFromCode } from './warehouse-utils';
+import { resolveLocationFromCode, resolveHubCode } from './warehouse-utils';
 
 // Clean Real Invoices store for BBKitchen (in-memory cache)
 let cachedInvoices: Invoice[] = [];
@@ -170,14 +170,16 @@ export async function getLiveClosingDealLedger(): Promise<{
 
           let itemUnitCost = it.unitCost || 0;
           let itemWarehouse = it.warehouseLocation || '';
-          let itemCategory = it.condition || '';
+          let itemAsalGudang = it.asalGudang || '';
+          let itemCategory = it.condition || it.category || '';
 
           // Check if SKU exists in master inventory
           const rawMatch = !isCustomSku ? rawItems.find((r) => r.SKU.trim().toUpperCase() === itemSku) : undefined;
           if (rawMatch) {
             matchedSkusSet.add(itemSku);
             itemUnitCost = rawMatch.HARGA_MODAL || 0;
-            itemWarehouse = rawMatch.asal_gudang || resolveLocationFromCode(rawMatch.asal_gudang || 'GK');
+            itemAsalGudang = rawMatch.asal_gudang || resolveHubCode(rawMatch.asal_gudang, rawMatch.LOKASI_UNIT, rawMatch.SKU) || 'GK';
+            itemWarehouse = rawMatch.LOKASI_UNIT || resolveLocationFromCode(itemAsalGudang);
             itemCategory = rawMatch.CATEGORY_NAME || rawMatch.CATEGORY_SLUG || '';
             invoiceModal += itemUnitCost * qty;
           } else {
@@ -190,16 +192,20 @@ export async function getLiveClosingDealLedger(): Promise<{
                     Boolean(r.itemTitle) &&
                     (r.itemTitle.trim().toLowerCase() === it.description.trim().toLowerCase() ||
                       it.description.toLowerCase().includes(r.itemTitle.toLowerCase()) ||
-                      r.itemTitle.toLowerCase().includes(it.description.toLowerCase()))))
+                      r.itemTitle.toLowerCase().includes(it.description.toLowerCase()))) ||
+                  inv.items.length === 1)
             );
 
             if (resolvedNonSku) {
               itemUnitCost = (resolvedNonSku.hppModal || 0) / qty;
-              itemWarehouse = resolvedNonSku.warehouseCode || resolvedNonSku.hubLocation || it.warehouseLocation || 'ML';
-              itemCategory = resolvedNonSku.category || it.condition || '';
+              itemAsalGudang = resolvedNonSku.warehouseCode || resolveHubCode(resolvedNonSku.warehouseCode, resolvedNonSku.hubLocation) || 'ML';
+              itemWarehouse = resolvedNonSku.hubLocation || resolveLocationFromCode(itemAsalGudang) || 'Pamulang Barat';
+              itemCategory = resolvedNonSku.category || it.condition || it.category || 'Meja 1 Susun';
               invoiceModal += resolvedNonSku.hppModal || 0;
             } else {
               invoiceModal += (it.unitCost || 0) * qty;
+              itemAsalGudang = it.asalGudang || (it.warehouseLocation ? resolveHubCode(it.warehouseLocation, it.warehouseLocation) : '') || 'ML';
+              itemWarehouse = it.warehouseLocation || resolveLocationFromCode(itemAsalGudang) || 'Pamulang Barat';
             }
           }
 
@@ -207,7 +213,9 @@ export async function getLiveClosingDealLedger(): Promise<{
             ...it,
             unitCost: itemUnitCost,
             warehouseLocation: itemWarehouse,
+            asalGudang: itemAsalGudang,
             condition: itemCategory,
+            category: itemCategory,
           });
         }
 
@@ -229,9 +237,13 @@ export async function getLiveClosingDealLedger(): Promise<{
           ? inv.items.map((it) => `${it.quantity > 1 ? `${it.quantity}x ` : ''}${it.description || it.sku}`).join(' • ')
           : (inv.items[0].description || inv.items[0].sku || 'Peralatan Dapur Komersial');
 
+        const primaryEnriched = enrichedItems[0] || inv.items[0];
         const category = isMultiItem
           ? `Paket Pesanan (${inv.items.length} Item)`
-          : (inv.items[0].condition || 'Peralatan Dapur Komersial');
+          : (primaryEnriched.category || primaryEnriched.condition || 'Peralatan Dapur Komersial');
+
+        const dealAsalGudang = primaryEnriched.asalGudang || resolveHubCode(primaryEnriched.warehouseLocation, primaryEnriched.warehouseLocation) || 'ML';
+        const dealLokasi = primaryEnriched.warehouseLocation || resolveLocationFromCode(dealAsalGudang) || 'Pamulang Barat';
 
         bbkInvoiceDeals.push({
           sku: primarySku,
@@ -240,8 +252,8 @@ export async function getLiveClosingDealLedger(): Promise<{
           tanggalMasuk: invDate,
           tanggalTerjual: invDate,
           durasiTerjual: '1 hari',
-          lokasiGudang: inv.items[0]?.warehouseLocation || 'Pamulang 2',
-          asalGudang: inv.items[0]?.warehouseLocation || 'GK',
+          lokasiGudang: dealLokasi,
+          asalGudang: dealAsalGudang,
           quantity: totalQty,
           hargaModal: invoiceModal,
           hargaClosing: invoiceClosing,
@@ -257,6 +269,7 @@ export async function getLiveClosingDealLedger(): Promise<{
           itemsCount: inv.items.length,
           rawInvoice: inv,
         });
+      }
       }
     } catch (invErr) {
       console.warn('Could not merge real invoices into deal ledger:', invErr);
@@ -459,9 +472,12 @@ export async function resolveNonSkuItem(params: {
   const targetInv = invoices.find((i) => i.invoiceNumber === params.invoiceNumber);
   if (!targetInv) return false;
 
-  const targetItem = targetInv.items.find(
+  let targetItem = targetInv.items.find(
     (it) => (it.sku || '').trim().toUpperCase() === params.skuTemp.toUpperCase() || it.description === params.itemTitle
   );
+  if (!targetItem && targetInv.items.length === 1) {
+    targetItem = targetInv.items[0];
+  }
   if (!targetItem) return false;
 
   if (params.action === 'LINK_EXISTING' && params.targetSku) {
@@ -485,6 +501,13 @@ export async function resolveNonSkuItem(params: {
     targetItem.unitCost = cleanModal;
     if (params.hubLocation) {
       targetItem.warehouseLocation = params.hubLocation;
+    }
+    if (params.warehouseCode) {
+      targetItem.asalGudang = params.warehouseCode;
+    }
+    if (params.category) {
+      targetItem.condition = params.category;
+      targetItem.category = params.category;
     }
     await updateInvoice(targetInv);
 

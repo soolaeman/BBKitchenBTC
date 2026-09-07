@@ -2,7 +2,15 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { formatIDR, resolveLocationFromCode, parseToISODate } from '@/lib/repositories/warehouse-utils';
+import {
+  formatIDR,
+  resolveLocationFromCode,
+  parseToISODate,
+  UniversalDatePreset,
+  getDynamicDatePresetOptions,
+  getDatePresetBounds,
+  isDateInRange,
+} from '@/lib/repositories/warehouse-utils';
 import { ClosingDealItem, Invoice, DocumentType } from '@/lib/types/finance';
 import { OfficialDocumentModal } from './OfficialDocumentModal';
 import { ResolveNonSkuModal, NonSkuResolveItem } from './ResolveNonSkuModal';
@@ -55,7 +63,7 @@ export function CashflowFinanceView() {
   const { role } = useAuth();
 
   // Filter States
-  const [datePreset, setDatePreset] = useState<'ALL' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR' | 'CUSTOM'>('THIS_MONTH');
+  const [datePreset, setDatePreset] = useState<UniversalDatePreset>('THIS_MONTH');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [jenisKasFilter, setJenisKasFilter] = useState<'ALL' | CashflowType>('ALL');
@@ -111,30 +119,11 @@ export function CashflowFinanceView() {
 
   // Compute active date bounds
   const { startFilter, endFilter } = useMemo(() => {
-    const now = new Date();
-    if (datePreset === 'THIS_MONTH') {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-      return { startFilter: start, endFilter: end };
-    }
-    if (datePreset === 'LAST_MONTH') {
-      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
-      const end = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
-      return { startFilter: start, endFilter: end };
-    }
-    if (datePreset === 'THIS_YEAR') {
-      return {
-        startFilter: `${now.getFullYear()}-01-01`,
-        endFilter: `${now.getFullYear()}-12-31`,
-      };
-    }
-    if (datePreset === 'CUSTOM') {
-      return {
-        startFilter: startDate || undefined,
-        endFilter: endDate || undefined,
-      };
-    }
-    return { startFilter: undefined, endFilter: undefined };
+    const bounds = getDatePresetBounds(datePreset, startDate, endDate);
+    return {
+      startFilter: bounds.startFilter || undefined,
+      endFilter: bounds.endFilter || undefined,
+    };
   }, [datePreset, startDate, endDate]);
 
   // Fetch Cashflow Data from Google Sheets API
@@ -495,14 +484,14 @@ export function CashflowFinanceView() {
             </label>
             <select
               value={datePreset}
-              onChange={(e) => setDatePreset(e.target.value as any)}
+              onChange={(e) => setDatePreset(e.target.value as UniversalDatePreset)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs font-semibold"
             >
-              <option value="ALL">Semua Periode</option>
-              <option value="THIS_MONTH">Bulan Ini</option>
-              <option value="LAST_MONTH">Bulan Lalu</option>
-              <option value="THIS_YEAR">Tahun Ini</option>
-              <option value="CUSTOM">Custom Rentang Tanggal</option>
+              {getDynamicDatePresetOptions().map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
 

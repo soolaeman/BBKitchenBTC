@@ -8,6 +8,10 @@ import {
   WAREHOUSE_13_HUBS,
   matchWarehouseHub,
   matchCategory,
+  UniversalDatePreset,
+  getDynamicDatePresetOptions,
+  getDatePresetBounds,
+  isDateInRange,
 } from '@/lib/repositories/warehouse-utils';
 import { OFFICIAL_CATEGORIES } from '@/lib/repositories/categories';
 import { ClosingDealItem, Invoice, DocumentType } from '@/lib/types/finance';
@@ -59,7 +63,7 @@ import {
   Line,
 } from 'recharts';
 
-type DatePreset = 'ALL' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR' | 'CUSTOM';
+type DatePreset = UniversalDatePreset;
 type GrowthMetric = 'REVENUE' | 'PROFIT' | 'CLOSING' | 'UNITS';
 type UnitEconomicsMetric = 'PROFIT' | 'MARGIN' | 'UNITS';
 
@@ -185,64 +189,10 @@ export function FinanceDashboard() {
 
   // Dynamic Date Bounds for Active Period & Previous Period (For Growth Calculation)
   const { dateBounds, prevDateBounds } = useMemo(() => {
-    let startFilter: string | null = null;
-    let endFilter: string | null = null;
-    let prevStartFilter: string | null = null;
-    let prevEndFilter: string | null = null;
-
-    if (datePreset === 'LAST_7_DAYS') {
-      const endObj = new Date(now);
-      const startObj = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const prevEndObj = new Date(startObj.getTime() - 1 * 24 * 60 * 60 * 1000);
-      const prevStartObj = new Date(startObj.getTime() - 8 * 24 * 60 * 60 * 1000);
-
-      startFilter = startObj.toISOString().split('T')[0];
-      endFilter = endObj.toISOString().split('T')[0];
-      prevStartFilter = prevStartObj.toISOString().split('T')[0];
-      prevEndFilter = prevEndObj.toISOString().split('T')[0];
-    } else if (datePreset === 'LAST_30_DAYS') {
-      const endObj = new Date(now);
-      const startObj = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const prevEndObj = new Date(startObj.getTime() - 1 * 24 * 60 * 60 * 1000);
-      const prevStartObj = new Date(startObj.getTime() - 31 * 24 * 60 * 60 * 1000);
-
-      startFilter = startObj.toISOString().split('T')[0];
-      endFilter = endObj.toISOString().split('T')[0];
-      prevStartFilter = prevStartObj.toISOString().split('T')[0];
-      prevEndFilter = prevEndObj.toISOString().split('T')[0];
-    } else if (datePreset === 'THIS_MONTH') {
-      const startObj = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endObj = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      const prevStartObj = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const prevEndObj = new Date(now.getFullYear(), now.getMonth(), 0);
-
-      startFilter = startObj.toISOString().split('T')[0];
-      endFilter = endObj.toISOString().split('T')[0];
-      prevStartFilter = prevStartObj.toISOString().split('T')[0];
-      prevEndFilter = prevEndObj.toISOString().split('T')[0];
-    } else if (datePreset === 'LAST_MONTH') {
-      const startObj = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const endObj = new Date(now.getFullYear(), now.getMonth(), 0);
-      const prevStartObj = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-      const prevEndObj = new Date(now.getFullYear(), now.getMonth() - 1, 0);
-
-      startFilter = startObj.toISOString().split('T')[0];
-      endFilter = endObj.toISOString().split('T')[0];
-      prevStartFilter = prevStartObj.toISOString().split('T')[0];
-      prevEndFilter = prevEndObj.toISOString().split('T')[0];
-    } else if (datePreset === 'THIS_YEAR') {
-      startFilter = `${now.getFullYear()}-01-01`;
-      endFilter = `${now.getFullYear()}-12-31`;
-      prevStartFilter = `${now.getFullYear() - 1}-01-01`;
-      prevEndFilter = `${now.getFullYear() - 1}-12-31`;
-    } else if (datePreset === 'CUSTOM') {
-      if (startDate) startFilter = startDate;
-      if (endDate) endFilter = endDate;
-    }
-
+    const bounds = getDatePresetBounds(datePreset, startDate, endDate, now);
     return {
-      dateBounds: { startFilter, endFilter },
-      prevDateBounds: { startFilter: prevStartFilter, endFilter: prevEndFilter },
+      dateBounds: { startFilter: bounds.startFilter, endFilter: bounds.endFilter },
+      prevDateBounds: { startFilter: bounds.prevStartFilter, endFilter: bounds.prevEndFilter },
     };
   }, [datePreset, startDate, endDate, now]);
 
@@ -871,13 +821,11 @@ export function FinanceDashboard() {
               onChange={(e) => setDatePreset(e.target.value as DatePreset)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold text-xs"
             >
-              <option value="ALL">Semua Waktu (All Time)</option>
-              <option value="LAST_7_DAYS">7 Hari Terakhir</option>
-              <option value="LAST_30_DAYS">30 Hari Terakhir</option>
-              <option value="THIS_MONTH">Bulan Ini</option>
-              <option value="LAST_MONTH">Bulan Lalu</option>
-              <option value="THIS_YEAR">Tahun Ini ({currentYear})</option>
-              <option value="CUSTOM">Kustom Tanggal</option>
+              {getDynamicDatePresetOptions(now).map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
 

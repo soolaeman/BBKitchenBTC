@@ -585,3 +585,181 @@ export function matchCategory(itemTitle: string = '', itemCat: string = '', filt
 
   return false;
 }
+
+// ---------------------------------------------------------------------------
+// CENTRALIZED DYNAMIC DATE PRESET & FILTERING ENGINE
+// ---------------------------------------------------------------------------
+
+export type UniversalDatePreset =
+  | 'ALL'
+  | 'THIS_WEEK'
+  | 'LAST_WEEK'
+  | 'LAST_7_DAYS'
+  | 'THIS_MONTH'
+  | 'LAST_MONTH'
+  | 'LAST_30_DAYS'
+  | 'THIS_YEAR'
+  | 'LAST_YEAR'
+  | 'CUSTOM';
+
+const INDO_MONTHS = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+/**
+ * Returns user-friendly Indonesian labels with dynamic month and year numbers.
+ */
+export function getDynamicDatePresetOptions(baseDate: Date = new Date()): { value: UniversalDatePreset; label: string }[] {
+  const currentMonthIdx = baseDate.getMonth();
+  const currentYear = baseDate.getFullYear();
+
+  const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1);
+  const prevMonthIdx = prevMonthDate.getMonth();
+  const prevMonthYear = prevMonthDate.getFullYear();
+
+  return [
+    { value: 'ALL', label: 'Semua Waktu (All Time)' },
+    { value: 'THIS_WEEK', label: 'Minggu Ini (Pekan Berjalan)' },
+    { value: 'LAST_WEEK', label: 'Minggu Lalu (Pekan Sebelumnya)' },
+    { value: 'LAST_7_DAYS', label: '7 Hari Terakhir' },
+    { value: 'THIS_MONTH', label: `Bulan Ini (${INDO_MONTHS[currentMonthIdx]} ${currentYear})` },
+    { value: 'LAST_MONTH', label: `Bulan Lalu (${INDO_MONTHS[prevMonthIdx]} ${prevMonthYear})` },
+    { value: 'LAST_30_DAYS', label: '30 Hari Terakhir' },
+    { value: 'THIS_YEAR', label: `Tahun Ini (${currentYear})` },
+    { value: 'LAST_YEAR', label: `Tahun Lalu (${currentYear - 1})` },
+    { value: 'CUSTOM', label: 'Kustom Tanggal' },
+  ];
+}
+
+/**
+ * Calculates start and end ISO strings (YYYY-MM-DD) for active and previous period comparison.
+ */
+export function getDatePresetBounds(
+  preset: UniversalDatePreset,
+  customStart?: string,
+  customEnd?: string,
+  baseDate: Date = new Date()
+): {
+  startFilter: string | null;
+  endFilter: string | null;
+  prevStartFilter: string | null;
+  prevEndFilter: string | null;
+} {
+  const now = baseDate;
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+
+  let startFilter: string | null = null;
+  let endFilter: string | null = null;
+  let prevStartFilter: string | null = null;
+  let prevEndFilter: string | null = null;
+
+  if (preset === 'THIS_WEEK') {
+    // Week start on Monday
+    const day = now.getDay();
+    const diffToMonday = (day + 6) % 7;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+
+    const prevMonday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7);
+    const prevSunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 1);
+
+    startFilter = monday.toISOString().split('T')[0];
+    endFilter = sunday.toISOString().split('T')[0];
+    prevStartFilter = prevMonday.toISOString().split('T')[0];
+    prevEndFilter = prevSunday.toISOString().split('T')[0];
+  } else if (preset === 'LAST_WEEK') {
+    const day = now.getDay();
+    const diffToMonday = (day + 6) % 7;
+    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    const mondayLastWeek = new Date(mondayThisWeek.getFullYear(), mondayThisWeek.getMonth(), mondayThisWeek.getDate() - 7);
+    const sundayLastWeek = new Date(mondayThisWeek.getFullYear(), mondayThisWeek.getMonth(), mondayThisWeek.getDate() - 1);
+
+    const monday2WeeksAgo = new Date(mondayLastWeek.getFullYear(), mondayLastWeek.getMonth(), mondayLastWeek.getDate() - 7);
+    const sunday2WeeksAgo = new Date(mondayLastWeek.getFullYear(), mondayLastWeek.getMonth(), mondayLastWeek.getDate() - 1);
+
+    startFilter = mondayLastWeek.toISOString().split('T')[0];
+    endFilter = sundayLastWeek.toISOString().split('T')[0];
+    prevStartFilter = monday2WeeksAgo.toISOString().split('T')[0];
+    prevEndFilter = sunday2WeeksAgo.toISOString().split('T')[0];
+  } else if (preset === 'LAST_7_DAYS') {
+    const endObj = new Date(now);
+    const startObj = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const prevEndObj = new Date(startObj.getTime() - 1 * 24 * 60 * 60 * 1000);
+    const prevStartObj = new Date(startObj.getTime() - 8 * 24 * 60 * 60 * 1000);
+
+    startFilter = startObj.toISOString().split('T')[0];
+    endFilter = endObj.toISOString().split('T')[0];
+    prevStartFilter = prevStartObj.toISOString().split('T')[0];
+    prevEndFilter = prevEndObj.toISOString().split('T')[0];
+  } else if (preset === 'LAST_30_DAYS') {
+    const endObj = new Date(now);
+    const startObj = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const prevEndObj = new Date(startObj.getTime() - 1 * 24 * 60 * 60 * 1000);
+    const prevStartObj = new Date(startObj.getTime() - 31 * 24 * 60 * 60 * 1000);
+
+    startFilter = startObj.toISOString().split('T')[0];
+    endFilter = endObj.toISOString().split('T')[0];
+    prevStartFilter = prevStartObj.toISOString().split('T')[0];
+    prevEndFilter = prevEndObj.toISOString().split('T')[0];
+  } else if (preset === 'THIS_MONTH') {
+    const startObj = new Date(currentYear, currentMonth, 1);
+    const endObj = new Date(currentYear, currentMonth + 1, 0);
+    const prevStartObj = new Date(currentYear, currentMonth - 1, 1);
+    const prevEndObj = new Date(currentYear, currentMonth, 0);
+
+    startFilter = startObj.toISOString().split('T')[0];
+    endFilter = endObj.toISOString().split('T')[0];
+    prevStartFilter = prevStartObj.toISOString().split('T')[0];
+    prevEndFilter = prevEndObj.toISOString().split('T')[0];
+  } else if (preset === 'LAST_MONTH') {
+    const startObj = new Date(currentYear, currentMonth - 1, 1);
+    const endObj = new Date(currentYear, currentMonth, 0);
+    const prevStartObj = new Date(currentYear, currentMonth - 2, 1);
+    const prevEndObj = new Date(currentYear, currentMonth - 1, 0);
+
+    startFilter = startObj.toISOString().split('T')[0];
+    endFilter = endObj.toISOString().split('T')[0];
+    prevStartFilter = prevStartObj.toISOString().split('T')[0];
+    prevEndFilter = prevEndObj.toISOString().split('T')[0];
+  } else if (preset === 'THIS_YEAR') {
+    startFilter = `${currentYear}-01-01`;
+    endFilter = `${currentYear}-12-31`;
+    prevStartFilter = `${currentYear - 1}-01-01`;
+    prevEndFilter = `${currentYear - 1}-12-31`;
+  } else if (preset === 'LAST_YEAR') {
+    startFilter = `${currentYear - 1}-01-01`;
+    endFilter = `${currentYear - 1}-12-31`;
+    prevStartFilter = `${currentYear - 2}-01-01`;
+    prevEndFilter = `${currentYear - 2}-12-31`;
+  } else if (preset === 'CUSTOM') {
+    if (customStart) startFilter = parseToISODate(customStart) || customStart;
+    if (customEnd) endFilter = parseToISODate(customEnd) || customEnd;
+  }
+
+  return {
+    startFilter,
+    endFilter,
+    prevStartFilter,
+    prevEndFilter,
+  };
+}
+
+/**
+ * Universal date range comparator.
+ */
+export function isDateInRange(
+  dateStr?: string,
+  startFilter?: string | null,
+  endFilter?: string | null
+): boolean {
+  if (!startFilter && !endFilter) return true;
+  if (!dateStr) return false;
+
+  const iso = parseToISODate(dateStr) || dateStr.split('T')[0];
+  if (startFilter && iso < startFilter) return false;
+  if (endFilter && iso > endFilter) return false;
+  return true;
+}
+
