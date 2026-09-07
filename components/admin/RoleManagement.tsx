@@ -42,7 +42,7 @@ export function RoleManagement() {
             <ShieldCheck className="h-5 w-5 text-emerald-400" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-white">Role Access Control</h2>
+            <h2 className="text-base font-bold text-white">Role</h2>
             <p className="mt-1 text-xs leading-5 text-white/50">
               Read-only view of the permissions attached to each BBKitchen role.
               Google remains the authentication provider; role assignment stays server-side.
