@@ -78,67 +78,59 @@ export default function AdminPage() {
     id: AdminTab;
     label: string;
     icon: React.ReactNode;
-    badge?: string;
     allowed: boolean;
   }[] = [
     {
       id: 'OVERVIEW',
-      label: '👑 Executive Overview',
+      label: 'Executive Overview',
       icon: <TrendingUp className="w-4 h-4 text-emerald-400" />,
-      badge: 'CEO & Investor',
       allowed: true,
     },
     {
       id: 'INVENTORY',
-      label: '📦 Master Inventory',
+      label: 'Master Inventory',
       icon: <Boxes className="w-4 h-4" />,
-      badge: 'Live',
       allowed: true,
     },
     {
       id: 'SALES_HELPER',
-      label: '⚡ Sales & WA Pitch',
+      label: 'Sales & WA Pitch',
       icon: <MessageSquare className="w-4 h-4 text-emerald-400" />,
-      badge: '13 Hubs',
       allowed: true,
     },
     {
       id: 'PIPELINE',
-      label: '🏷️ Pipeline & QC Funnel',
+      label: 'Pipeline & QC Funnel',
       icon: <Workflow className="w-4 h-4" />,
-      badge: '5 Stages',
       allowed: permissions.canEditInventory,
     },
     {
       id: 'INVOICES',
-      label: '📄 Invoices & Dokumen Resmi',
+      label: 'Invoices & Dokumen Resmi',
       icon: <FileText className="w-4 h-4 text-amber-400" />,
-      badge: 'Multi-Termin',
       allowed: true,
     },
     {
       id: 'FINANCE',
-      label: '💰 Financials & Cashflow',
+      label: 'Financials & Cashflow',
       icon: <Wallet className="w-4 h-4 text-emerald-400" />,
-      badge: 'Buku Kas Live',
       allowed: true,
     },
     {
       id: 'WAREHOUSES',
-      label: '🏢 Warehouse Intelligence',
+      label: 'Warehouse Intelligence',
       icon: <Warehouse className="w-4 h-4" />,
-      badge: '13 Hubs',
       allowed: true,
     },
     {
       id: 'SEO',
-      label: '🔍 SEO Quality & Schema',
+      label: 'SEO Quality & Schema',
       icon: <SearchCheck className="w-4 h-4" />,
       allowed: permissions.canEditSEO,
     },
     {
       id: 'SOCIAL',
-      label: '🌐 Social Distribution',
+      label: 'Social Distribution',
       icon: <Share2 className="w-4 h-4" />,
       allowed: permissions.canManageSocialMedia,
     },
@@ -194,7 +186,7 @@ export default function AdminPage() {
                 if (!item.allowed) return null;
                 return (
                   <option key={item.id} value={item.id}>
-                    {item.label} {item.badge ? `(${item.badge})` : ''}
+                    {item.label}
                   </option>
                 );
               })}
@@ -242,17 +234,6 @@ export default function AdminPage() {
                       </span>
                       <span className="truncate">{item.label}</span>
                     </div>
-                    {item.badge && (
-                      <span
-                        className={`text-[10px] font-mono px-2 py-0.5 rounded-sm ${
-                          isActive
-                            ? 'bg-blue-950/80 text-blue-300 border border-blue-800/80'
-                            : 'bg-black/30 text-white/40 border border-white/[0.06]'
-                        }`}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
                   </button>
                 );
               })}
