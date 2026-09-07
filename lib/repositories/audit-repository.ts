@@ -166,3 +166,36 @@ export async function savePersistentAuditState(
 
   return cachedState;
 }
+
+export async function resetAllAuditState(): Promise<AuditSystemState> {
+  cachedState.timestamps = {};
+  cachedState.activeSku = null;
+  cachedState.soldNotices = [];
+  lastFetchTime = Date.now();
+
+  const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
+  if (!spreadsheetId) return cachedState;
+
+  try {
+    await ensureAuditSheetExists(spreadsheetId);
+    const sheets = getSheetsClient();
+    const isoNow = new Date().toISOString();
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${AUDIT_SHEET_NAME}!A2:C4`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [
+          ['AUDIT_TIMESTAMPS', '{}', isoNow],
+          ['ACTIVE_SKU', '', isoNow],
+          ['SOLD_NOTICES', '[]', isoNow],
+        ],
+      },
+    });
+  } catch (err) {
+    console.warn('Failed to reset SYSTEM_AUDIT_STATE in Google Sheets:', err);
+  }
+
+  return cachedState;
+}

@@ -134,35 +134,15 @@ export function SalesHelperView() {
 
   // Cross-device synchronization for audit timestamps ONLY (Row control strictly in Master Inventory)
   useEffect(() => {
-    // 1. Initial push of existing desktop timestamps to backend if present
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('bbk_audit_timestamps');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-            fetch('/api/audit-timestamps', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ batch: parsed }),
-            }).catch(() => {});
-          }
-        }
-      } catch {}
-    }
-
     async function syncTimestamps() {
       try {
         const res = await fetch('/api/audit-timestamps');
         const data = await res.json();
         if (data.timestamps && typeof data.timestamps === 'object') {
-          setAuditTimestamps((prev) => {
-            const merged = { ...prev, ...data.timestamps };
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('bbk_audit_timestamps', JSON.stringify(merged));
-            }
-            return merged;
-          });
+          setAuditTimestamps(data.timestamps);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('bbk_audit_timestamps', JSON.stringify(data.timestamps));
+          }
         }
       } catch {}
     }
@@ -637,12 +617,13 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                       <span className="text-[9px] font-mono text-slate-400 px-1 py-0.2 bg-slate-900 rounded">{item.asal_gudang}</span>
                     </div>
                     <div className="text-[10px] text-slate-300 truncate leading-tight mt-0.5">{item.PRODUCT_TITLE}</div>
-                    <div className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">
-                      {item.HARGA_BUKA_WA ? formatIDR(item.HARGA_BUKA_WA) : 'Tanya Harga'}
-                    </div>
-                    {displayTime && (
-                      <div className="text-[9px] text-slate-400 font-mono mt-0.5 truncate" title="Waktu posting / audit">
+                    {displayTime ? (
+                      <div className="text-[9px] text-emerald-400 font-mono mt-0.5 truncate" title="Waktu audit Telegram">
                         🕒 {displayTime}
+                      </div>
+                    ) : (
+                      <div className="text-[9px] text-slate-500 font-mono mt-0.5 truncate">
+                        Belum Dicek
                       </div>
                     )}
                   </button>
@@ -755,12 +736,18 @@ _Stok cepat berputar, segera amankan unit sebelum diambil resto lain!_`;
                   <MapPin className="w-3 h-3 text-slate-500" />
                   <span>{searchedItem.LOKASI_UNIT}</span>
                 </div>
-                {(auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM) && (
-                  <div className="text-[10px] font-mono text-emerald-400/90 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-lg inline-flex items-center gap-1 mt-1">
-                    <span>🕒 Terakhir Dicek:</span>
-                    <strong>{formatTimestampWithYear(auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM)}</strong>
-                  </div>
-                )}
+                <div className={`text-[10px] font-mono px-2 py-0.5 rounded-lg inline-flex items-center gap-1 mt-1 border ${
+                  (auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM)
+                    ? 'text-emerald-400/90 bg-emerald-950/60 border-emerald-800/60'
+                    : 'text-slate-400 bg-slate-900 border-slate-800'
+                }`}>
+                  <span>🕒 Terakhir Dicek:</span>
+                  <strong>
+                    {(auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM)
+                      ? formatTimestampWithYear(auditTimestamps[searchedItem.SKU] || searchedItem.LAST_CHECKED_TELEGRAM)
+                      : 'Belum Dicek (Klik Telegram)'}
+                  </strong>
+                </div>
               </div>
             </div>
 
