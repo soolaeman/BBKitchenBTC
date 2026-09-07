@@ -2,29 +2,59 @@ import { Invoice, FinancialKPIs, ClosingDealItem, InvoiceStatus } from '@/lib/ty
 import { getRawMasterInventory } from './inventory-repository';
 import { getGoogleSheetsInventory } from './google-sheets-inventory';
 
-// Clean Real Invoices store for BBKitchen
-const initialInvoices: Invoice[] = [];
+import {
+  fetchGoogleSheetsInvoices,
+  appendGoogleSheetsInvoice,
+  updateGoogleSheetsInvoiceStatus,
+} from './google-sheets-invoices';
 
-export function getInvoices(): Invoice[] {
-  return [...initialInvoices];
+// Clean Real Invoices store for BBKitchen (in-memory cache)
+let cachedInvoices: Invoice[] = [];
+
+export async function getInvoices(): Promise<Invoice[]> {
+  try {
+    const sheetsInvoices = await fetchGoogleSheetsInvoices();
+    if (sheetsInvoices && sheetsInvoices.length > 0) {
+      cachedInvoices = sheetsInvoices;
+      return cachedInvoices;
+    }
+  } catch (err) {
+    console.warn('Fallback to in-memory invoices:', err);
+  }
+  return [...cachedInvoices];
 }
 
-export function createInvoice(invoiceData: Omit<Invoice, 'id'>): Invoice {
+export async function createInvoice(invoiceData: Omit<Invoice, 'id'>): Promise<Invoice> {
   const newInvoice: Invoice = {
     ...invoiceData,
     id: `inv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
   };
-  initialInvoices.unshift(newInvoice);
+  cachedInvoices.unshift(newInvoice);
+
+  // Persist to Google Sheets INVOICE_ARCHIVE tab
+  await appendGoogleSheetsInvoice(newInvoice).catch((e) =>
+    console.warn('Google Sheets invoice append warning:', e)
+  );
+
   return newInvoice;
 }
 
-export function updateInvoiceStatus(id: string, status: InvoiceStatus): boolean {
-  const index = initialInvoices.findIndex((inv) => inv.id === id);
-  if (index === -1) return false;
-  initialInvoices[index].status = status;
-  if (status === 'PAID') {
-    initialInvoices[index].paidDate = new Date().toISOString().split('T')[0];
+export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<boolean> {
+  const index = cachedInvoices.findIndex((inv) => inv.id === id || inv.invoiceNumber === id);
+  if (index !== -1) {
+    cachedInvoices[index].status = status;
+    if (status === 'PAID') {
+      cachedInvoices[index].paidDate = new Date().toISOString().split('T')[0];
+    }
   }
+
+  // Persist status update to Google Sheets
+  await updateGoogleSheetsInvoiceStatus(
+    id,
+    status,
+    status === 'PAID' ? new Date().toISOString().split('T')[0] : undefined
+  ).catch((e) => console.warn('Google Sheets invoice status update warning:', e));
+
   return true;
 }
 

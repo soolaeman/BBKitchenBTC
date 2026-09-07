@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(kpis);
     }
 
-    const invoices = getInvoices();
+    const invoices = await getInvoices();
     const ledgerData = await getLiveClosingDealLedger();
     return NextResponse.json({
       invoices,
@@ -57,12 +57,12 @@ export async function POST(request: NextRequest) {
     const { action, invoice, id, status } = body;
 
     if (action === 'CREATE') {
-      const created = createInvoice(invoice);
+      const created = await createInvoice(invoice);
       return NextResponse.json({ success: true, invoice: created });
     }
 
     if (action === 'UPDATE_STATUS') {
-      const updated = updateInvoiceStatus(id, status);
+      const updated = await updateInvoiceStatus(id, status);
       return NextResponse.json({ success: updated });
     }
 

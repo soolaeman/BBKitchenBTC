@@ -7,7 +7,7 @@ import { ROLE_PERMISSIONS } from "@/lib/types/auth";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
-function getSheetsClient() {
+export function getSheetsClient() {
   const email = (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "").replace(/['"]/g, "").trim();
   let privateKey = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "").replace(/['"]/g, "").trim();
   if (privateKey) {
