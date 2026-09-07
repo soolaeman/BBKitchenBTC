@@ -133,13 +133,19 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
     else titleText = `📋 *SURAT PENAWARAN HARGA (QUOTATION)*\nNo: *${docNumber}*`;
 
     let shippingTextWA = '';
-    if (invoice.shippingFeeType === 'INCLUDED' && (invoice.shippingFee || 0) > 0) {
-      shippingTextWA = `\n🚚 *Ongkos Kirim (Include):* ${formatIDR(invoice.shippingFee || 0)}`;
-    } else if (invoice.shippingFeeType === 'BUYER_COD') {
-      shippingTextWA = `\n🚚 *Ongkos Kirim:* Ditanggung Pembeli (Bayar COD ke Driver saat tiba)`;
-    } else if (invoice.shippingFeeType === 'FREE_PROMO') {
-      shippingTextWA = `\n🚚 *Ongkos Kirim:* Free Ongkir Promo BBKitchen (Gratis)`;
+    if (activeType === 'INVOICE') {
+      if (invoice.shippingFeeType === 'INCLUDED' && (invoice.shippingFee || 0) > 0) {
+        shippingTextWA = `\n🚚 *Ongkos Kirim (Include):* ${formatIDR(invoice.shippingFee || 0)}`;
+      } else if (invoice.shippingFeeType === 'BUYER_COD') {
+        shippingTextWA = `\n🚚 *Ongkos Kirim:* Ditanggung Pembeli (Bayar COD ke Driver saat tiba)`;
+      } else if (invoice.shippingFeeType === 'FREE_PROMO') {
+        shippingTextWA = `\n🚚 *Ongkos Kirim:* Free Ongkir Promo BBKitchen (Gratis)`;
+      }
     }
+
+    const bankPaymentWA = activeType === 'INVOICE'
+      ? `\n💳 *Rekening Resmi Pembayaran:*\n• Bank Jago Syariah: *5079 8068 4419* a.n. *Ahmad Sulaeman*\n*(DP minimal 50% untuk penguncian unit & jadwal kirim)*\n`
+      : '';
 
     return `Halo Kak *${invoice.customerName}*! 🙏
 Berikut kami lampirkan dokumen transaksi resmi dari *Bukan Baru Kitchen (BBKitchen)*:
@@ -154,7 +160,7 @@ ${discount > 0 ? `🏷️ *Diskon:* -${formatIDR(discount)}\n` : ''}
 💰 *Total Transaksi:* ${formatIDR(total)}
 ${dp > 0 && dp < total ? `• DP Dibayarkan: ${formatIDR(dp)}\n• Sisa Pelunasan: *${formatIDR(sisa)}*` : ''}
 ${activeType === 'RECEIPT' ? `✅ *STATUS: LUNAS BERSIH*` : ''}
-
+${bankPaymentWA}
 🏢 *Bukan Baru Kitchen*
 Pusat Peralatan Dapur Komersial & Resto Second Terpercaya
 Gudang Pamulang 2 / Sawangan / Kedaung, Tangerang Selatan
@@ -464,12 +470,8 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                   <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs space-y-1.5">
                     <span className="font-bold text-blue-900 uppercase text-[10px] block">Rekening Resmi Pembayaran:</span>
                     <div className="flex items-center justify-between font-mono text-slate-800">
-                      <span>• BCA: <strong>883-129-4821</strong></span>
-                      <span className="text-[10px] text-slate-500">a.n. Soolaeman (BBKitchen)</span>
-                    </div>
-                    <div className="flex items-center justify-between font-mono text-slate-800">
-                      <span>• Mandiri: <strong>164-00-049281-2</strong></span>
-                      <span className="text-[10px] text-slate-500">a.n. BBKitchen Official</span>
+                      <span>• Bank Jago Syariah: <strong>5079 8068 4419</strong></span>
+                      <span className="text-[10px] font-bold text-slate-700">a.n. Ahmad Sulaeman</span>
                     </div>
                     <p className="text-[10px] text-blue-800 pt-1 border-t border-blue-200">
                       * Harap transfer DP min. 50% untuk penguncian unit & konfirmasi jadwal pengiriman.
@@ -490,19 +492,19 @@ Hotline: 0851 2200 1051 | www.bukanbarukitchen.com`;
                   <span>Subtotal Unit / Produk:</span>
                   <span className="font-mono font-bold">{formatIDR(subtotal)}</span>
                 </div>
-                {invoice.shippingFeeType === 'INCLUDED' && (invoice.shippingFee || 0) > 0 && (
+                {activeType === 'INVOICE' && invoice.shippingFeeType === 'INCLUDED' && (invoice.shippingFee || 0) > 0 && (
                   <div className="flex justify-between py-1 border-b border-slate-200 text-emerald-700">
                     <span>Ongkos Kirim (Include Tagihan):</span>
                     <span className="font-mono font-bold">+ {formatIDR(invoice.shippingFee || 0)}</span>
                   </div>
                 )}
-                {invoice.shippingFeeType === 'BUYER_COD' && (
+                {activeType === 'INVOICE' && invoice.shippingFeeType === 'BUYER_COD' && (
                   <div className="flex justify-between py-1 border-b border-slate-200 text-[11px] text-amber-700 bg-amber-50/50 px-1 rounded">
                     <span>Ongkir (COD ke Kurir):</span>
                     <span className="italic font-medium">Ditanggung Pembeli</span>
                   </div>
                 )}
-                {invoice.shippingFeeType === 'FREE_PROMO' && (
+                {activeType === 'INVOICE' && invoice.shippingFeeType === 'FREE_PROMO' && (
                   <div className="flex justify-between py-1 border-b border-slate-200 text-[11px] text-blue-700 bg-blue-50/50 px-1 rounded">
                     <span>Ongkir BBKitchen:</span>
                     <span className="font-bold uppercase">Free Ongkir Promo</span>

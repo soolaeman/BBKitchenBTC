@@ -50,9 +50,9 @@ export interface Invoice {
   validUntilDate?: string; // Untuk Quotation
   status: InvoiceStatus;
   paidDate?: string | null;
-  paymentMethod?: 'TRANSFER_BCA' | 'TRANSFER_MANDIRI' | 'CASH_PICKUP' | 'WOOCOMMERCE_GATEWAY';
+  paymentMethod?: 'TRANSFER_JAGO_SYARIAH' | 'TRANSFER_BCA' | 'TRANSFER_MANDIRI' | 'CASH_PICKUP' | 'WOOCOMMERCE_GATEWAY';
   
-  // Shipping & Delivery Details
+  // Shipping & Delivery Details (Optional in Invoice, carried over to Surat Jalan)
   deliveryDriver?: string;
   driverPhone?: string;
   deliveryVehiclePlate?: string;
