@@ -87,28 +87,15 @@ export function PipelineMonitor() {
   const loadPipelineData = useCallback(async () => {
     setIsLoadingQc(true);
     try {
-      const res = await fetch('/api/inventory?pageSize=100', {
+      const url = `/api/inventory?pageSize=50&statusPipeline=${encodeURIComponent(activeQcFilter)}`;
+      const res = await fetch(url, {
         headers: { ...(role ? { 'x-bbk-role': role } : {}) },
       });
-      const data = await res.json();
-      setStats(data.stats);
-
-      let filteredItems = data.items || [];
-      if (activeQcFilter === 'ALL_EXCEPTIONS') {
-        filteredItems = filteredItems.filter(
-          (i: MasterInventoryItem) =>
-            i.STATUS_PIPELINE === 'ERROR' ||
-            i.STATUS_PIPELINE === 'NO_PHOTOS_FOUND' ||
-            i.STATUS_PIPELINE === 'AMBIGUOUS' ||
-            i.STATUS_PIPELINE === 'PENDING_PHOTOS'
-        );
-      } else {
-        filteredItems = filteredItems.filter(
-          (i: MasterInventoryItem) => i.STATUS_PIPELINE === activeQcFilter
-        );
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data.stats);
+        setItems(data.items || []);
       }
-
-      setItems(filteredItems);
     } catch (err) {
       console.error('Failed to load pipeline exceptions', err);
     } finally {
@@ -357,8 +344,8 @@ export function PipelineMonitor() {
             {/* RED: Errors */}
             <button
               type="button"
-              onClick={() => setActiveQcFilter('ERROR')}
-              className={`text-left p-4 rounded-2xl border transition-all ${
+              onClick={() => setActiveQcFilter(activeQcFilter === 'ERROR' ? 'ALL_EXCEPTIONS' : 'ERROR')}
+              className={`text-left p-4 rounded-2xl border transition-all cursor-pointer ${
                 activeQcFilter === 'ERROR'
                   ? 'bg-rose-950 border-rose-600 ring-2 ring-rose-500/40 shadow-lg shadow-rose-950/50'
                   : 'bg-slate-900/90 border-slate-800/80 hover:border-rose-800/80'
@@ -369,7 +356,7 @@ export function PipelineMonitor() {
                 <AlertTriangle className="w-4 h-4 text-rose-500" />
               </div>
               <div className="text-2xl font-black text-rose-400 font-mono mt-2">
-                {stats?.errors || 95}
+                {stats ? (stats.errors ?? 0) : <span className="text-sm animate-pulse text-slate-500">...</span>}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">Data dirty / spec rusak</div>
             </button>
@@ -377,8 +364,8 @@ export function PipelineMonitor() {
             {/* YELLOW: Missing Photos */}
             <button
               type="button"
-              onClick={() => setActiveQcFilter('NO_PHOTOS_FOUND')}
-              className={`text-left p-4 rounded-2xl border transition-all ${
+              onClick={() => setActiveQcFilter(activeQcFilter === 'NO_PHOTOS_FOUND' ? 'ALL_EXCEPTIONS' : 'NO_PHOTOS_FOUND')}
+              className={`text-left p-4 rounded-2xl border transition-all cursor-pointer ${
                 activeQcFilter === 'NO_PHOTOS_FOUND'
                   ? 'bg-amber-950 border-amber-600 ring-2 ring-amber-500/40 shadow-lg shadow-amber-950/50'
                   : 'bg-slate-900/90 border-slate-800/80 hover:border-amber-800/80'
@@ -389,7 +376,7 @@ export function PipelineMonitor() {
                 <ImageOff className="w-4 h-4 text-amber-500" />
               </div>
               <div className="text-2xl font-black text-amber-400 font-mono mt-2">
-                120
+                {stats ? (stats.pendingPhotos ?? 0) : <span className="text-sm animate-pulse text-slate-500">...</span>}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">Foto belum ter-scrape</div>
             </button>
@@ -397,8 +384,8 @@ export function PipelineMonitor() {
             {/* ORANGE: Ambiguous */}
             <button
               type="button"
-              onClick={() => setActiveQcFilter('AMBIGUOUS')}
-              className={`text-left p-4 rounded-2xl border transition-all ${
+              onClick={() => setActiveQcFilter(activeQcFilter === 'AMBIGUOUS' ? 'ALL_EXCEPTIONS' : 'AMBIGUOUS')}
+              className={`text-left p-4 rounded-2xl border transition-all cursor-pointer ${
                 activeQcFilter === 'AMBIGUOUS'
                   ? 'bg-purple-950 border-purple-600 ring-2 ring-purple-500/40 shadow-lg shadow-purple-950/50'
                   : 'bg-slate-900/90 border-slate-800/80 hover:border-purple-800/80'
@@ -409,7 +396,7 @@ export function PipelineMonitor() {
                 <HelpCircle className="w-4 h-4 text-purple-500" />
               </div>
               <div className="text-2xl font-black text-purple-400 font-mono mt-2">
-                {stats?.ambiguous || 65}
+                {stats ? (stats.ambiguous ?? 0) : <span className="text-sm animate-pulse text-slate-500">...</span>}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">Duplikasi row Sheets</div>
             </button>
@@ -417,8 +404,8 @@ export function PipelineMonitor() {
             {/* BLUE: Ready to Publish */}
             <button
               type="button"
-              onClick={() => setActiveQcFilter('READY_TO_PUBLISH')}
-              className={`text-left p-4 rounded-2xl border transition-all ${
+              onClick={() => setActiveQcFilter(activeQcFilter === 'READY_TO_PUBLISH' ? 'ALL_EXCEPTIONS' : 'READY_TO_PUBLISH')}
+              className={`text-left p-4 rounded-2xl border transition-all cursor-pointer ${
                 activeQcFilter === 'READY_TO_PUBLISH'
                   ? 'bg-blue-950 border-blue-600 ring-2 ring-blue-500/40 shadow-lg shadow-blue-950/50'
                   : 'bg-slate-900/90 border-slate-800/80 hover:border-blue-800/80'
@@ -429,7 +416,7 @@ export function PipelineMonitor() {
                 <UploadCloud className="w-4 h-4 text-blue-500" />
               </div>
               <div className="text-2xl font-black text-blue-400 font-mono mt-2">
-                {stats?.readyToPublish || 210}
+                {stats ? (stats.readyToPublish ?? 0) : <span className="text-sm animate-pulse text-slate-500">...</span>}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">Siap tayang ke publik</div>
             </button>
@@ -437,8 +424,8 @@ export function PipelineMonitor() {
             {/* GREEN: Published Healthy */}
             <button
               type="button"
-              onClick={() => setActiveQcFilter('PUBLISHED')}
-              className={`text-left p-4 rounded-2xl border transition-all ${
+              onClick={() => setActiveQcFilter(activeQcFilter === 'PUBLISHED' ? 'ALL_EXCEPTIONS' : 'PUBLISHED')}
+              className={`text-left p-4 rounded-2xl border transition-all cursor-pointer ${
                 activeQcFilter === 'PUBLISHED'
                   ? 'bg-emerald-950 border-emerald-600 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-950/50'
                   : 'bg-slate-900/90 border-slate-800/80 hover:border-emerald-800/80'
@@ -449,7 +436,7 @@ export function PipelineMonitor() {
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               </div>
               <div className="text-2xl font-black text-emerald-400 font-mono mt-2">
-                {stats?.published || 2150}
+                {stats ? (stats.published ?? 0) : <span className="text-sm animate-pulse text-slate-500">...</span>}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">Live di WooCommerce</div>
             </button>
@@ -457,9 +444,20 @@ export function PipelineMonitor() {
 
           {/* Actionable Exception List */}
           <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl">
-            <div className="p-4 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between">
-              <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                Daftar Pengecualian ({items.length} unit terpilih)
+            <div className="p-4 bg-slate-950/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                  Daftar Pengecualian ({items.length} unit terpilih)
+                </span>
+                {activeQcFilter !== 'ALL_EXCEPTIONS' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveQcFilter('ALL_EXCEPTIONS')}
+                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                  >
+                    Tampilkan Semua Pengecualian
+                  </button>
+                )}
               </div>
               <div className="text-xs text-slate-400">
                 Klik tindakan untuk menyelesaikan bottleneck dalam 1-klik

@@ -297,7 +297,30 @@ export async function queryGoogleSheetsInventory(
     }
   }
   if (options.statusPipeline && options.statusPipeline !== "ALL") {
-    filtered = filtered.filter((item) => item.STATUS_PIPELINE === options.statusPipeline);
+    if (options.statusPipeline === "ALL_EXCEPTIONS") {
+      filtered = filtered.filter(
+        (item) =>
+          item.STATUS_PIPELINE === "ERROR" ||
+          item.STATUS_PIPELINE === "NO_PHOTOS_FOUND" ||
+          item.STATUS_PIPELINE === "AMBIGUOUS" ||
+          item.STATUS_PIPELINE === "PENDING_PHOTOS" ||
+          item.IS_DIRTY ||
+          !item.FEATURED_IMAGE
+      );
+    } else if (options.statusPipeline === "NO_PHOTOS_FOUND") {
+      filtered = filtered.filter(
+        (item) =>
+          item.STATUS_PIPELINE === "NO_PHOTOS_FOUND" ||
+          item.STATUS_PIPELINE === "PENDING_PHOTOS" ||
+          !item.FEATURED_IMAGE
+      );
+    } else if (options.statusPipeline === "ERROR") {
+      filtered = filtered.filter(
+        (item) => item.STATUS_PIPELINE === "ERROR" || item.IS_DIRTY
+      );
+    } else {
+      filtered = filtered.filter((item) => item.STATUS_PIPELINE === options.statusPipeline);
+    }
   }
   if (options.guardrailStatus && options.guardrailStatus !== "ALL") {
     filtered = filtered.filter((item) => item.STATUS_GUARDRAIL === options.guardrailStatus);
@@ -316,10 +339,12 @@ export async function queryGoogleSheetsInventory(
     totalUnits: allItems.length,
     availableUnits: allItems.filter((i) => i.STATUS_UNIT === "AVAILABLE" || i.STATUS_UNIT === "READY").length,
     soldUnits: allItems.filter((i) => i.STATUS_UNIT === "SOLD").length,
-    pendingPhotos: allItems.filter((i) => i.STATUS_PIPELINE === "PENDING_PHOTOS").length,
+    pendingPhotos: allItems.filter(
+      (i) => i.STATUS_PIPELINE === "PENDING_PHOTOS" || i.STATUS_PIPELINE === "NO_PHOTOS_FOUND" || !i.FEATURED_IMAGE
+    ).length,
     readyToPublish: allItems.filter((i) => i.STATUS_PIPELINE === "READY_TO_PUBLISH").length,
     published: allItems.filter((i) => i.STATUS_PIPELINE === "PUBLISHED").length,
-    errors: allItems.filter((i) => i.STATUS_PIPELINE === "ERROR").length,
+    errors: allItems.filter((i) => i.STATUS_PIPELINE === "ERROR" || i.IS_DIRTY).length,
     ambiguous: allItems.filter((i) => i.STATUS_PIPELINE === "AMBIGUOUS" || i.STATUS_UNIT === "AMBIGUOUS").length,
     dirtyCount: allItems.filter((i) => i.IS_DIRTY).length,
   };
