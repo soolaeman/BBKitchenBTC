@@ -3,6 +3,8 @@ import {
   SEOHealthStatus,
   SEOCheckItem,
   SEOArticle,
+  RankTrackItem,
+  OffPageSignal,
 } from '@/lib/types/seo';
 import { MasterInventoryItem } from '@/lib/types/inventory';
 
@@ -12,13 +14,13 @@ import { MasterInventoryItem } from '@/lib/types/inventory';
 export function auditProductSEO(item: MasterInventoryItem): SEOAuditReport {
   const checks: SEOCheckItem[] = [];
   const keyword = (item.YOAST_KEYWORD || '').toLowerCase().trim();
-  const title = item.SEO_TITLE || item.PRODUCT_TITLE;
-  const metaDesc = item.YOAST_DESCRIPTION || item.SHORT_DESCRIPTION;
+  const title = item.SEO_TITLE || item.PRODUCT_TITLE || '';
+  const metaDesc = item.YOAST_DESCRIPTION || item.SHORT_DESCRIPTION || '';
   const fullContent = item.FULL_DESCRIPTION || '';
   const wordCount = fullContent.replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length;
 
   // 1. SEO Title Check
-  const titleHasKeyword = keyword && title.toLowerCase().includes(keyword);
+  const titleHasKeyword = Boolean(keyword && title.toLowerCase().includes(keyword));
   const titleLengthOk = title.length >= 35 && title.length <= 70;
   checks.push({
     key: 'title_optimization',
@@ -29,12 +31,12 @@ export function auditProductSEO(item: MasterInventoryItem): SEOAuditReport {
       ? `Panjang title ideal (${title.length} karakter) dan ${titleHasKeyword ? 'mengandung' : 'belum mengandung'} keyword target.`
       : `Panjang title (${title.length} karakter) di luar rentang optimal 35-70 karakter.`,
     recommendation: !titleHasKeyword
-      ? `Sisipkan keyword fokus "${keyword}" di awal judul produk.`
+      ? `Sisipkan keyword fokus "${keyword || 'peralatan resto bekas'}" di awal judul produk.`
       : undefined,
   });
 
   // 2. Meta Description Check
-  const metaHasKeyword = keyword && metaDesc.toLowerCase().includes(keyword);
+  const metaHasKeyword = Boolean(keyword && metaDesc.toLowerCase().includes(keyword));
   const metaLengthOk = metaDesc.length >= 110 && metaDesc.length <= 165;
   checks.push({
     key: 'meta_description',
@@ -63,19 +65,19 @@ export function auditProductSEO(item: MasterInventoryItem): SEOAuditReport {
   });
 
   // 4. Clean URL / Slug
-  const slug = item.SKU.toLowerCase();
-  const slugOk = !slug.includes(' ') && !slug.includes('?') && slug.length < 50;
+  const skuSlug = (item.SKU || '').toLowerCase();
+  const slugOk = Boolean(skuSlug && !skuSlug.includes(' ') && !skuSlug.includes('?') && skuSlug.length < 50);
   checks.push({
     key: 'slug_structure',
     label: 'Clean Slug & Canonical URL',
     passed: slugOk,
     score: slugOk ? 10 : 5,
-    message: slugOk ? `Slug /product/${slug} terstruktur dan canonical valid.` : 'Slug mengandung karakter tidak ramah SEO.',
+    message: slugOk ? `Slug /product/${skuSlug} terstruktur dan canonical valid.` : 'Slug mengandung karakter tidak ramah SEO.',
   });
 
   // 5. Content Completeness & Specs
   const specsCount = Object.keys(item.SPESIFIKASI || {}).length;
-  const contentComplete = wordCount >= 60 && specsCount >= 5;
+  const contentComplete = wordCount >= 40 && specsCount >= 3;
   checks.push({
     key: 'content_depth',
     label: 'Deskripsi Teknis & Spesifikasi Lengkap',
@@ -91,14 +93,15 @@ export function auditProductSEO(item: MasterInventoryItem): SEOAuditReport {
 
   // 6. Image Alt & Visuals
   const hasAlt = Boolean(item.image_alt && item.image_alt.length > 5);
-  const hasMultiplePhotos = Array.isArray(item.PHOTO_URLS) && item.PHOTO_URLS.length >= 2;
+  const photoCount = Array.isArray(item.PHOTO_URLS) ? item.PHOTO_URLS.length : item.PHOTO_URLS ? 1 : 0;
+  const hasMultiplePhotos = photoCount >= 2;
   checks.push({
     key: 'image_seo',
     label: 'Image SEO & Multi-Angle Photos',
-    passed: hasAlt && hasMultiplePhotos,
+    passed: Boolean(hasAlt && hasMultiplePhotos),
     score: hasAlt && hasMultiplePhotos ? 15 : hasAlt ? 10 : 3,
     message: hasAlt && hasMultiplePhotos
-      ? `Memiliki ${item.PHOTO_URLS.length} foto dengan tag ALT deskriptif untuk Google Image Search.`
+      ? `Memiliki ${photoCount} foto dengan tag ALT deskriptif untuk Google Image Search.`
       : 'Foto kurang dari 2 sudut atau tag image alt belum optimal.',
     recommendation: !hasAlt ? 'Isi image alt dengan format "[Merk] [Kategori] Bekas Siap Pakai BBKitchen".' : undefined,
   });
@@ -138,26 +141,256 @@ export function auditProductSEO(item: MasterInventoryItem): SEOAuditReport {
   }
 
   return {
-    targetId: item.SKU,
-    title: item.PRODUCT_TITLE,
+    targetId: item.SKU || 'UNKNOWN-SKU',
+    title: item.PRODUCT_TITLE || item.ITEM_NAME || 'Produk BBKitchen',
     type: 'PRODUCT',
-    slug: item.SKU.toLowerCase(),
+    slug: (item.SKU || '').toLowerCase(),
     healthStatus,
     overallScore: totalScore,
     checks,
     passedCount,
     totalCount: checks.length,
-    focusKeyword: item.YOAST_KEYWORD,
+    focusKeyword: item.YOAST_KEYWORD || 'peralatan resto bekas',
     metaDescription: metaDesc,
-    h1: item.PRODUCT_TITLE,
+    h1: item.PRODUCT_TITLE || item.ITEM_NAME,
     wordCount,
     imageAltPresent: hasAlt,
     internalLinksCount: 3,
-    canonicalUrl: `https://bukanbarukitchen.com/product/${item.SKU.toLowerCase()}`,
+    canonicalUrl: `https://bukanbarukitchen.com/product/${(item.SKU || '').toLowerCase()}`,
     schemaValid: schemaOk,
     lastAudited: new Date().toISOString(),
   };
 }
+
+/**
+ * Generate Schema.org JSON-LD for Google Rich Results
+ */
+export function buildProductSchemaJsonLd(item: MasterInventoryItem) {
+  const images = Array.isArray(item.PHOTO_URLS)
+    ? item.PHOTO_URLS
+    : item.PHOTO_URLS
+    ? [item.PHOTO_URLS]
+    : ['https://bukanbarukitchen.com/og-image.jpg'];
+
+  const schema = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Product',
+        '@id': `https://bukanbarukitchen.com/product/${item.SKU.toLowerCase()}#product`,
+        name: item.PRODUCT_TITLE || item.ITEM_NAME,
+        sku: item.SKU,
+        mpn: item.SKU,
+        image: images,
+        description: item.SHORT_DESCRIPTION || item.FULL_DESCRIPTION || `${item.ITEM_NAME} bekas komersial bergaransi`,
+        brand: {
+          '@type': 'Brand',
+          name: item.MERK || 'Commercial Grade',
+        },
+        category: item.CATEGORY_SLUG || 'Kitchen Equipment',
+        offers: {
+          '@type': 'Offer',
+          '@id': `https://bukanbarukitchen.com/product/${item.SKU.toLowerCase()}#offer`,
+          url: `https://bukanbarukitchen.com/product/${item.SKU.toLowerCase()}`,
+          priceCurrency: 'IDR',
+          price: item.HARGA_ESTIMASI_PUBLIK || 0,
+          priceValidUntil: '2026-12-31',
+          itemCondition: 'https://schema.org/UsedCondition',
+          availability: item.STATUS_BARANG === 'TERSEDIA' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+          seller: {
+            '@type': 'Organization',
+            name: 'Bukan Baru Kitchen',
+            url: 'https://bukanbarukitchen.com',
+          },
+          availableAtOrFrom: {
+            '@type': 'Place',
+            name: `Hub ${item.LOKASI_UNIT || 'BK - BBKitchen (HQ)'}`,
+            address: {
+              '@type': 'PostalAddress',
+              addressLocality: 'Tangerang Selatan',
+              addressRegion: 'Banten',
+              addressCountry: 'ID',
+            },
+          },
+        },
+      },
+      {
+        '@type': 'BreadcrumbList',
+        '@id': `https://bukanbarukitchen.com/product/${item.SKU.toLowerCase()}#breadcrumb`,
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: 'https://bukanbarukitchen.com',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: item.CATEGORY_SLUG || 'Equipment',
+            item: `https://bukanbarukitchen.com/category/${item.CATEGORY_SLUG || 'all'}`,
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: item.PRODUCT_TITLE || item.ITEM_NAME,
+            item: `https://bukanbarukitchen.com/product/${item.SKU.toLowerCase()}`,
+          },
+        ],
+      },
+    ],
+  };
+
+  return schema;
+}
+
+/**
+ * 1-Click Autofix Generator for Yoast Meta & Image Alt
+ */
+export function generateAutoFixMetadata(item: MasterInventoryItem) {
+  const brand = item.MERK || 'Resto';
+  const name = item.ITEM_NAME || item.PRODUCT_TITLE || 'Peralatan Kitchen';
+  const hub = item.LOKASI_UNIT || 'Jabodetabek';
+  const priceStr = item.HARGA_ESTIMASI_PUBLIK
+    ? `Rp ${item.HARGA_ESTIMASI_PUBLIK.toLocaleString('id-ID')}`
+    : 'Harga Spesial';
+
+  const yoastKeyword = `${brand.toLowerCase()} ${name.toLowerCase()} bekas`.slice(0, 50);
+  const seoTitle = `${name} ${brand} Bekas Siap Pakai | Bukan Baru Kitchen`.slice(0, 68);
+  const yoastDescription = `Jual ${name} ${brand} bekas bergaransi. Kondisi prima terinspeksi teknisi BBKitchen di Hub ${hub}. ${priceStr}. Konsultasi WA siap kirim Jabodetabek.`.slice(0, 160);
+  const imageAlt = `${name} ${brand} Bekas Komersial Hub ${hub} BBKitchen`;
+
+  return {
+    yoastKeyword,
+    seoTitle,
+    yoastDescription,
+    imageAlt,
+  };
+}
+
+/**
+ * SERP Rank Tracking Dataset for Google.co.id
+ */
+export const initialRankings: RankTrackItem[] = [
+  {
+    id: 'rk_01',
+    keyword: 'combi oven bekas restoran',
+    position: 2,
+    prevPosition: 4,
+    impressions30d: 4890,
+    clicks30d: 342,
+    ctr: '6.99%',
+    landingPage: 'https://bukanbarukitchen.com/category/combi-oven',
+    searchEngine: 'Google.co.id (Mobile)',
+    rankingChange: 'UP',
+  },
+  {
+    id: 'rk_02',
+    keyword: 'chiller stainless 304 bekas',
+    position: 3,
+    prevPosition: 3,
+    impressions30d: 3100,
+    clicks30d: 215,
+    ctr: '6.94%',
+    landingPage: 'https://bukanbarukitchen.com/category/refrigeration',
+    searchEngine: 'Google.co.id (Mobile)',
+    rankingChange: 'STABLE',
+  },
+  {
+    id: 'rk_03',
+    keyword: 'kompor resto heavy duty bekas jakarta',
+    position: 1,
+    prevPosition: 2,
+    impressions30d: 2750,
+    clicks30d: 280,
+    ctr: '10.18%',
+    landingPage: 'https://bukanbarukitchen.com/category/cooking-range',
+    searchEngine: 'Google.co.id (Mobile)',
+    rankingChange: 'UP',
+  },
+  {
+    id: 'rk_04',
+    keyword: 'mesin espresso 2 group bekas cafe',
+    position: 4,
+    prevPosition: 7,
+    impressions30d: 5400,
+    clicks30d: 310,
+    ctr: '5.74%',
+    landingPage: 'https://bukanbarukitchen.com/category/coffee-beverage',
+    searchEngine: 'Google.co.id (Mobile)',
+    rankingChange: 'UP',
+  },
+  {
+    id: 'rk_05',
+    keyword: 'deep fryer gas bekas restoran',
+    position: 5,
+    prevPosition: 5,
+    impressions30d: 1980,
+    clicks30d: 124,
+    ctr: '6.26%',
+    landingPage: 'https://bukanbarukitchen.com/category/cooking-range',
+    searchEngine: 'Google.co.id (Mobile)',
+    rankingChange: 'STABLE',
+  },
+  {
+    id: 'rk_06',
+    keyword: 'ice maker scotsman bekas bergaransi',
+    position: 2,
+    prevPosition: 3,
+    impressions30d: 1650,
+    clicks30d: 145,
+    ctr: '8.78%',
+    landingPage: 'https://bukanbarukitchen.com/category/ice-maker',
+    searchEngine: 'Google.co.id (Mobile)',
+    rankingChange: 'UP',
+  },
+];
+
+/**
+ * Off-Page Backlink Signals & Mentions
+ */
+export const initialOffPageSignals: OffPageSignal[] = [
+  {
+    id: 'op_01',
+    sourceDomain: 'detik.com/food',
+    sourceType: 'MEDIA_CULINARY',
+    targetUrl: 'https://bukanbarukitchen.com/panduan-memilih-combi-oven-bekas-restoran',
+    anchorText: 'platform kurasi alat resto Bukan Baru Kitchen',
+    domainAuthority: 84,
+    dateDiscovered: '2026-08-18',
+    status: 'ACTIVE',
+  },
+  {
+    id: 'op_02',
+    sourceDomain: 'pergikuliner.com/blog',
+    sourceType: 'MEDIA_CULINARY',
+    targetUrl: 'https://bukanbarukitchen.com/category/coffee-beverage',
+    anchorText: 'suplier mesin kopi cafe bekas bergaransi',
+    domainAuthority: 68,
+    dateDiscovered: '2026-08-20',
+    status: 'ACTIVE',
+  },
+  {
+    id: 'op_03',
+    sourceDomain: 'forum-fnb-indonesia.org',
+    sourceType: 'FORUM_RESTO',
+    targetUrl: 'https://bukanbarukitchen.com',
+    anchorText: 'Bukan Baru Kitchen gudang peralatan resto',
+    domainAuthority: 45,
+    dateDiscovered: '2026-08-24',
+    status: 'ACTIVE',
+  },
+  {
+    id: 'op_04',
+    sourceDomain: 'nibble.id/article',
+    sourceType: 'MEDIA_CULINARY',
+    targetUrl: 'https://bukanbarukitchen.com/category/refrigeration',
+    anchorText: 'tips beli chiller stainless 304',
+    domainAuthority: 62,
+    dateDiscovered: '2026-08-26',
+    status: 'OPPORTUNITY',
+  },
+];
 
 // Initial SEO Article Pipeline Records
 export const initialArticles: SEOArticle[] = [
@@ -261,6 +494,35 @@ let articlesCache: SEOArticle[] = [...initialArticles];
 
 export function getSEOArticles(): SEOArticle[] {
   return articlesCache;
+}
+
+export function addNewArticle(newArt: Partial<SEOArticle>): SEOArticle {
+  const id = `art_${Date.now()}`;
+  const article: SEOArticle = {
+    id,
+    title: newArt.title || 'Artikel Baru',
+    slug: newArt.slug || newArt.title?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'artikel-baru',
+    targetKeyword: newArt.targetKeyword || '',
+    secondaryKeywords: newArt.secondaryKeywords || [],
+    searchIntent: newArt.searchIntent || 'INFORMATIONAL',
+    stage: newArt.stage || 'IDEA',
+    author: newArt.author || 'Tim BBKitchen',
+    assignedTo: newArt.assignedTo || 'Tim Editorial',
+    excerpt: newArt.excerpt || '',
+    content: newArt.content || '',
+    featuredImage: newArt.featuredImage || 'https://picsum.photos/seed/bbk_new_art/800/500',
+    relatedCategorySlug: newArt.relatedCategorySlug || 'general',
+    relatedSkus: newArt.relatedSkus || [],
+    yoastTitle: newArt.yoastTitle || `${newArt.title} | Bukan Baru Kitchen`,
+    yoastMetaDesc: newArt.yoastMetaDesc || newArt.excerpt || '',
+    wordCount: newArt.content ? newArt.content.split(/\s+/).filter(Boolean).length : 0,
+    internalLinksCount: (newArt.relatedSkus || []).length + 2,
+    publishedDate: newArt.stage === 'PUBLISHED' ? new Date().toISOString().split('T')[0] : undefined,
+    updatedAt: new Date().toISOString().split('T')[0],
+  };
+
+  articlesCache = [article, ...articlesCache];
+  return article;
 }
 
 export function updateArticleStage(id: string, stage: SEOArticle['stage']): boolean {

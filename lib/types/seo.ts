@@ -67,3 +67,54 @@ export interface SEOArticle {
   publishedDate?: string;
   updatedAt: string;
 }
+
+export interface SEOKeywordItem {
+  keyword: string;
+  intent: 'COMMERCIAL' | 'INFORMATIONAL' | 'TRANSACTIONAL' | 'NAVIGATIONAL';
+  volumeMonthly: string;
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  categorySlug: string;
+  targetSku?: string;
+  cpcEst: string;
+  source: 'GOOGLE_SUGGEST' | 'MARKETPLACE' | 'INTERNAL_SHEETS';
+}
+
+export interface TechnicalSEOAudit {
+  domain: string;
+  robotsStatus: 'VALID' | 'WARNING' | 'BLOCKED';
+  robotsDetails: string;
+  sitemapStatus: 'VALID' | 'NOT_FOUND' | 'WARNING';
+  sitemapUrl: string;
+  sitemapUrlsCount: number;
+  ttfbMs: number;
+  sslSecure: boolean;
+  canonicalValid: boolean;
+  mobileFriendly: boolean;
+  schemaValid: boolean;
+  coreWebVitalsScore: number;
+  lastAudited: string;
+}
+
+export interface OffPageSignal {
+  id: string;
+  sourceDomain: string;
+  sourceType: 'MEDIA_CULINARY' | 'FORUM_RESTO' | 'DIRECTORY' | 'SOCIAL_SIGNAL';
+  targetUrl: string;
+  anchorText: string;
+  domainAuthority: number;
+  dateDiscovered: string;
+  status: 'ACTIVE' | 'PENDING' | 'OPPORTUNITY';
+}
+
+export interface RankTrackItem {
+  id: string;
+  keyword: string;
+  position: number;
+  prevPosition: number;
+  impressions30d: number;
+  clicks30d: number;
+  ctr: string;
+  landingPage: string;
+  searchEngine: 'Google.co.id (Mobile)';
+  rankingChange: 'UP' | 'DOWN' | 'STABLE';
+}
