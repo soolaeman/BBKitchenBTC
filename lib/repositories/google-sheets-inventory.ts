@@ -4,6 +4,7 @@ import { OFFICIAL_CATEGORIES } from "./categories";
 import { formatCleanProductUrl } from "./warehouse-utils";
 import type { UserRole } from "@/lib/types/auth";
 import { ROLE_PERMISSIONS } from "@/lib/types/auth";
+import { removePendingSoldReport } from "./sold-reports-repository";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
@@ -546,23 +547,23 @@ export async function updateGoogleSheetsStockStatus(input: {
     requestBody: { values: soldValues },
   });
 
-  // 3. Update Column AG (HARGA_CLOSING) — Preserves formula in Column AB!
+  // 3. Update Column AB (HARGA_DEAL_WA) if deal price provided & clean up LAPORAN_TERJUAL sheet
   if (input.status === "SOLD") {
-    const closingPriceVal = input.dealPrice !== undefined && input.dealPrice > 0 ? input.dealPrice : (input.dealPrice === 0 ? 0 : "");
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `MASTER_INVENTORY!AG${rowIndex}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[closingPriceVal]] },
-    });
+    if (input.dealPrice !== undefined && input.dealPrice > 0) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `MASTER_INVENTORY!AB${rowIndex}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [[input.dealPrice]] },
+      }).catch(() => {});
+    }
+    // Auto-remove pending record from LAPORAN_TERJUAL sheet upon execution!
+    await removePendingSoldReport(input.sku).catch((err) =>
+      console.warn(`Could not remove pending sold report for SKU ${input.sku}:`, err)
+    );
   } else if (input.status === "READY" || input.status === "AVAILABLE") {
-    // Clear closing price on reset
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `MASTER_INVENTORY!AG${rowIndex}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[""]] },
-    });
+    // Also clean up any lingering pending report on status reset
+    await removePendingSoldReport(input.sku).catch(() => {});
   }
 
   // 4. Trigger Direct WooCommerce API and Apps Script Webhook

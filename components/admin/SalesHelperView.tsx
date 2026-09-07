@@ -301,6 +301,8 @@ export function SalesHelperView() {
         body: JSON.stringify({
           action: 'REPORT_SOLD_NOTICE',
           sku: targetSku,
+          productTitle: searchedItem.PRODUCT_TITLE,
+          lokasiGudang: searchedItem.LOKASI_UNIT,
           dealPrice: finalPrice,
           notes: finalNotes,
           reportedBy: role || 'Sales Desk',
