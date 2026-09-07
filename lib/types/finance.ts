@@ -5,6 +5,7 @@ export type InvoiceStatus =
   | 'GENERATING'
   | 'GENERATED'
   | 'SENT'
+  | 'DP_PAID'
   | 'PAID'
   | 'VOID'
   | 'ERROR';
