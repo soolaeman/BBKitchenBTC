@@ -142,7 +142,7 @@ export function auditProductSEO(item: MasterInventoryItem): SEOAuditReport {
 
   return {
     targetId: item.SKU || 'UNKNOWN-SKU',
-    title: item.PRODUCT_TITLE || item.ITEM_NAME || 'Produk BBKitchen',
+    title: item.PRODUCT_TITLE || 'Produk BBKitchen',
     type: 'PRODUCT',
     slug: (item.SKU || '').toLowerCase(),
     healthStatus,
@@ -152,7 +152,7 @@ export function auditProductSEO(item: MasterInventoryItem): SEOAuditReport {
     totalCount: checks.length,
     focusKeyword: item.YOAST_KEYWORD || 'peralatan resto bekas',
     metaDescription: metaDesc,
-    h1: item.PRODUCT_TITLE || item.ITEM_NAME,
+    h1: item.PRODUCT_TITLE,
     wordCount,
     imageAltPresent: hasAlt,
     internalLinksCount: 3,
@@ -172,20 +172,22 @@ export function buildProductSchemaJsonLd(item: MasterInventoryItem) {
     ? [item.PHOTO_URLS]
     : ['https://bukanbarukitchen.com/og-image.jpg'];
 
+  const brandName = item.SPESIFIKASI?.['MERK'] || item.SPESIFIKASI?.['Brand'] || 'Commercial Grade';
+
   const schema = {
     '@context': 'https://schema.org',
     '@graph': [
       {
         '@type': 'Product',
         '@id': `https://bukanbarukitchen.com/product/${item.SKU.toLowerCase()}#product`,
-        name: item.PRODUCT_TITLE || item.ITEM_NAME,
+        name: item.PRODUCT_TITLE,
         sku: item.SKU,
         mpn: item.SKU,
         image: images,
-        description: item.SHORT_DESCRIPTION || item.FULL_DESCRIPTION || `${item.ITEM_NAME} bekas komersial bergaransi`,
+        description: item.SHORT_DESCRIPTION || item.FULL_DESCRIPTION || `${item.PRODUCT_TITLE} bekas komersial bergaransi`,
         brand: {
           '@type': 'Brand',
-          name: item.MERK || 'Commercial Grade',
+          name: brandName,
         },
         category: item.CATEGORY_SLUG || 'Kitchen Equipment',
         offers: {
@@ -196,7 +198,7 @@ export function buildProductSchemaJsonLd(item: MasterInventoryItem) {
           price: item.HARGA_ESTIMASI_PUBLIK || 0,
           priceValidUntil: '2026-12-31',
           itemCondition: 'https://schema.org/UsedCondition',
-          availability: item.STATUS_BARANG === 'TERSEDIA' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+          availability: item.STATUS_UNIT === 'READY' || item.STATUS_UNIT === 'AVAILABLE' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
           seller: {
             '@type': 'Organization',
             name: 'Bukan Baru Kitchen',
@@ -233,7 +235,7 @@ export function buildProductSchemaJsonLd(item: MasterInventoryItem) {
           {
             '@type': 'ListItem',
             position: 3,
-            name: item.PRODUCT_TITLE || item.ITEM_NAME,
+            name: item.PRODUCT_TITLE,
             item: `https://bukanbarukitchen.com/product/${item.SKU.toLowerCase()}`,
           },
         ],
@@ -248,8 +250,8 @@ export function buildProductSchemaJsonLd(item: MasterInventoryItem) {
  * 1-Click Autofix Generator for Yoast Meta & Image Alt
  */
 export function generateAutoFixMetadata(item: MasterInventoryItem) {
-  const brand = item.MERK || 'Resto';
-  const name = item.ITEM_NAME || item.PRODUCT_TITLE || 'Peralatan Kitchen';
+  const brand = item.SPESIFIKASI?.['MERK'] || item.SPESIFIKASI?.['Brand'] || 'Resto';
+  const name = item.PRODUCT_TITLE || 'Peralatan Kitchen';
   const hub = item.LOKASI_UNIT || 'Jabodetabek';
   const priceStr = item.HARGA_ESTIMASI_PUBLIK
     ? `Rp ${item.HARGA_ESTIMASI_PUBLIK.toLocaleString('id-ID')}`

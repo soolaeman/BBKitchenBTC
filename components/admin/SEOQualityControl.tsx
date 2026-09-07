@@ -1050,11 +1050,11 @@ Sitemap: https://bukanbarukitchen.com/sitemap.xml`}
                 <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3 font-mono text-xs">
                   <div className="text-slate-400">Preview Pesan Otomatis WhatsApp Pembeli:</div>
                   <div className="p-3 bg-slate-900 rounded-lg text-emerald-300 text-[11px] leading-relaxed border border-slate-800">
-                    &quot;Halo Admin BBKitchen, saya ingin konsultasi ketersediaan unit dan jadwal survei Hub {currentInventoryItem.LOKASI_UNIT} untuk produk: {currentInventoryItem.ITEM_NAME} (SKU: {currentInventoryItem.SKU}) dengan harga Rp {currentInventoryItem.HARGA_ESTIMASI_PUBLIK?.toLocaleString('id-ID')}. Terima kasih!&quot;
+                    &quot;Halo Admin BBKitchen, saya ingin konsultasi ketersediaan unit dan jadwal survei Hub {currentInventoryItem.LOKASI_UNIT} untuk produk: {currentInventoryItem.PRODUCT_TITLE} (SKU: {currentInventoryItem.SKU}) dengan harga Rp {currentInventoryItem.HARGA_ESTIMASI_PUBLIK?.toLocaleString('id-ID')}. Terima kasih!&quot;
                   </div>
                   <a
                     href={`https://wa.me/6281234567890?text=${encodeURIComponent(
-                      `Halo Admin BBKitchen, saya ingin konsultasi unit ${currentInventoryItem.ITEM_NAME} (${currentInventoryItem.SKU})`
+                      `Halo Admin BBKitchen, saya ingin konsultasi unit ${currentInventoryItem.PRODUCT_TITLE} (${currentInventoryItem.SKU})`
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
