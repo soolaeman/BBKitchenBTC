@@ -112,3 +112,73 @@ export function formatCleanProductUrl(title: string, rawLinkUnit?: string): stri
 
   return `https://www.bukanbarukitchen.com/shop/${slug}/`;
 }
+
+// Bulletproof Date Normalizer for Excel Serials, ISO Strings, Timestamps (Client & Server Safe)
+export function parseToISODate(raw: any): string | undefined {
+  if (!raw) return undefined;
+  const str = String(raw).trim();
+  if (!str) return undefined;
+
+  // 1. Check if numeric serial (e.g. 45918 or 46272)
+  const num = Number(str);
+  if (!isNaN(num) && num > 30000 && num < 60000) {
+    // Excel base date is Dec 30, 1899 (25569 days from Jan 1 1970)
+    const jsDate = new Date((num - 25569) * 86400 * 1000);
+    if (!isNaN(jsDate.getTime())) {
+      return jsDate.toISOString().split('T')[0];
+    }
+  }
+
+  // 2. Check standard ISO or YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    const y = isoMatch[1];
+    const m = isoMatch[2].padStart(2, '0');
+    const d = isoMatch[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 3. Check DD-MM-YYYY or DD/MM/YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    const d = dmyMatch[1].padStart(2, '0');
+    const m = dmyMatch[2].padStart(2, '0');
+    const y = dmyMatch[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // 4. Handle localized Indonesian dates like "03 Sep 2026", "03 September 2026"
+  const indoMonths: Record<string, string> = {
+    jan: '01', januari: '01',
+    feb: '02', februari: '02',
+    mar: '03', maret: '03',
+    apr: '04', april: '04',
+    mei: '05', may: '05',
+    jun: '06', juni: '06',
+    jul: '07', juli: '07',
+    agu: '08', agt: '08', agustus: '08', aug: '08',
+    sep: '09', september: '09',
+    okt: '10', oktober: '10', oct: '10',
+    nov: '11', november: '11',
+    des: '12', desember: '12', dec: '12',
+  };
+
+  const textDateMatch = str.match(/(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/);
+  if (textDateMatch) {
+    const d = textDateMatch[1].padStart(2, '0');
+    const monKey = textDateMatch[2].toLowerCase();
+    const y = textDateMatch[3];
+    const m = indoMonths[monKey];
+    if (m) {
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  // 5. Try native Date constructor
+  const d = new Date(str.replace(/\./g, ':'));
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0];
+  }
+
+  return undefined;
+}

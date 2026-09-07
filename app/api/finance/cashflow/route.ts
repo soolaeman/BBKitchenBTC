@@ -6,7 +6,7 @@ import {
   CashflowType,
 } from '@/lib/repositories/cashflow-repository';
 import { getLiveClosingDealLedger } from '@/lib/repositories/finance-repository';
-import { parseToISODate } from '@/lib/repositories/google-sheets-invoices';
+import { parseToISODate } from '@/lib/repositories/warehouse-utils';
 import { auth } from '@/auth';
 
 export async function GET(req: NextRequest) {

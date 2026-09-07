@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Invoice, DocumentType } from '@/lib/types/finance';
-import { formatIDR } from '@/lib/repositories/warehouse-utils';
+import { formatIDR, parseToISODate } from '@/lib/repositories/warehouse-utils';
 import {
   Printer,
   FileText,
@@ -27,8 +27,6 @@ interface OfficialDocumentModalProps {
   onClose: () => void;
   initialType?: DocumentType;
 }
-
-import { parseToISODate } from '@/lib/repositories/google-sheets-invoices';
 
 export function OfficialDocumentModal({
   invoice,

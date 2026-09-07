@@ -1,48 +1,8 @@
 import { Invoice, InvoiceStatus, InvoiceItem, DocumentType, PaymentRecord, NonSkuTransaction } from '@/lib/types/finance';
 import { getSheetsClient, updateGoogleSheetsStockStatus } from './google-sheets-inventory';
+import { parseToISODate } from './warehouse-utils';
 
-// Bulletproof Date Normalizer for Excel Serials, ISO Strings, Timestamps
-export function parseToISODate(raw: any): string | undefined {
-  if (!raw) return undefined;
-  const str = String(raw).trim();
-  if (!str) return undefined;
-
-  // 1. Check if numeric serial (e.g. 45918 or 46272)
-  const num = Number(str);
-  if (!isNaN(num) && num > 30000 && num < 60000) {
-    // Excel base date is Dec 30, 1899 (25569 days from Jan 1 1970)
-    const jsDate = new Date((num - 25569) * 86400 * 1000);
-    if (!isNaN(jsDate.getTime())) {
-      return jsDate.toISOString().split('T')[0];
-    }
-  }
-
-  // 2. Check standard ISO or YYYY-MM-DD or YYYY/MM/DD
-  const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-  if (isoMatch) {
-    const y = isoMatch[1];
-    const m = isoMatch[2].padStart(2, '0');
-    const d = isoMatch[3].padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-
-  // 3. Check DD-MM-YYYY or DD/MM/YYYY
-  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
-  if (dmyMatch) {
-    const d = dmyMatch[1].padStart(2, '0');
-    const m = dmyMatch[2].padStart(2, '0');
-    const y = dmyMatch[3];
-    return `${y}-${m}-${d}`;
-  }
-
-  // 4. Try native Date constructor
-  const d = new Date(str.replace(/\./g, ':'));
-  if (!isNaN(d.getTime())) {
-    return d.toISOString().split('T')[0];
-  }
-
-  return str;
-}
+export { parseToISODate };
 
 const INVOICE_SHEET_NAME = 'INVOICE_ARCHIVE';
 const INVOICE_RANGE = `${INVOICE_SHEET_NAME}!A:AB`;
