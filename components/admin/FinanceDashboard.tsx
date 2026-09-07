@@ -536,6 +536,22 @@ export function FinanceDashboard() {
       return map.get(cat)!;
     };
 
+    // Pre-populate Map with official categories/subcategories so all official slots appear even before transactions
+    const filterClean = (categoryFilter || '').toLowerCase().trim().replace(' (semua)', '');
+    const activeParent = OFFICIAL_CATEGORIES.find(
+      (g) =>
+        filterClean === g.slug.toLowerCase() ||
+        filterClean === g.name.toLowerCase() ||
+        g.name.toLowerCase().includes(filterClean) ||
+        filterClean.includes(g.name.toLowerCase())
+    );
+
+    if (activeParent && activeParent.children.length > 0) {
+      activeParent.children.forEach((ch) => getEntry(ch.name));
+    } else if (categoryFilter === 'ALL') {
+      OFFICIAL_CATEGORIES.forEach((g) => getEntry(g.name));
+    }
+
     // Aggregate from filtered deals (Item-by-item breakdown so multi-item invoices are properly distributed)
     filteredDeals.forEach((deal) => {
       if (deal.items && deal.items.length > 0) {
@@ -643,12 +659,10 @@ export function FinanceDashboard() {
   }, [categoryEconomics, unitEconMetric]);
 
   // 7. DEMAND & SUPPLY BREAKDOWN
-  // Demand: Top Selling Categories
+  // Demand: All Selling Categories / Subcategories under active filter
   const topDemandCategories = useMemo(() => {
     return [...categoryEconomics]
-      .filter((c) => c.unitsSold > 0)
-      .sort((a, b) => b.unitsSold - a.unitsSold)
-      .slice(0, 5);
+      .sort((a, b) => b.unitsSold - a.unitsSold || b.readyUnits - a.readyUnits);
   }, [categoryEconomics]);
 
   // Supply: Global Partner Hub Supply across all 13 Hubs
@@ -670,6 +684,16 @@ export function FinanceDashboard() {
       ON: 'ON - Kedaung Tangsel',
       RK: 'RK - Rizki Kitchen',
     };
+
+    // Pre-populate all 13 partner hubs
+    Object.entries(hubLabels).forEach(([code, label]) => {
+      hubMap.set(code, {
+        code,
+        label,
+        availableUnits: 0,
+        estPartnerCapital: 0,
+      });
+    });
 
     const { startFilter, endFilter } = dateBounds;
     let totalReadyGlobal = 0;
@@ -1378,30 +1402,40 @@ export function FinanceDashboard() {
                 <div className="flex items-center gap-2">
                   <Flame className="w-4 h-4 text-amber-400" />
                   <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    DEMAND: Kategori Paling Cepat Terjual
+                    DEMAND: {categoryFilter !== 'ALL' ? 'Subkategori' : 'Kategori'} Paling Cepat Terjual
                   </h3>
                 </div>
-                <span className="text-[10px] text-slate-400 font-mono">Closing Velocity</span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {topDemandCategories.length} {categoryFilter !== 'ALL' ? 'Subkategori' : 'Kategori'}
+                </span>
               </div>
 
-              <div className="divide-y divide-slate-800/60 mt-2">
+              <div className="divide-y divide-slate-800/60 mt-1 max-h-52 overflow-y-auto pr-1">
                 {topDemandCategories.length === 0 ? (
                   <p className="text-xs text-slate-500 py-6 text-center">Tidak ada transaksi pada filter ini.</p>
                 ) : (
                   topDemandCategories.map((item, idx) => (
                     <div key={item.category} className="py-2.5 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-5 h-5 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center font-bold text-[10px] text-amber-400 font-mono">
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <span className="w-5 h-5 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center font-bold text-[10px] text-amber-400 font-mono shrink-0">
                           {idx + 1}
                         </span>
-                        <div>
-                          <span className="font-bold text-slate-200 block">{item.category}</span>
-                          <span className="text-[10px] text-slate-400">ASP: {formatIDR(item.asp)}</span>
+                        <div className="truncate">
+                          <span className="font-bold text-slate-200 block truncate" title={item.category}>
+                            {item.category}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block">
+                            {item.unitsSold > 0 ? `ASP: ${formatIDR(item.asp)}` : `${item.readyUnits} Unit Ready`}
+                          </span>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="font-mono font-bold text-emerald-400">{item.unitsSold} Unit Terjual</span>
-                        <span className="text-[10px] text-slate-400 block">Margin: {item.marginPct}%</span>
+                      <div className="text-right shrink-0">
+                        <span className="font-mono font-bold text-emerald-400">
+                          {item.unitsSold} Unit Terjual
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          {item.unitsSold > 0 ? `Margin: ${item.marginPct}%` : `${item.readyUnits} Stok Ready`}
+                        </span>
                       </div>
                     </div>
                   ))
@@ -1410,7 +1444,7 @@ export function FinanceDashboard() {
             </div>
 
             <p className="text-[10px] text-slate-500 border-t border-slate-800/60 pt-2">
-              💡 Kategori di atas memiliki perputaran paling cepat di pasar resto.
+              💡 Seluruh {categoryFilter !== 'ALL' ? 'subkategori' : 'kategori'} dapat discroll untuk memantau demand penjualan dan ketersediaan stok.
             </p>
           </div>
 
