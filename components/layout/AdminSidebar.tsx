@@ -25,24 +25,25 @@ interface NavItem {
   name: string;
   href: string;
   icon: React.ElementType;
+  iconColor?: string;
   requiredPermission?: 'canViewFinanceReports' | 'canEditSEO' | 'canManageSocialMedia' | 'canManageInvoices';
   badge?: string;
   badgeColor?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { name: 'Overview', href: '/admin', icon: LayoutDashboard },
-  { name: 'Inventory', href: '/admin/inventory', icon: Boxes, badge: 'Live' },
-  { name: 'Pipeline Monitor', href: '/admin/pipeline', icon: Workflow, badge: 'Exception', badgeColor: 'bg-rose-900 text-rose-200' },
-  { name: 'Warehouse Intelligence', href: '/admin/warehouse', icon: Warehouse },
-  { name: 'Sales & Deal Desk', href: '/admin/sales', icon: MessageSquareShare },
-  { name: 'Finance Hub', href: '/admin/finance', icon: Banknote, requiredPermission: 'canViewFinanceReports' },
-  { name: 'Invoices', href: '/admin/invoices', icon: FileText, requiredPermission: 'canManageInvoices' },
-  { name: 'SEO Quality & Articles', href: '/admin/seo', icon: SearchCode },
-  { name: 'Social Media Center', href: '/admin/social', icon: Share2 },
-  { name: 'Analytics & GSC', href: '/admin/analytics', icon: BarChart3 },
-  { name: 'Executive Reports', href: '/admin/reports', icon: FileSpreadsheet },
-  { name: 'Settings & Integrations', href: '/admin/settings', icon: Settings },
+  { name: 'Overview', href: '/admin', icon: LayoutDashboard, iconColor: 'text-emerald-400' },
+  { name: 'Inventory', href: '/admin/inventory', icon: Boxes, badge: 'Live', iconColor: 'text-sky-400' },
+  { name: 'Pipeline Monitor', href: '/admin/pipeline', icon: Workflow, badge: 'Exception', badgeColor: 'bg-rose-900 text-rose-200', iconColor: 'text-rose-400' },
+  { name: 'Warehouse Intelligence', href: '/admin/warehouse', icon: Warehouse, iconColor: 'text-orange-400' },
+  { name: 'Sales & Deal Desk', href: '/admin/sales', icon: MessageSquareShare, iconColor: 'text-emerald-400' },
+  { name: 'Finance Hub', href: '/admin/finance', icon: Banknote, iconColor: 'text-emerald-400', requiredPermission: 'canViewFinanceReports' },
+  { name: 'Invoices', href: '/admin/invoices', icon: FileText, iconColor: 'text-amber-400', requiredPermission: 'canManageInvoices' },
+  { name: 'SEO Quality & Articles', href: '/admin/seo', icon: SearchCode, iconColor: 'text-purple-400' },
+  { name: 'Social Media Center', href: '/admin/social', icon: Share2, iconColor: 'text-pink-400' },
+  { name: 'Analytics & GSC', href: '/admin/analytics', icon: BarChart3, iconColor: 'text-blue-400' },
+  { name: 'Executive Reports', href: '/admin/reports', icon: FileSpreadsheet, iconColor: 'text-teal-400' },
+  { name: 'Settings & Integrations', href: '/admin/settings', icon: Settings, iconColor: 'text-slate-400' },
 ];
 
 export function AdminSidebar({
@@ -121,7 +122,7 @@ export function AdminSidebar({
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-slate-950' : 'text-slate-400'}`} />
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-slate-950' : (item.iconColor || 'text-slate-400')}`} />
                   <span>{item.name}</span>
                 </div>
                 {item.badge && (

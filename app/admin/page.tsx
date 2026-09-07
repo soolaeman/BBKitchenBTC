@@ -113,7 +113,7 @@ export default function AdminPage() {
     {
       id: 'INVENTORY',
       label: 'Master Inventory',
-      icon: <Boxes className="w-4 h-4" />,
+      icon: <Boxes className="w-4 h-4 text-sky-400" />,
       allowed: true,
     },
     {
@@ -125,7 +125,7 @@ export default function AdminPage() {
     {
       id: 'PIPELINE',
       label: 'Pipeline & QC Funnel',
-      icon: <Workflow className="w-4 h-4" />,
+      icon: <Workflow className="w-4 h-4 text-rose-400" />,
       allowed: permissions.canEditInventory,
     },
     {
@@ -143,19 +143,19 @@ export default function AdminPage() {
     {
       id: 'WAREHOUSES',
       label: 'Warehouse Intelligence',
-      icon: <Warehouse className="w-4 h-4" />,
+      icon: <Warehouse className="w-4 h-4 text-orange-400" />,
       allowed: true,
     },
     {
       id: 'SEO',
       label: 'SEO Quality & Schema',
-      icon: <SearchCheck className="w-4 h-4" />,
+      icon: <SearchCheck className="w-4 h-4 text-purple-400" />,
       allowed: permissions.canEditSEO,
     },
     {
       id: 'SOCIAL',
       label: 'Social Distribution',
-      icon: <Share2 className="w-4 h-4" />,
+      icon: <Share2 className="w-4 h-4 text-pink-400" />,
       allowed: permissions.canManageSocialMedia,
     },
   ];
@@ -264,7 +264,7 @@ export default function AdminPage() {
                       }`}
                     >
                       <div className="flex items-center gap-3 truncate">
-                        <span className={isActive ? 'text-[#3b82f6]' : 'text-white/50'}>
+                        <span className="shrink-0 flex items-center justify-center">
                           {item.icon}
                         </span>
                         <span className="truncate">{item.label}</span>
