@@ -35,6 +35,10 @@ import {
   Sparkles,
   ChevronDown,
   Wallet,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 type AdminTab =
@@ -51,9 +55,29 @@ type AdminTab =
 export default function AdminPage() {
   const { user, role, permissions } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('OVERVIEW');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [liveStockCount, setLiveStockCount] = useState<number>(2797);
   const [readyStockCount, setReadyStockCount] = useState<number>(2229);
   const router = useRouter();
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('bbk_sidebar_collapsed');
+      if (saved !== null) {
+        setIsSidebarCollapsed(saved === 'true');
+      }
+    } catch {}
+  }, []);
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('bbk_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     // Fetch live counts for synced header badge
@@ -197,76 +221,110 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Executive Sidebar (Visible ONLY on Desktop) */}
-        <aside className="hidden lg:flex w-72 bg-[#141417] border-r border-white/[0.08] flex-col justify-between shrink-0 p-6 h-full overflow-y-auto">
-          <div className="space-y-6">
-            {/* Brand Header */}
-            <div className="brand mb-6">
-              <h2 className="text-2xl font-black text-white tracking-tighter uppercase leading-none">
-                BBKitchen
-              </h2>
-              <p className="font-mono text-[10px] text-white/60 tracking-widest mt-1.5 uppercase">
-                OS v2.4.0 • Enterprise Control Tower
-              </p>
+        {/* Executive Sidebar (Visible ONLY on Desktop when not collapsed) */}
+        {!isSidebarCollapsed && (
+          <aside className="hidden lg:flex w-72 bg-[#141417] border-r border-white/[0.08] flex-col justify-between shrink-0 p-6 h-full overflow-y-auto transition-all animate-in slide-in-from-left duration-200">
+            <div className="space-y-6">
+              {/* Brand Header with Collapse Button */}
+              <div className="brand mb-6 flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tighter uppercase leading-none">
+                    BBKitchen
+                  </h2>
+                  <p className="font-mono text-[10px] text-white/60 tracking-widest mt-1.5 uppercase">
+                    OS v2.4.0 • Enterprise Control Tower
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleSidebar}
+                  className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-colors"
+                  title="Sembunyikan Menu Sidebar (Mode Layar Penuh)"
+                >
+                  <PanelLeftClose className="w-4 h-4 text-slate-400 hover:text-white" />
+                </button>
+              </div>
+
+              {/* Navigation items */}
+              <nav className="space-y-1">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-[#3b82f6] mb-3 block font-semibold">
+                  Navigation
+                </span>
+                {navItems.map((item) => {
+                  if (!item.allowed) return null;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium transition-all rounded-sm ${
+                        isActive
+                          ? 'text-[#3b82f6] font-semibold bg-white/[0.04]'
+                          : 'text-white/60 hover:text-white hover:bg-white/[0.02]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 truncate">
+                        <span className={isActive ? 'text-[#3b82f6]' : 'text-white/50'}>
+                          {item.icon}
+                        </span>
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </nav>
             </div>
 
-            {/* Navigation items */}
-            <nav className="space-y-1">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-[#3b82f6] mb-3 block font-semibold">
-                Navigation
-              </span>
-              {navItems.map((item) => {
-                if (!item.allowed) return null;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium transition-all rounded-sm ${
-                      isActive
-                        ? 'text-[#3b82f6] font-semibold bg-white/[0.04]'
-                        : 'text-white/60 hover:text-white hover:bg-white/[0.02]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 truncate">
-                      <span className={isActive ? 'text-[#3b82f6]' : 'text-white/50'}>
-                        {item.icon}
-                      </span>
-                      <span className="truncate">{item.label}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* User Profile Badge at Sidebar Bottom */}
-          <div className="profile border-t border-white/[0.08] pt-5 mt-6 flex items-center gap-3">
-            <div className="w-8 h-8 bg-[#3b82f6] rounded-sm flex items-center justify-center font-bold text-white text-xs">
-              {user?.name ? user.name[0] : 'S'}
+            {/* User Profile Badge at Sidebar Bottom */}
+            <div className="profile border-t border-white/[0.08] pt-5 mt-6 flex items-center gap-3">
+              <div className="w-8 h-8 bg-[#3b82f6] rounded-sm flex items-center justify-center font-bold text-white text-xs">
+                {user?.name ? user.name[0] : 'S'}
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-xs font-semibold text-white truncate">
+                  {user?.name || 'Sarah'}
+                </p>
+                <p className="text-[10px] text-white/60 font-mono truncate">
+                  {role === 'MARKETING' ? 'SEO & Social Lead' : role}
+                </p>
+              </div>
             </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-semibold text-white truncate">
-                {user?.name || 'Sarah'}
-              </p>
-              <p className="text-[10px] text-white/60 font-mono truncate">
-                {role === 'MARKETING' ? 'SEO & Social Lead' : role}
-              </p>
-            </div>
-          </div>
-        </aside>
+          </aside>
+        )}
 
         {/* Content Area */}
         <main className="flex-1 flex flex-col bg-[#0c0c0e] min-w-0 h-full overflow-hidden">
           {/* Header Bar */}
           <header className="h-20 bg-[#0c0c0e] border-b border-white/[0.08] flex items-center justify-between px-6 sm:px-10 shrink-0 z-20">
-            <div>
-              <h1 className="text-base sm:text-lg font-bold text-white tracking-tight uppercase">
-                {navItems.find((n) => n.id === activeTab)?.label}
-              </h1>
-              <p className="text-[10px] text-white/60 uppercase tracking-widest font-mono mt-0.5">
-                Real-time Multi-Warehouse Sync • Jabodetabek Hubs
-              </p>
+            <div className="flex items-center gap-3">
+              {/* Sidebar Collapse / Expand Toggle Button */}
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="hidden lg:inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-all shadow-md group"
+                title={isSidebarCollapsed ? "Buka Menu Sidebar" : "Sembunyikan Menu Sidebar (Mode Layar Penuh)"}
+              >
+                {isSidebarCollapsed ? (
+                  <>
+                    <PanelLeftOpen className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-[11px] font-bold text-emerald-300">Buka Menu</span>
+                  </>
+                ) : (
+                  <>
+                    <PanelLeftClose className="w-4 h-4 text-slate-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-[11px] font-medium text-slate-400 group-hover:text-slate-200">Fullscreen</span>
+                  </>
+                )}
+              </button>
+
+              <div>
+                <h1 className="text-base sm:text-lg font-bold text-white tracking-tight uppercase">
+                  {navItems.find((n) => n.id === activeTab)?.label}
+                </h1>
+                <p className="text-[10px] text-white/60 uppercase tracking-widest font-mono mt-0.5">
+                  Real-time Multi-Warehouse Sync • Jabodetabek Hubs
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-4">
