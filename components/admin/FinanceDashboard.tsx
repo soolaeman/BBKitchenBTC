@@ -1022,8 +1022,8 @@ export function FinanceDashboard() {
         </button>
       </div>
 
-      {/* 2. FILTER UTAMA (PERIODE, CHANNEL, KATEGORI, HUB) */}
-      <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4.5 space-y-3 shadow-xl">
+      {/* 2. FILTER UTAMA (PERIODE, CHANNEL, KATEGORI, HUB) - STICKY FLOATING */}
+      <div className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border border-slate-800/90 rounded-2xl p-4.5 space-y-3 shadow-2xl transition-all">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
           <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-200">
             <Filter className="w-4 h-4 text-emerald-400" />
