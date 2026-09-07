@@ -1,5 +1,5 @@
 import { Invoice, InvoiceStatus, InvoiceItem, DocumentType, PaymentRecord } from '@/lib/types/finance';
-import { getSheetsClient } from './google-sheets-inventory';
+import { getSheetsClient, updateGoogleSheetsStockStatus } from './google-sheets-inventory';
 
 const INVOICE_SHEET_NAME = 'INVOICE_ARCHIVE';
 const INVOICE_RANGE = `${INVOICE_SHEET_NAME}!A:AB`;
@@ -239,6 +239,25 @@ export async function fetchGoogleSheetsInvoices(): Promise<Invoice[]> {
   }
 }
 
+async function syncInvoiceItemsToSold(invoice: Invoice) {
+  if (invoice.status !== 'PAID' || !invoice.items || invoice.items.length === 0) return;
+  for (const it of invoice.items) {
+    const sku = (it.sku || '').trim().toUpperCase();
+    if (sku && !sku.startsWith('BBK-CUSTOM') && !sku.startsWith('INV-')) {
+      try {
+        await updateGoogleSheetsStockStatus({
+          sku,
+          status: 'SOLD',
+          dealPrice: it.unitPrice,
+          notes: `Auto-marked from PAID Invoice #${invoice.invoiceNumber || invoice.id}`,
+        });
+      } catch (e) {
+        console.warn(`Could not auto-mark SKU ${sku} as SOLD:`, e);
+      }
+    }
+  }
+}
+
 export async function appendGoogleSheetsInvoice(invoice: Invoice): Promise<boolean> {
   const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '').replace(/['"]/g, '').trim();
   if (!spreadsheetId) return false;
@@ -257,6 +276,12 @@ export async function appendGoogleSheetsInvoice(invoice: Invoice): Promise<boole
         values: [row],
       },
     });
+
+    if (invoice.status === 'PAID') {
+      syncInvoiceItemsToSold(invoice).catch((err) =>
+        console.warn('Background auto-mark SOLD error:', err)
+      );
+    }
 
     return true;
   } catch (err) {
@@ -349,6 +374,12 @@ export async function updateGoogleSheetsInvoice(invoice: Invoice): Promise<boole
         values: [row],
       },
     });
+
+    if (invoice.status === 'PAID') {
+      syncInvoiceItemsToSold(invoice).catch((err) =>
+        console.warn('Background auto-mark SOLD error:', err)
+      );
+    }
 
     return true;
   } catch (err) {

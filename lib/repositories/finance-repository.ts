@@ -254,6 +254,65 @@ export async function getLiveClosingDealLedger(): Promise<{
       };
     });
 
+    // 2. Incorporate Real Paid Invoices from INVOICE_ARCHIVE
+    try {
+      const realInvoices = await getInvoices();
+      const paidInvoices = (realInvoices || []).filter((inv) => inv.status === 'PAID');
+
+      for (const inv of paidInvoices) {
+        if (!inv.items || inv.items.length === 0) continue;
+        for (const it of inv.items) {
+          const itemSku = (it.sku || '').trim().toUpperCase();
+          const matchedDeal = itemSku ? deals.find((d) => d.sku.toUpperCase() === itemSku) : undefined;
+
+          if (matchedDeal) {
+            if (it.unitPrice > 0) {
+              matchedDeal.hargaClosing = it.unitPrice;
+              matchedDeal.realizedProfit = Math.max(0, it.unitPrice - matchedDeal.hargaModal);
+              matchedDeal.marginPercent = it.unitPrice > 0 ? Math.round((matchedDeal.realizedProfit / it.unitPrice) * 100) : 0;
+            }
+            if (inv.customerName) matchedDeal.customerName = inv.customerName;
+            matchedDeal.soldBy = 'SALES_BBK';
+            matchedDeal.notes = `Faktur Resmi ${inv.invoiceNumber}`;
+            if (inv.paidDate) matchedDeal.tanggalTerjual = inv.paidDate;
+          } else {
+            // Manual entry / invoice without master inventory entry
+            const qty = it.quantity || 1;
+            const closingPrice = (it.unitPrice || 0) * qty;
+            const modalPrice = (it.unitCost || 0) * qty;
+            const realizedProfit = Math.max(0, closingPrice - modalPrice);
+            const marginPercent = closingPrice > 0 ? Math.round((realizedProfit / closingPrice) * 100) : 0;
+
+            deals.push({
+              sku: it.sku || `INV-${inv.invoiceNumber}`,
+              productTitle: it.description || 'Peralatan Dapur Komersial',
+              category: 'Transaksi Manual & Invoicing',
+              tanggalMasuk: inv.issueDate,
+              tanggalTerjual: inv.paidDate || inv.issueDate,
+              durasiTerjual: '1 hari',
+              lokasiGudang: it.warehouseLocation || 'GK',
+              asalGudang: it.warehouseLocation || 'GK',
+              hargaModal: modalPrice,
+              hargaClosing: closingPrice,
+              realizedProfit,
+              marginPercent,
+              soldBy: 'SALES_BBK',
+              customerName: inv.customerName,
+              notes: `Faktur Resmi ${inv.invoiceNumber}`,
+            });
+          }
+        }
+      }
+    } catch (invErr) {
+      console.warn('Could not merge real invoices into deal ledger:', invErr);
+    }
+
+    // Recalculate Totals
+    totalRevenue = deals.reduce((sum, d) => sum + d.hargaClosing, 0);
+    totalProfit = deals.reduce((sum, d) => sum + d.realizedProfit, 0);
+    bbkSalesCount = deals.filter((d) => d.soldBy === 'SALES_BBK').length;
+    thirdPartyCount = deals.filter((d) => d.soldBy === 'THIRD_PARTY').length;
+
     // Sort newest sold date first
     deals.sort((a, b) => {
       const dateA = a.tanggalTerjual ? new Date(a.tanggalTerjual).getTime() : 0;

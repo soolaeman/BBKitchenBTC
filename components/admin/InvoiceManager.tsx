@@ -34,6 +34,7 @@ interface DocumentItemRow {
   description: string;
   quantity: number;
   unitPrice: number;
+  unitCost?: number;
   warehouseLocation?: string;
   condition?: string;
 }
@@ -178,6 +179,7 @@ export function InvoiceManager() {
           description: it.description,
           quantity: it.quantity || 1,
           unitPrice: it.unitPrice || 0,
+          unitCost: it.unitCost || 0,
           warehouseLocation: it.warehouseLocation,
           condition: it.condition,
         }))
@@ -218,12 +220,13 @@ export function InvoiceManager() {
           description: it.description || '',
           quantity: it.quantity || 1,
           unitPrice: it.unitPrice || 0,
+          unitCost: it.unitCost || 0,
           warehouseLocation: it.warehouseLocation,
           condition: it.condition,
         }))
       );
     } else {
-      setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: inv.totalAmount || 0 }]);
+      setItemRows([{ id: 'item_1', sku: '', description: '', quantity: 1, unitPrice: inv.totalAmount || 0, unitCost: 0 }]);
     }
     setDiscount(inv.discount ? String(inv.discount) : '0');
 
@@ -381,6 +384,7 @@ export function InvoiceManager() {
             sku: item.SKU,
             description: item.PRODUCT_TITLE,
             unitPrice: item.HARGA_BUKA_WA || item.HARGA_ESTIMASI_PUBLIK || 0,
+            unitCost: item.HARGA_MODAL || 0,
             warehouseLocation: item.LOKASI_UNIT || item.asal_gudang,
             condition: item.KONDISI_UNIT || 'Bekas Siap Pakai (Lolos QC)',
           };
@@ -417,12 +421,14 @@ export function InvoiceManager() {
     const cleanItems: InvoiceItem[] = itemRows.map((r, idx) => {
       const q = Math.max(1, Number(r.quantity) || 1);
       const p = Number(r.unitPrice) || 0;
+      const c = r.unitCost ? Number(r.unitCost) : undefined;
       return {
         id: r.id || `item_${idx}_${Date.now()}`,
         sku: r.sku.trim() || `BBK-CUSTOM-${idx + 1}`,
         description: r.description.trim() || 'Peralatan Dapur Komersial Restoran',
         quantity: q,
         unitPrice: p,
+        unitCost: c,
         total: q * p,
         warehouseLocation: r.warehouseLocation,
         condition: r.condition,
@@ -1070,7 +1076,7 @@ export function InvoiceManager() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                         {/* Product Title Input */}
-                        <div className="sm:col-span-6">
+                        <div className="sm:col-span-5">
                           <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
                             Nama Unit / Deskripsi Barang *
                           </label>
@@ -1091,7 +1097,7 @@ export function InvoiceManager() {
                           </label>
                           <input
                             type="text"
-                            placeholder="BBK-xxx (Opsional)"
+                            placeholder="BBK-xxx"
                             value={row.sku}
                             onChange={(e) => handleSearchSku(row.id, e.target.value.toUpperCase())}
                             onFocus={() => {
@@ -1128,9 +1134,9 @@ export function InvoiceManager() {
                         </div>
 
                         {/* Qty Input */}
-                        <div className="sm:col-span-2">
-                          <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
-                            Jumlah (Qty) *
+                        <div className="sm:col-span-1">
+                          <label className="block text-[10px] text-slate-400 font-semibold mb-0.5 text-center">
+                            Qty *
                           </label>
                           <input
                             type="number"
@@ -1138,14 +1144,14 @@ export function InvoiceManager() {
                             required
                             value={row.quantity}
                             onChange={(e) => updateItemRow(row.id, 'quantity', Number(e.target.value))}
-                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 font-bold text-xs text-center focus:ring-1 focus:ring-amber-500"
+                            className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 font-bold text-xs text-center focus:ring-1 focus:ring-amber-500"
                           />
                         </div>
 
                         {/* Unit Price */}
                         <div className="sm:col-span-2">
                           <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
-                            Harga Satuan (Rp) *
+                            Harga Jual (Rp) *
                           </label>
                           <input
                             type="number"
@@ -1154,6 +1160,25 @@ export function InvoiceManager() {
                             value={row.unitPrice || ''}
                             onChange={(e) => updateItemRow(row.id, 'unitPrice', Number(e.target.value))}
                             className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-emerald-400 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500 text-right"
+                          />
+                        </div>
+
+                        {/* Internal Modal / HPP Satuan */}
+                        <div className="sm:col-span-2">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <label className="block text-[10px] text-amber-300/90 font-semibold">
+                              🔒 HPP Modal
+                            </label>
+                            <span className="text-[9px] text-slate-500 font-mono" title="Harga modal bersifat internal dan tidak tercetak di surat resmi/WA">
+                              (Internal)
+                            </span>
+                          </div>
+                          <input
+                            type="number"
+                            placeholder="0 (Opsional)"
+                            value={row.unitCost || ''}
+                            onChange={(e) => updateItemRow(row.id, 'unitCost', Number(e.target.value))}
+                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-amber-900/40 rounded-lg text-amber-300 font-mono text-xs focus:ring-1 focus:ring-amber-500 text-right"
                           />
                         </div>
                       </div>

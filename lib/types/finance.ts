@@ -30,6 +30,7 @@ export interface InvoiceItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  unitCost?: number; // Internal HPP modal per unit (confidential, never exposed to customer/receipt)
   total: number;
   condition?: string;
   warehouseLocation?: string;
