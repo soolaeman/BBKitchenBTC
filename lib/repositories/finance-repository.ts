@@ -75,6 +75,9 @@ export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Pr
     status === 'PAID' ? new Date().toISOString().split('T')[0] : undefined
   ).catch((e) => console.warn('Google Sheets invoice status update warning:', e));
 
+  return true;
+}
+
 export async function deleteInvoice(idOrNumber: string): Promise<boolean> {
   cachedInvoices = cachedInvoices.filter(
     (inv) => inv.id !== idOrNumber && inv.invoiceNumber !== idOrNumber
