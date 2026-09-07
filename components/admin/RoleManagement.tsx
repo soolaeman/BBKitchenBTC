@@ -27,17 +27,16 @@ const CAPABILITIES: Array<{
   viewKey: keyof RolePermissions;
   editKey?: keyof RolePermissions;
 }> = [
-  { label: 'Finance reports', viewKey: 'canViewFinanceReports' },
-  { label: 'Manage invoices', viewKey: 'canManageInvoices', editKey: 'canManageInvoices' },
-  { label: 'Edit inventory', viewKey: 'canEditInventory', editKey: 'canEditInventory' },
-  { label: 'Mark inventory as sold', viewKey: 'canMarkAsSold', editKey: 'canMarkAsSold' },
-  { label: 'Edit SEO', viewKey: 'canEditSEO', editKey: 'canEditSEO' },
-  { label: 'Manage social media', viewKey: 'canManageSocialMedia', editKey: 'canManageSocialMedia' },
-  { label: 'Internal cost', viewKey: 'canViewInternalCost' },
-  { label: 'Supplier data', viewKey: 'canViewSupplierData' },
+  { label: 'Executive Overview', viewKey: 'canViewFinanceReports' },
+  { label: 'Master Inventory', viewKey: 'canEditInventory', editKey: 'canEditInventory' },
+  { label: 'Sales & WA Pitch', viewKey: 'canViewDealPrice' },
+  { label: 'Pipeline & QC Funnel', viewKey: 'canViewTelegramLink' },
+  { label: 'Invoices & Dokumen Resmi', viewKey: 'canManageInvoices', editKey: 'canManageInvoices' },
+  { label: 'Financials & Cashflow', viewKey: 'canViewFinanceReports' },
+  { label: 'Warehouse Intelligence', viewKey: 'canViewSupplierData' },
+  { label: 'SEO Quality & Schema', viewKey: 'canEditSEO', editKey: 'canEditSEO' },
+  { label: 'Social Distribution', viewKey: 'canManageSocialMedia', editKey: 'canManageSocialMedia' },
 ];
-
-const STORAGE_KEY = 'bbk_role_permissions_overrides';
 
 type Overrides = Partial<Record<UserRole, Partial<RolePermissions>>>;
 
